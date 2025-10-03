@@ -25,6 +25,7 @@ router.get('/auth/pipedrive', (req, res) => {
 });
 
 router.get('/auth/pipedrive/callback', async (req, res) => {
+  console.log('Callback route hit! Code param:', req.query.code);
   const code = req.query.code;
   
   if (!code) {
