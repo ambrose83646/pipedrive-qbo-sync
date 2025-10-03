@@ -21,6 +21,9 @@ async function getToken(code) {
     ? process.env.APP_URL + '/auth/pipedrive/callback' 
     : 'https://pipedrive-qbo-sync.replit.app/auth/pipedrive/callback';
   
+  console.log('Client ID from env:', process.env.PIPEDRIVE_CLIENT_ID);
+  console.log('Client Secret from env:', process.env.PIPEDRIVE_CLIENT_SECRET ? 'Set' : 'Missing');
+  
   try {
     const response = await axios.post('https://oauth.pipedrive.com/oauth/v1/token', {
       grant_type: 'authorization_code',
