@@ -13,6 +13,7 @@
   "dependencies": {
     "@replit/database": "^3.0.1",
     "@types/node": "^22.13.11",
+    "axios": "^1.12.2",
     "dotenv": "^17.2.3",
     "express": "^5.1.0"
   }
