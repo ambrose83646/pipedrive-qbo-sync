@@ -24,22 +24,52 @@ async function getToken(code) {
   console.log('Client ID from env:', process.env.PIPEDRIVE_CLIENT_ID);
   console.log('Client Secret from env:', process.env.PIPEDRIVE_CLIENT_SECRET ? 'Set' : 'Missing');
   
+  const requestData = {
+    grant_type: 'authorization_code',
+    code: code,
+    redirect_uri: redirectUri,
+    client_id: clientId,
+    client_secret: clientSecret
+  };
+  
+  const requestConfig = {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  };
+  
+  console.log('Pipedrive Token Request Config:');
+  console.log('URL:', 'https://oauth.pipedrive.com/oauth/v1/token');
+  console.log('Headers:', JSON.stringify(requestConfig.headers, null, 2));
+  console.log('Data:', JSON.stringify({
+    ...requestData,
+    client_secret: clientSecret ? '[REDACTED]' : 'Missing'
+  }, null, 2));
+  
   try {
-    const response = await axios.post('https://oauth.pipedrive.com/oauth/v1/token', {
-      grant_type: 'authorization_code',
-      code: code,
-      redirect_uri: redirectUri,
-      client_id: clientId,
-      client_secret: clientSecret
-    }, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    const response = await axios.post('https://oauth.pipedrive.com/oauth/v1/token', requestData, requestConfig);
+    
+    console.log('Pipedrive Token Response:');
+    console.log('Status:', response.status);
+    console.log('Data:', JSON.stringify(response.data, null, 2));
     
     return response.data;
   } catch (error) {
-    console.error('Error getting token:', error.response?.data || error.message);
+    console.error('=== Pipedrive Token Error ===');
+    console.error('Error Message:', error.message);
+    
+    if (error.response) {
+      console.error('Response Status:', error.response.status);
+      console.error('Response Headers:', JSON.stringify(error.response.headers, null, 2));
+      console.error('Response Data:', JSON.stringify(error.response.data, null, 2));
+    } else if (error.request) {
+      console.error('No response received');
+      console.error('Request:', error.request);
+    } else {
+      console.error('Error setting up request:', error.message);
+    }
+    
+    console.error('Full Error:', error);
     throw error;
   }
 }
