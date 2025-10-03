@@ -15,6 +15,7 @@
     "@types/node": "^22.13.11",
     "axios": "^1.12.2",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "intuit-oauth": "^4.2.0"
   }
 }

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getUser, setUser } = require('../../config/database');
 const { getAuthUrl, getToken } = require('../auth/pipedrive');
+const qbAuth = require('../auth/quickbooks');
 
 router.get('/', (req, res) => {
   res.send('Hello!');
@@ -45,15 +46,59 @@ router.get('/auth/pipedrive/callback', async (req, res) => {
       created_at: new Date().toISOString()
     });
     
-    res.redirect('/success');
+    res.redirect('/auth/qb?user_id=' + encodeURIComponent(userId));
   } catch (error) {
     console.error('OAuth callback error:', error);
     res.status(500).send('Authentication failed');
   }
 });
 
+router.get('/auth/qb', (req, res) => {
+  const userId = req.query.user_id;
+  const authUrl = qbAuth.getAuthUrl(userId);
+  res.redirect(authUrl);
+});
+
+router.get('/auth/qb/callback', async (req, res) => {
+  const code = req.query.code;
+  const realmId = req.query.realmId;
+  const userId = req.query.state;
+  
+  if (!code) {
+    return res.status(400).send('Authorization code not provided');
+  }
+  
+  if (!userId) {
+    return res.status(400).send('User ID not found in state parameter');
+  }
+  
+  try {
+    const qbTokenData = await qbAuth.getToken(code, realmId);
+    
+    const existingUser = await getUser(userId) || {};
+    
+    const updatedUser = {
+      ...existingUser,
+      qb_access_token: qbTokenData.access_token,
+      qb_refresh_token: qbTokenData.refresh_token,
+      qb_expires_in: qbTokenData.expires_in,
+      qb_token_type: qbTokenData.token_type,
+      qb_realm_id: qbTokenData.realm_id,
+      qb_expires_at: new Date(Date.now() + qbTokenData.expires_in * 1000).toISOString(),
+      qb_updated_at: new Date().toISOString()
+    };
+    
+    await setUser(userId, updatedUser);
+    
+    res.redirect('/success');
+  } catch (error) {
+    console.error('QB OAuth callback error:', error);
+    res.status(500).send('QuickBooks authentication failed');
+  }
+});
+
 router.get('/success', (req, res) => {
-  res.send('<h1>Authentication Successful!</h1><p>Your Pipedrive account has been connected.</p>');
+  res.send('<h1>Authentication Successful!</h1><p>Your Pipedrive and QuickBooks accounts have been connected.</p>');
 });
 
 module.exports = router;
