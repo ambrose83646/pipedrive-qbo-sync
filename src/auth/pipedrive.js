@@ -31,8 +31,9 @@ const getToken = async (code) => {
   try {
     console.log('Token request headers:', { Authorization: authHeader, 'Content-Type': 'application/x-www-form-urlencoded' });
     console.log('Token request body:', params.toString());
+    console.log('Using token endpoint:', 'https://oauth.pipedrive.com/oauth/token');
 
-    const response = await axios.post('https://oauth.pipedrive.com/oauth/v1/token', params, {
+    const response = await axios.post('https://oauth.pipedrive.com/oauth/token', params, {
       headers: {
         'Authorization': authHeader,
         'Content-Type': 'application/x-www-form-urlencoded'
