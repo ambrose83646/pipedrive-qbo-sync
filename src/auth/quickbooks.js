@@ -4,40 +4,39 @@ const oauthClient = new OAuthClient({
   clientId: process.env.QB_CLIENT_ID,
   clientSecret: process.env.QB_CLIENT_SECRET,
   environment: 'sandbox',
-  redirectUri: process.env.APP_URL 
-    ? process.env.APP_URL + '/auth/qb/callback' 
-    : 'https://pipedrive-qbo-sync.replit.app/auth/qb/callback',
-  logging: true
+  redirectUri: process.env.APP_URL + '/auth/qb/callback'
 });
 
 function getAuthUrl(userId) {
-  const redirectUri = process.env.APP_URL 
-    ? process.env.APP_URL + '/auth/qb/callback' 
-    : 'https://pipedrive-qbo-sync.replit.app/auth/qb/callback';
-  
-  console.log('Generated QB redirectUri:', redirectUri);
-  
   const authUri = oauthClient.authorizeUri({
-    scope: [OAuthClient.scopes.Accounting, OAuthClient.scopes.OpenId],
-    state: userId || 'default_user'
+    scope: ['com.intuit.quickbooks.accounting'],
+    state: userId || 'test'
   });
   
+  console.log('Generated QB auth URL');
   return authUri;
 }
 
-async function getToken(code, realmId) {
+async function handleToken(requestUrl) {
   try {
-    const authResponse = await oauthClient.createToken(code);
+    const authResponse = await oauthClient.createToken(requestUrl);
     
-    return {
+    const tokenData = {
       access_token: authResponse.token.access_token,
       refresh_token: authResponse.token.refresh_token,
       expires_in: authResponse.token.expires_in,
       token_type: authResponse.token.token_type,
-      realm_id: realmId
+      realm_id: authResponse.token.realmId
     };
+    
+    if (authResponse.token.expires_in) {
+      const expiresAt = new Date(Date.now() + authResponse.token.expires_in * 1000);
+      tokenData.expires_at = expiresAt.toISOString();
+    }
+    
+    return tokenData;
   } catch (error) {
-    console.error('Error getting QB token:', error);
+    console.error('Error handling QB token:', error);
     throw error;
   }
 }
@@ -62,16 +61,8 @@ async function refreshToken(refreshToken) {
   }
 }
 
-function isTokenExpired(expiresAt) {
-  if (!expiresAt) return true;
-  const now = new Date().getTime();
-  const expiry = new Date(expiresAt).getTime();
-  return now >= expiry;
-}
-
 module.exports = {
   getAuthUrl,
-  getToken,
-  refreshToken,
-  isTokenExpired
+  handleToken,
+  refreshToken
 };

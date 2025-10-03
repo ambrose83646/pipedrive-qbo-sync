@@ -61,7 +61,6 @@ router.get('/auth/qb', (req, res) => {
 
 router.get('/auth/qb/callback', async (req, res) => {
   const code = req.query.code;
-  const realmId = req.query.realmId;
   const userId = req.query.state;
   
   if (!code) {
@@ -73,7 +72,8 @@ router.get('/auth/qb/callback', async (req, res) => {
   }
   
   try {
-    const qbTokenData = await qbAuth.getToken(code, realmId);
+    const requestUrl = req.url;
+    const qbTokenData = await qbAuth.handleToken(requestUrl);
     
     const existingUser = await getUser(userId) || {};
     
@@ -84,7 +84,7 @@ router.get('/auth/qb/callback', async (req, res) => {
       qb_expires_in: qbTokenData.expires_in,
       qb_token_type: qbTokenData.token_type,
       qb_realm_id: qbTokenData.realm_id,
-      qb_expires_at: new Date(Date.now() + qbTokenData.expires_in * 1000).toISOString(),
+      qb_expires_at: qbTokenData.expires_at,
       qb_updated_at: new Date().toISOString()
     };
     
