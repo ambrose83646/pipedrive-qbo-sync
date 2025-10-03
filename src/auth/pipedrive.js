@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { Buffer } = require('buffer');
 
 function getAuthUrl() {
   const clientId = process.env.PIPEDRIVE_CLIENT_ID;
@@ -14,65 +15,37 @@ function getAuthUrl() {
   return authUrl;
 }
 
-async function getToken(code) {
+const getToken = async (code) => {
   const clientId = process.env.PIPEDRIVE_CLIENT_ID;
   const clientSecret = process.env.PIPEDRIVE_CLIENT_SECRET;
-  const redirectUri = process.env.APP_URL 
-    ? process.env.APP_URL + '/auth/pipedrive/callback' 
-    : 'https://pipedrive-qbo-sync.replit.app/auth/pipedrive/callback';
-  
-  console.log('Client ID from env:', process.env.PIPEDRIVE_CLIENT_ID);
-  console.log('Client Secret from env:', process.env.PIPEDRIVE_CLIENT_SECRET ? 'Set' : 'Missing');
-  
-  const requestData = {
+  const redirectUri = process.env.APP_URL + '/auth/pipedrive/callback';
+
+  const authHeader = 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+  const params = new URLSearchParams({
     grant_type: 'authorization_code',
     code: code,
-    redirect_uri: redirectUri,
-    client_id: clientId,
-    client_secret: clientSecret
-  };
-  
-  const requestConfig = {
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  };
-  
-  console.log('Pipedrive Token Request Config:');
-  console.log('URL:', 'https://oauth.pipedrive.com/oauth/v1/token');
-  console.log('Headers:', JSON.stringify(requestConfig.headers, null, 2));
-  console.log('Data:', JSON.stringify({
-    ...requestData,
-    client_secret: clientSecret ? '[REDACTED]' : 'Missing'
-  }, null, 2));
-  
+    redirect_uri: redirectUri
+  });
+
   try {
-    const response = await axios.post('https://oauth.pipedrive.com/oauth/v1/token', requestData, requestConfig);
-    
-    console.log('Pipedrive Token Response:');
-    console.log('Status:', response.status);
-    console.log('Data:', JSON.stringify(response.data, null, 2));
-    
+    console.log('Token request headers:', { Authorization: authHeader, 'Content-Type': 'application/x-www-form-urlencoded' });
+    console.log('Token request body:', params.toString());
+
+    const response = await axios.post('https://oauth.pipedrive.com/oauth/v1/token', params, {
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    });
+
+    console.log('Token response:', response.status, response.data);
     return response.data;
   } catch (error) {
-    console.error('=== Pipedrive Token Error ===');
-    console.error('Error Message:', error.message);
-    
-    if (error.response) {
-      console.error('Response Status:', error.response.status);
-      console.error('Response Headers:', JSON.stringify(error.response.headers, null, 2));
-      console.error('Response Data:', JSON.stringify(error.response.data, null, 2));
-    } else if (error.request) {
-      console.error('No response received');
-      console.error('Request:', error.request);
-    } else {
-      console.error('Error setting up request:', error.message);
-    }
-    
-    console.error('Full Error:', error);
+    console.error('Token exchange error:', error.response?.status, error.response?.data || error.message);
     throw error;
   }
-}
+};
 
 module.exports = {
   getAuthUrl,
