@@ -43,6 +43,7 @@ const getToken = async (code) => {
     return response.data;
   } catch (error) {
     console.error('Token exchange error:', error.response?.status, error.response?.data || error.message);
+    console.error('Full token error response:', { status: error.response?.status, data: error.response?.data, message: error.message });
     throw error;
   }
 };

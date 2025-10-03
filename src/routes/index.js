@@ -50,7 +50,8 @@ router.get('/auth/pipedrive/callback', async (req, res) => {
     res.redirect('/auth/qb?user_id=' + encodeURIComponent(userId));
   } catch (error) {
     console.error('OAuth callback error:', error);
-    res.status(500).send('Authentication failed');
+    console.log('Callback full error:' + JSON.stringify(error, null, 2));
+    res.status(500).send('Auth failed: ' + (error.response?.data?.error_description || 'Unknown error'));
   }
 });
 
