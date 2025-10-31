@@ -3,6 +3,7 @@ const router = express.Router();
 const { getUser, setUser } = require('../../config/database');
 const { getAuthUrl, getToken } = require('../auth/pipedrive');
 const qbAuth = require('../auth/quickbooks');
+const { syncContact } = require('../controllers/sync');
 
 router.get('/', (req, res) => {
   res.send('Hello!');
@@ -101,6 +102,45 @@ router.get('/auth/qb/callback', async (req, res) => {
 
 router.get('/success', (req, res) => {
   res.send('<h1>Authentication Successful!</h1><p>Your Pipedrive and QuickBooks accounts have been connected.</p>');
+});
+
+router.post('/api/sync-contact', express.json(), async (req, res) => {
+  try {
+    const { personId } = req.body;
+    const pipedriveUserId = req.query.userId || req.session?.userId || req.body.userId;
+    
+    if (!personId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'personId is required in request body' 
+      });
+    }
+    
+    if (!pipedriveUserId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'pipedriveUserId is required (pass as query param userId, in session, or in body)' 
+      });
+    }
+    
+    console.log(`Sync request received - User: ${pipedriveUserId}, Person: ${personId}`);
+    
+    const result = await syncContact(pipedriveUserId, personId);
+    
+    res.json({
+      success: true,
+      qbCustomerId: result.qbCustomerId,
+      action: result.action,
+      personName: result.pipedrivePersonName
+    });
+    
+  } catch (error) {
+    console.error('API sync-contact error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
 });
 
 module.exports = router;

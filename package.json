@@ -16,6 +16,7 @@
     "axios": "^1.12.2",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "intuit-oauth": "^4.2.0"
+    "intuit-oauth": "^4.2.0",
+    "pipedrive": "^30.3.0"
   }
 }
