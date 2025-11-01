@@ -104,6 +104,37 @@ router.get('/success', (req, res) => {
   res.send('<h1>Authentication Successful!</h1><p>Your Pipedrive and QuickBooks accounts have been connected.</p>');
 });
 
+router.get('/api/user-status', async (req, res) => {
+  try {
+    const userId = req.query.userId || 'test';
+    
+    const userData = await getUser(userId);
+    
+    if (!userData) {
+      return res.json({ 
+        connected: false, 
+        message: 'User not found' 
+      });
+    }
+    
+    // Check if QuickBooks tokens exist
+    const isConnected = !!(userData.qb_access_token && userData.qb_realm_id);
+    
+    res.json({
+      connected: isConnected,
+      hasPipedrive: !!userData.access_token,
+      hasQuickBooks: isConnected
+    });
+    
+  } catch (error) {
+    console.error('User status check error:', error);
+    res.status(500).json({ 
+      connected: false, 
+      error: 'Status check failed' 
+    });
+  }
+});
+
 router.post('/api/sync-contact', express.json(), async (req, res) => {
   try {
     const { personId } = req.body;
