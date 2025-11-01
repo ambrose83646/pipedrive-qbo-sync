@@ -4,6 +4,8 @@ const { getUser, setUser } = require("../../config/database");
 const { getAuthUrl, getToken } = require("../auth/pipedrive");
 const qbAuth = require("../auth/quickbooks");
 const { syncContact } = require("../controllers/sync");
+const OAuthClient = require("intuit-oauth");
+const axios = require("axios");
 
 router.get("/", (req, res) => {
   res.send("Hello!");
@@ -253,6 +255,270 @@ router.post("/api/sync-contact", express.json(), async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
+    });
+  }
+});
+
+// Helper function to create QB client with tokens
+async function createQBClient(userId) {
+  const userData = await getUser(userId);
+  if (!userData || !userData.qb_access_token) {
+    throw new Error("QuickBooks not connected for this user");
+  }
+
+  const qbClient = new OAuthClient({
+    clientId: process.env.QB_CLIENT_ID,
+    clientSecret: process.env.QB_CLIENT_SECRET,
+    environment: 'sandbox',
+    redirectUri: process.env.APP_URL + '/auth/qb/callback',
+    logging: false
+  });
+
+  qbClient.setToken({
+    access_token: userData.qb_access_token,
+    refresh_token: userData.qb_refresh_token,
+    token_type: 'Bearer',
+    expires_in: userData.qb_expires_in,
+    x_refresh_token_expires_in: 8726400,
+    realmId: userData.qb_realm_id
+  });
+
+  return { qbClient, companyId: userData.qb_realm_id };
+}
+
+// Search QuickBooks customers
+router.get("/api/items/search", async (req, res) => {
+  try {
+    const searchTerm = req.query.term;
+    const userId = req.query.userId || 'test';
+
+    if (!searchTerm) {
+      return res.status(400).json({
+        success: false,
+        error: "Search term is required"
+      });
+    }
+
+    const { qbClient, companyId } = await createQBClient(userId);
+    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    
+    // Search for customers by name or email
+    const query = `SELECT * FROM Customer WHERE Active = true AND (DisplayName LIKE '%${searchTerm}%' OR PrimaryEmailAddr LIKE '%${searchTerm}%') MAXRESULTS 20`;
+    const encodedQuery = encodeURIComponent(query);
+    
+    const queryResponse = await qbClient.makeApiCall({
+      url: `${baseUrl}/v3/company/${companyId}/query?query=${encodedQuery}`,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const queryResult = JSON.parse(queryResponse.text());
+    const customers = queryResult.QueryResponse?.Customer || [];
+    
+    res.json({
+      success: true,
+      customers: customers
+    });
+  } catch (error) {
+    console.error("Search customers error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Create new QuickBooks customer
+router.post("/api/create-customer", express.json(), async (req, res) => {
+  try {
+    const { name, email, phone } = req.body;
+    const userId = req.query.userId || req.body.userId || 'test';
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        error: "Customer name is required"
+      });
+    }
+
+    const { qbClient, companyId } = await createQBClient(userId);
+    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    
+    const customerData = {
+      DisplayName: name,
+      Active: true
+    };
+
+    if (email) {
+      customerData.PrimaryEmailAddr = {
+        Address: email
+      };
+    }
+
+    if (phone) {
+      customerData.PrimaryPhone = {
+        FreeFormNumber: phone
+      };
+    }
+
+    const createResponse = await qbClient.makeApiCall({
+      url: `${baseUrl}/v3/company/${companyId}/customer?minorversion=65`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(customerData)
+    });
+    
+    const createdCustomer = JSON.parse(createResponse.text()).Customer;
+    
+    res.json({
+      success: true,
+      customer: createdCustomer
+    });
+  } catch (error) {
+    console.error("Create customer error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Attach QuickBooks customer to Pipedrive deal
+router.post("/api/attach-contact", express.json(), async (req, res) => {
+  try {
+    const { dealId, qbCustomerId } = req.body;
+    const userId = req.query.userId || req.body.userId || 'test';
+
+    if (!dealId || !qbCustomerId) {
+      return res.status(400).json({
+        success: false,
+        error: "dealId and qbCustomerId are required"
+      });
+    }
+
+    // Get user's Pipedrive tokens
+    const userData = await getUser(userId);
+    if (!userData || !userData.access_token) {
+      return res.status(400).json({
+        success: false,
+        error: "Pipedrive not connected for this user"
+      });
+    }
+
+    // Update deal with custom field containing QB Customer ID
+    // Note: You'll need to create a custom field in Pipedrive for QB Customer ID
+    // and replace 'custom_field_key' with the actual field key
+    const apiDomain = userData.api_domain || 'api.pipedrive.com';
+    const updateUrl = `https://${apiDomain}/v1/deals/${dealId}?api_token=${userData.access_token}`;
+    
+    // For now, we'll store in notes field as a placeholder
+    // In production, use a proper custom field
+    const existingDeal = await axios.get(updateUrl);
+    const currentNotes = existingDeal.data.data.notes || '';
+    
+    const updatedNotes = currentNotes.includes(`QB_CUSTOMER_ID:${qbCustomerId}`) 
+      ? currentNotes 
+      : `${currentNotes}\n\nQB_CUSTOMER_ID:${qbCustomerId}`;
+    
+    await axios.put(updateUrl, {
+      notes: updatedNotes
+    });
+
+    res.json({
+      success: true,
+      message: "QuickBooks customer attached to deal",
+      dealId: dealId,
+      qbCustomerId: qbCustomerId
+    });
+  } catch (error) {
+    console.error("Attach contact error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get deal-contact association
+router.get("/api/deal-contact", async (req, res) => {
+  try {
+    const { dealId } = req.query;
+    const userId = req.query.userId || 'test';
+
+    if (!dealId) {
+      return res.status(400).json({
+        success: false,
+        error: "dealId is required"
+      });
+    }
+
+    // Get user's Pipedrive tokens
+    const userData = await getUser(userId);
+    if (!userData || !userData.access_token) {
+      return res.status(400).json({
+        success: false,
+        error: "Pipedrive not connected for this user"
+      });
+    }
+
+    // Get deal data from Pipedrive
+    const apiDomain = userData.api_domain || 'api.pipedrive.com';
+    const dealUrl = `https://${apiDomain}/v1/deals/${dealId}?api_token=${userData.access_token}`;
+    
+    const dealResponse = await axios.get(dealUrl);
+    const dealData = dealResponse.data.data;
+    
+    // Extract QB Customer ID from notes (in production, use custom field)
+    const notes = dealData.notes || '';
+    const qbIdMatch = notes.match(/QB_CUSTOMER_ID:(\w+)/);
+    
+    if (!qbIdMatch) {
+      return res.json({
+        success: true,
+        customer: null
+      });
+    }
+
+    const qbCustomerId = qbIdMatch[1];
+    
+    // Get customer details from QuickBooks
+    try {
+      const { qbClient, companyId } = await createQBClient(userId);
+      const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+      
+      const customerResponse = await qbClient.makeApiCall({
+        url: `${baseUrl}/v3/company/${companyId}/customer/${qbCustomerId}?minorversion=65`,
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const customer = JSON.parse(customerResponse.text()).Customer;
+      
+      res.json({
+        success: true,
+        customer: customer
+      });
+    } catch (qbError) {
+      // If QB fetch fails, just return the ID
+      res.json({
+        success: true,
+        customer: {
+          Id: qbCustomerId,
+          DisplayName: "QuickBooks Customer #" + qbCustomerId
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Get deal contact error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });
