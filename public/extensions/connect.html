@@ -94,6 +94,35 @@
       let pollInterval;
       let pollTimeout;
       
+      // Listen for messages from the OAuth callback window
+      window.addEventListener('message', function(event) {
+        // Check if it's from our QB callback
+        if (event.data && event.data.source === 'qb-callback') {
+          // Clear any existing polling
+          if (pollInterval) clearInterval(pollInterval);
+          if (pollTimeout) clearTimeout(pollTimeout);
+          
+          if (event.data.success === true) {
+            // Success - hide button, show message
+            connectButton.style.display = 'none';
+            connectedMessage.style.display = 'block';
+            
+            // Send toast notification
+            pd.sendCommand('TOAST', { message: 'QuickBooks Connected Successfully!' });
+            
+            // Optional: Close modal after a delay
+            setTimeout(function() {
+              pd.sendCommand('CLOSE_MODAL');
+            }, 2000);
+          } else {
+            // Error occurred
+            connectButton.disabled = false;
+            connectButton.textContent = 'Connect Now';
+            alert('Connection failed: ' + (event.data.error || 'Unknown error'));
+          }
+        }
+      });
+      
       function checkConnection() {
         fetch('/api/user-status?userId=' + userId)
           .then(response => response.json())
@@ -109,10 +138,11 @@
                 connectButton.disabled = true;
                 connectButton.textContent = 'Connecting...';
                 
-                // Open auth in new window
-                window.open('/auth/qb?user_id=' + userId, '_blank', 'width=600,height=700');
+                // Open auth in new window with extension parameter
+                const authUrl = '/auth/qb?user_id=' + userId + '&extension=true';
+                window.open(authUrl, '_blank', 'width=600,height=700');
                 
-                // Start polling for connection every 5 seconds
+                // Start polling for connection every 5 seconds (as fallback)
                 pollInterval = setInterval(function() {
                   fetch('/api/user-status?userId=' + userId)
                     .then(response => response.json())

@@ -58,19 +58,43 @@ router.get('/auth/pipedrive/callback', async (req, res) => {
 
 router.get('/auth/qb', (req, res) => {
   const userId = req.query.user_id;
-  const authUrl = qbAuth.getAuthUrl(userId);
+  const isExtension = req.query.extension === 'true';
+  
+  // Pass both userId and extension flag to getAuthUrl
+  const authUrl = qbAuth.getAuthUrl(userId, isExtension);
+  
   res.redirect(authUrl);
 });
 
 router.get('/auth/qb/callback', async (req, res) => {
   const code = req.query.code;
-  const userId = req.query.state;
+  const stateParam = req.query.state;
+  
+  // Decode state parameter to get userId and extension flag
+  let userId;
+  let isExtension = false;
+  
+  try {
+    const decodedState = Buffer.from(stateParam, 'base64').toString('utf-8');
+    const stateData = JSON.parse(decodedState);
+    userId = stateData.userId;
+    isExtension = stateData.extension || false;
+  } catch (e) {
+    // Fallback for old format (direct userId)
+    userId = stateParam;
+  }
   
   if (!code) {
+    if (isExtension) {
+      return res.send('<script>parent.postMessage({ success: false, error: "Authorization code not provided" }, "*");</script>');
+    }
     return res.status(400).send('Authorization code not provided');
   }
   
   if (!userId) {
+    if (isExtension) {
+      return res.send('<script>parent.postMessage({ success: false, error: "User ID not found" }, "*");</script>');
+    }
     return res.status(400).send('User ID not found in state parameter');
   }
   
@@ -93,9 +117,35 @@ router.get('/auth/qb/callback', async (req, res) => {
     
     await setUser(userId, updatedUser);
     
-    res.json({ success: true });
+    // If in extension/iframe, send message to parent
+    if (isExtension) {
+      return res.send(`
+        <html>
+          <body>
+            <h3>Success! QuickBooks connected.</h3>
+            <p>This window will close automatically...</p>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ success: true, source: 'qb-callback' }, '*');
+                setTimeout(() => window.close(), 2000);
+              } else if (parent !== window) {
+                parent.postMessage({ success: true, source: 'qb-callback' }, '*');
+              }
+            </script>
+          </body>
+        </html>
+      `);
+    }
+    
+    // For regular flow, show success page
+    res.send('<html><body><h1>QuickBooks Connected Successfully!</h1><p>You can close this window.</p></body></html>');
   } catch (error) {
     console.error('QB OAuth callback error:', error);
+    
+    if (isExtension) {
+      return res.send(`<script>parent.postMessage({ success: false, error: "${error.message}" }, "*");</script>`);
+    }
+    
     res.status(500).json({ success: false, error: 'QuickBooks authentication failed' });
   }
 });

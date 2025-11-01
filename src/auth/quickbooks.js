@@ -7,10 +7,17 @@ const oauthClient = new OAuthClient({
   redirectUri: process.env.APP_URL + '/auth/qb/callback'
 });
 
-function getAuthUrl(userId) {
+function getAuthUrl(userId, isExtension = false) {
+  // Encode both userId and extension flag in state parameter
+  const stateData = JSON.stringify({ 
+    userId: userId || 'test', 
+    extension: isExtension 
+  });
+  const state = Buffer.from(stateData).toString('base64');
+  
   const authUri = oauthClient.authorizeUri({
     scope: ['com.intuit.quickbooks.accounting'],
-    state: userId || 'test'
+    state: state
   });
   
   console.log('Generated QB auth URL');
