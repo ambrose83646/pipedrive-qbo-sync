@@ -106,31 +106,44 @@ router.get('/success', (req, res) => {
 
 router.get('/api/user-status', async (req, res) => {
   try {
-    const userId = req.query.userId || 'test';
+    const pipedriveUserId = req.query.userId;
     
-    const userData = await getUser(userId);
+    if (!pipedriveUserId) {
+      return res.json({ 
+        connected: false, 
+        message: 'Connect QuickBooks to start.' 
+      });
+    }
+    
+    const userData = await getUser(pipedriveUserId);
     
     if (!userData) {
       return res.json({ 
         connected: false, 
-        message: 'User not found' 
+        message: 'Connect QuickBooks to start.' 
       });
     }
     
     // Check if QuickBooks tokens exist
     const isConnected = !!(userData.qb_access_token && userData.qb_realm_id);
     
-    res.json({
-      connected: isConnected,
-      hasPipedrive: !!userData.access_token,
-      hasQuickBooks: isConnected
-    });
+    if (isConnected) {
+      res.json({
+        connected: true,
+        message: 'Ready to sync!'
+      });
+    } else {
+      res.json({
+        connected: false,
+        message: 'Connect QuickBooks to start.'
+      });
+    }
     
   } catch (error) {
     console.error('User status check error:', error);
-    res.status(500).json({ 
+    res.json({ 
       connected: false, 
-      error: 'Status check failed' 
+      message: 'Connect QuickBooks to start.' 
     });
   }
 });
