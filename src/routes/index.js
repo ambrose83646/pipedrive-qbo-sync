@@ -93,10 +93,10 @@ router.get('/auth/qb/callback', async (req, res) => {
     
     await setUser(userId, updatedUser);
     
-    res.redirect('/success');
+    res.json({ success: true });
   } catch (error) {
     console.error('QB OAuth callback error:', error);
-    res.status(500).send('QuickBooks authentication failed');
+    res.status(500).json({ success: false, error: 'QuickBooks authentication failed' });
   }
 });
 
