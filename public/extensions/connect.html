@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Connect QuickBooks - Pipedrive App</title>
-  <script src="https://app-extensions.pipedrive.com/sdk/v1/index.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@pipedrive/app-extensions-sdk@latest/dist/index.umd.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -85,16 +85,17 @@
   </div>
   
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', async function() {
       // Initialize Pipedrive SDK
-      pd.init();
+      const sdk = await new AppExtensionsSDK().initialize();
       
       // Get signed token from Pipedrive SDK
-      pd.execute(Command.GET_SIGNED_TOKEN).then(token => {
+      try {
+        const token = await sdk.execute('GET_SIGNED_TOKEN');
         console.log('Token:', token);
-      }).catch(error => {
+      } catch (error) {
         console.error('Error getting token:', error);
-      });
+      }
       
       const statusText = document.getElementById('statusText');
       const reconnectBtn = document.getElementById('reconnectBtn');
@@ -113,11 +114,11 @@
             reconnectBtn.style.display = 'none';
             
             // Send toast notification
-            pd.sendCommand('TOAST', { message: 'QuickBooks Connected Successfully!' });
+            sdk.execute('TOAST', { message: 'QuickBooks Connected Successfully!' });
             
             // Close modal after a delay
             setTimeout(function() {
-              pd.sendCommand('CLOSE_MODAL');
+              sdk.execute('CLOSE_MODAL');
             }, 2000);
           }
         }
