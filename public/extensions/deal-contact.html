@@ -247,16 +247,42 @@
     });
     
     function loadAttachedCustomer() {
-      fetch('/api/deal-contact?dealId=' + dealId)
-        .then(response => response.json())
-        .then(data => {
-          if (data.customer) {
-            displayAttachedCustomer(data.customer);
-          }
-        })
-        .catch(error => {
-          console.error('Error loading attached customer:', error);
-        });
+      // First try to get the QB customer ID from the deal's custom field
+      pd.execute('GET_ENTITY', {
+        id: dealId,
+        entity: 'deal'
+      })
+      .then(dealData => {
+        // Check if deal has QB customer ID in custom field
+        // Note: Replace 'qb_customer_id' with the actual custom field key
+        const qbCustomerId = dealData?.data?.qb_customer_id;
+        
+        if (qbCustomerId) {
+          // If we have a QB customer ID, fetch the customer details from backend
+          return fetch('/api/deal-contact?dealId=' + dealId)
+            .then(response => response.json());
+        }
+        return { customer: null };
+      })
+      .then(data => {
+        if (data.customer) {
+          displayAttachedCustomer(data.customer);
+        }
+      })
+      .catch(error => {
+        console.error('Error loading attached customer:', error);
+        // Fallback to backend API if SDK fails
+        fetch('/api/deal-contact?dealId=' + dealId)
+          .then(response => response.json())
+          .then(data => {
+            if (data.customer) {
+              displayAttachedCustomer(data.customer);
+            }
+          })
+          .catch(err => {
+            console.error('Fallback error:', err);
+          });
+      });
     }
     
     function displayAttachedCustomer(customer) {
@@ -334,25 +360,31 @@
         return;
       }
       
-      fetch('/api/attach-contact', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          dealId: dealId,
-          qbCustomerId: qbCustomerId
-        })
+      // Update deal using Pipedrive SDK
+      pd.execute('UPDATE_ENTITY', {
+        id: dealId,
+        entity: 'deal',
+        data: {
+          // Note: You need to create a custom field in Pipedrive for QB Customer ID
+          // Replace 'qb_customer_id' with the actual custom field key
+          qb_customer_id: qbCustomerId
+        }
       })
-      .then(response => {
-        if (!response.ok) throw new Error('Failed to attach customer');
-        return response.json();
-      })
-      .then(data => {
-        pd.execute('TOAST', { message: 'Customer attached successfully!' });
-        loadAttachedCustomer();
+      .then(result => {
+        console.log('Deal updated:', result);
+        pd.execute('TOAST', { message: 'Attached!' });
+        
+        // Update the display to show the attached customer
+        displayAttachedCustomer({
+          Id: qbCustomerId,
+          DisplayName: customerName
+        });
+        
         document.getElementById('searchResults').style.display = 'none';
         document.getElementById('searchInput').value = '';
+        
+        // Reload full customer details from QuickBooks
+        loadAttachedCustomer();
       })
       .catch(error => {
         console.error('Attach error:', error);
@@ -409,25 +441,33 @@
         return response.json();
       })
       .then(data => {
-        // Attach the newly created customer
-        return fetch('/api/attach-contact', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            dealId: dealId,
-            qbCustomerId: data.customer.Id
-          })
+        // Attach the newly created customer using Pipedrive SDK
+        const customerId = data.customer.Id;
+        const customerName = data.customer.DisplayName || name;
+        
+        return pd.execute('UPDATE_ENTITY', {
+          id: dealId,
+          entity: 'deal',
+          data: {
+            // Note: You need to create a custom field in Pipedrive for QB Customer ID
+            // Replace 'qb_customer_id' with the actual custom field key
+            qb_customer_id: customerId
+          }
+        }).then(result => {
+          return { customerId, customerName, result };
         });
       })
-      .then(response => {
-        if (!response.ok) throw new Error('Failed to attach customer');
-        return response.json();
-      })
       .then(data => {
-        pd.execute('TOAST', { message: 'Customer created and attached!' });
+        pd.execute('TOAST', { message: 'Created and Attached!' });
         toggleCreateForm();
+        
+        // Update the display immediately
+        displayAttachedCustomer({
+          Id: data.customerId,
+          DisplayName: data.customerName
+        });
+        
+        // Reload full customer details from QuickBooks
         loadAttachedCustomer();
       })
       .catch(error => {
