@@ -361,15 +361,22 @@
       }
       
       // Update deal using Pipedrive SDK
-      pd.execute('UPDATE_ENTITY', {
-        id: dealId,
-        entity: 'deal',
-        data: {
-          // Note: You need to create a custom field in Pipedrive for QB Customer ID
-          // Replace 'qb_customer_id' with the actual custom field key
-          qb_customer_id: qbCustomerId
-        }
-      })
+      // First get the field key from the backend
+      fetch('/api/field-key?userId=' + (new URLSearchParams(window.location.search).get('userId') || 'test'))
+        .then(response => response.json())
+        .then(fieldData => {
+          const fieldKey = fieldData.fieldKey || 'qb_customer_id';
+          
+          // Update deal using the actual field key
+          const updateData = {};
+          updateData[fieldKey] = qbCustomerId;
+          
+          return pd.execute('UPDATE_ENTITY', {
+            id: dealId,
+            entity: 'deal',
+            data: updateData
+          });
+        })
       .then(result => {
         console.log('Deal updated:', result);
         pd.execute('TOAST', { message: 'Attached!' });
@@ -445,17 +452,24 @@
         const customerId = data.customer.Id;
         const customerName = data.customer.DisplayName || name;
         
-        return pd.execute('UPDATE_ENTITY', {
-          id: dealId,
-          entity: 'deal',
-          data: {
-            // Note: You need to create a custom field in Pipedrive for QB Customer ID
-            // Replace 'qb_customer_id' with the actual custom field key
-            qb_customer_id: customerId
-          }
-        }).then(result => {
-          return { customerId, customerName, result };
-        });
+        // Get the field key from the backend
+        return fetch('/api/field-key?userId=' + (new URLSearchParams(window.location.search).get('userId') || 'test'))
+          .then(response => response.json())
+          .then(fieldData => {
+            const fieldKey = fieldData.fieldKey || 'qb_customer_id';
+            
+            // Update deal using the actual field key
+            const updateData = {};
+            updateData[fieldKey] = customerId;
+            
+            return pd.execute('UPDATE_ENTITY', {
+              id: dealId,
+              entity: 'deal',
+              data: updateData
+            }).then(result => {
+              return { customerId, customerName, result };
+            });
+          });
       })
       .then(data => {
         pd.execute('TOAST', { message: 'Created and Attached!' });

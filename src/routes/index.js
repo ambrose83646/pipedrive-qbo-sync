@@ -41,6 +41,7 @@ router.get("/auth/pipedrive/callback", async (req, res) => {
     const userId =
       tokenData.api_domain || tokenData.user_id || "pipedrive_user";
 
+    // Save user tokens first
     await setUser(userId, {
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
@@ -50,6 +51,60 @@ router.get("/auth/pipedrive/callback", async (req, res) => {
       api_domain: tokenData.api_domain,
       created_at: new Date().toISOString(),
     });
+
+    // Check for and create QB Customer ID custom field if it doesn't exist
+    try {
+      const apiDomain = tokenData.api_domain || 'api.pipedrive.com';
+      const apiToken = tokenData.access_token;
+      
+      // Get all deal fields
+      const fieldsResponse = await axios.get(
+        `https://${apiDomain}/v1/dealFields?api_token=${apiToken}`
+      );
+      
+      // Check if qb_customer_id field exists
+      const existingField = fieldsResponse.data.data?.find(
+        field => field.name === 'QB Customer ID' || field.key === 'qb_customer_id'
+      );
+      
+      let fieldKey = existingField?.key;
+      
+      if (!existingField) {
+        // Create the custom field
+        const createFieldResponse = await axios.post(
+          `https://${apiDomain}/v1/dealFields?api_token=${apiToken}`,
+          {
+            name: 'QB Customer ID',
+            field_type: 'text',
+            add_visible_flag: true
+          }
+        );
+        
+        fieldKey = createFieldResponse.data.data.key;
+        console.log('Field created:', fieldKey);
+        
+        // Update user data with the field key
+        const userData = await getUser(userId);
+        await setUser(userId, {
+          ...userData,
+          qb_field_id: fieldKey
+        });
+      } else {
+        console.log('Field already exists:', fieldKey);
+        
+        // Save the field key if not already saved
+        const userData = await getUser(userId);
+        if (!userData.qb_field_id) {
+          await setUser(userId, {
+            ...userData,
+            qb_field_id: fieldKey
+          });
+        }
+      }
+    } catch (fieldError) {
+      console.error('Error creating custom field:', fieldError.response?.data || fieldError.message);
+      // Continue even if field creation fails
+    }
 
     res.redirect("/auth/qb?user_id=" + encodeURIComponent(userId));
   } catch (error) {
@@ -286,6 +341,25 @@ async function createQBClient(userId) {
   return { qbClient, companyId: userData.qb_realm_id };
 }
 
+// Get the custom field key for QB Customer ID
+router.get("/api/field-key", async (req, res) => {
+  try {
+    const userId = req.query.userId || 'test';
+    const userData = await getUser(userId);
+    
+    res.json({
+      success: true,
+      fieldKey: userData?.qb_field_id || null
+    });
+  } catch (error) {
+    console.error("Get field key error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Search QuickBooks customers
 router.get("/api/items/search", async (req, res) => {
   try {
@@ -520,6 +594,84 @@ router.get("/api/deal-contact", async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+});
+
+// Deauthorization endpoint - called by Pipedrive when app is uninstalled
+router.post("/deauth", express.json(), async (req, res) => {
+  try {
+    console.log("Deauthorization request received");
+    
+    // Verify Pipedrive signature
+    // The signature is HMAC-SHA256 of the request body with the client secret
+    const signature = req.headers['x-pipedrive-signature'];
+    const crypto = require('crypto');
+    
+    if (signature) {
+      const expectedSignature = crypto
+        .createHmac('sha256', process.env.PIPEDRIVE_CLIENT_SECRET)
+        .update(JSON.stringify(req.body))
+        .digest('hex');
+      
+      if (signature !== expectedSignature) {
+        console.error('Invalid signature on deauth request');
+        return res.status(401).send('Invalid signature');
+      }
+    }
+    
+    // Get userId from payload
+    const userId = req.body.user_id || req.body.api_domain;
+    
+    if (!userId) {
+      console.error('No user ID in deauth request');
+      return res.status(400).send('User ID not found');
+    }
+    
+    console.log('Processing deauthorization for user:', userId);
+    
+    // Get user data to retrieve field ID
+    const userData = await getUser(userId);
+    
+    if (userData) {
+      // Delete custom field if it exists
+      if (userData.qb_field_id && userData.access_token) {
+        try {
+          const apiDomain = userData.api_domain || 'api.pipedrive.com';
+          
+          // Get the field ID from the field key
+          const fieldsResponse = await axios.get(
+            `https://${apiDomain}/v1/dealFields?api_token=${userData.access_token}`
+          );
+          
+          const field = fieldsResponse.data.data?.find(
+            f => f.key === userData.qb_field_id
+          );
+          
+          if (field) {
+            // Delete the custom field
+            await axios.delete(
+              `https://${apiDomain}/v1/dealFields/${field.id}?api_token=${userData.access_token}`
+            );
+            console.log('Deleted custom field:', field.id);
+          }
+        } catch (fieldError) {
+          console.error('Error deleting custom field:', fieldError.response?.data || fieldError.message);
+          // Continue with user deletion even if field deletion fails
+        }
+      }
+      
+      // Clear user from database
+      await setUser(userId, null);
+      console.log('Cleared user from database:', userId);
+    }
+    
+    // Return 200 OK to acknowledge the deauthorization
+    res.status(200).send('OK');
+    
+  } catch (error) {
+    console.error('Deauthorization error:', error);
+    // Still return 200 to acknowledge receipt
+    res.status(200).send('OK');
   }
 });
 
