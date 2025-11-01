@@ -361,10 +361,12 @@ router.get("/api/field-key", async (req, res) => {
 });
 
 // Search QuickBooks customers
-router.get("/api/items/search", async (req, res) => {
+router.get("/api/customers/search", async (req, res) => {
   try {
     const searchTerm = req.query.term;
     const userId = req.query.userId || 'test';
+
+    console.log('Search term:', searchTerm);
 
     if (!searchTerm) {
       return res.status(400).json({
@@ -373,15 +375,44 @@ router.get("/api/items/search", async (req, res) => {
       });
     }
 
-    const { qbClient, companyId } = await createQBClient(userId);
+    // Get user tokens and realmId from DB
+    const userData = await getUser(userId);
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      return res.status(400).json({
+        success: false,
+        error: "QuickBooks not connected for this user"
+      });
+    }
+
+    // Create QuickBooks client
+    const qbClient = new OAuthClient({
+      clientId: process.env.QB_CLIENT_ID,
+      clientSecret: process.env.QB_CLIENT_SECRET,
+      environment: 'sandbox',
+      redirectUri: process.env.APP_URL + '/auth/qb/callback',
+      logging: false
+    });
+
+    // Set the token
+    qbClient.setToken({
+      access_token: userData.qb_access_token,
+      refresh_token: userData.qb_refresh_token,
+      token_type: 'Bearer',
+      expires_in: userData.qb_expires_in,
+      x_refresh_token_expires_in: 8726400,
+      realmId: userData.qb_realm_id
+    });
+
     const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const realmId = userData.qb_realm_id;
     
-    // Search for customers by name or email
-    const query = `SELECT * FROM Customer WHERE Active = true AND (DisplayName LIKE '%${searchTerm}%' OR PrimaryEmailAddr LIKE '%${searchTerm}%') MAXRESULTS 20`;
+    // Build query to search customers by DisplayName
+    const query = `SELECT * FROM Customer WHERE DisplayName LIKE '%${searchTerm}%' MAXRESULTS 10`;
     const encodedQuery = encodeURIComponent(query);
     
+    // Make API call to QuickBooks
     const queryResponse = await qbClient.makeApiCall({
-      url: `${baseUrl}/v3/company/${companyId}/query?query=${encodedQuery}`,
+      url: `${baseUrl}/v3/company/${realmId}/query?query=${encodedQuery}`,
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
@@ -391,10 +422,14 @@ router.get("/api/items/search", async (req, res) => {
     const queryResult = JSON.parse(queryResponse.text());
     const customers = queryResult.QueryResponse?.Customer || [];
     
-    res.json({
-      success: true,
-      customers: customers
-    });
+    // Transform to simplified format { id, name, email }
+    const simplifiedCustomers = customers.map(customer => ({
+      id: customer.Id,
+      name: customer.DisplayName || 'Unnamed',
+      email: customer.PrimaryEmailAddr?.Address || null
+    }));
+    
+    res.json(simplifiedCustomers);
   } catch (error) {
     console.error("Search customers error:", error);
     res.status(500).json({

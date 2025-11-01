@@ -311,13 +311,13 @@
       resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
       resultsDiv.style.display = 'block';
       
-      fetch('/api/items/search?term=' + encodeURIComponent(searchTerm))
+      fetch('/api/customers/search?term=' + encodeURIComponent(searchTerm))
         .then(response => {
           if (!response.ok) throw new Error('Search failed');
           return response.json();
         })
         .then(data => {
-          displaySearchResults(data.customers || []);
+          displaySearchResults(data);
         })
         .catch(error => {
           console.error('Search error:', error);
@@ -329,7 +329,7 @@
     function displaySearchResults(customers) {
       const resultsDiv = document.getElementById('searchResults');
       
-      if (customers.length === 0) {
+      if (!customers || customers.length === 0) {
         resultsDiv.innerHTML = '<div class="no-results">No customers found</div>';
         return;
       }
@@ -339,10 +339,10 @@
         html += `
           <div class="result-item">
             <div class="customer-info">
-              <div class="customer-name">${customer.DisplayName || 'Unnamed'}</div>
-              ${customer.PrimaryEmailAddr ? `<div class="customer-email">${customer.PrimaryEmailAddr.Address}</div>` : ''}
+              <div class="customer-name">${customer.name}</div>
+              ${customer.email ? `<div class="customer-email">${customer.email}</div>` : ''}
             </div>
-            <button onclick="attachCustomer('${customer.Id}', '${(customer.DisplayName || '').replace(/'/g, "\\'")}')">Attach</button>
+            <button onclick="attachCustomer('${customer.id}', '${customer.name.replace(/'/g, "\\'")}')">Attach</button>
           </div>
         `;
       });
