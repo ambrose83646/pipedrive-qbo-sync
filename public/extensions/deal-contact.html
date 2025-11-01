@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deal Contact Manager - Pipedrive App</title>
+  <script src="https://app-extensions.pipedrive.com/sdk/v1/index.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    h2 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .section {
+      margin-bottom: 25px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .section:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    
+    .search-box {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"] {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.3s;
+    }
+    
+    button:hover {
+      background: #0056b3;
+    }
+    
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .btn-secondary {
+      background: #6c757d;
+    }
+    
+    .btn-secondary:hover {
+      background: #545b62;
+    }
+    
+    .btn-success {
+      background: #28a745;
+    }
+    
+    .btn-success:hover {
+      background: #218838;
+    }
+    
+    .results-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      background: #f8f9fa;
+    }
+    
+    .result-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px;
+      margin-bottom: 5px;
+      background: white;
+      border-radius: 4px;
+      border: 1px solid #e0e0e0;
+    }
+    
+    .result-item:last-child {
+      margin-bottom: 0;
+    }
+    
+    .customer-info {
+      flex: 1;
+    }
+    
+    .customer-name {
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .customer-email {
+      font-size: 12px;
+      color: #666;
+    }
+    
+    .attached-customer {
+      background: #e8f4fd;
+      border: 1px solid #bee5eb;
+      border-radius: 4px;
+      padding: 15px;
+      text-align: center;
+    }
+    
+    .attached-label {
+      color: #004085;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    
+    .create-form {
+      display: none;
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #555;
+    }
+    
+    .loading {
+      text-align: center;
+      color: #666;
+      padding: 20px;
+    }
+    
+    .error {
+      color: #dc3545;
+      text-align: center;
+      padding: 10px;
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      border-radius: 4px;
+      margin-bottom: 15px;
+    }
+    
+    .no-results {
+      text-align: center;
+      color: #666;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Manage Deal Contact</h2>
+    
+    <div id="attachedSection" class="section" style="display: none;">
+      <div class="attached-customer">
+        <div class="attached-label">Currently Attached Customer</div>
+        <div id="attachedInfo"></div>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h3>Search QuickBooks Customers</h3>
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by name or email...">
+        <button onclick="searchCustomers()">Search</button>
+      </div>
+      <div id="searchResults" style="display: none;"></div>
+    </div>
+    
+    <div class="section">
+      <button id="createNewBtn" class="btn-success" onclick="toggleCreateForm()">Create New Customer</button>
+      
+      <div id="createForm" class="create-form">
+        <h3>New Customer Details</h3>
+        <div class="form-group">
+          <label for="newName">Name *</label>
+          <input type="text" id="newName" placeholder="John Doe" required>
+        </div>
+        <div class="form-group">
+          <label for="newEmail">Email</label>
+          <input type="email" id="newEmail" placeholder="john@example.com">
+        </div>
+        <div class="form-group">
+          <label for="newPhone">Phone</label>
+          <input type="tel" id="newPhone" placeholder="+1 555-1234">
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button onclick="createAndAttach()">Create & Attach</button>
+          <button class="btn-secondary" onclick="toggleCreateForm()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    let dealId = null;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      // Initialize Pipedrive SDK
+      pd.init();
+      
+      // Get dealId from SDK
+      pd.execute('GET_QUERY').then(function(query) {
+        if (query && query.selectedIds && query.selectedIds[0]) {
+          dealId = query.selectedIds[0];
+          loadAttachedCustomer();
+        } else {
+          showError('No deal selected');
+        }
+      }).catch(function(error) {
+        console.error('Error getting deal ID:', error);
+        showError('Failed to get deal information');
+      });
+    });
+    
+    function loadAttachedCustomer() {
+      fetch('/api/deal-contact?dealId=' + dealId)
+        .then(response => response.json())
+        .then(data => {
+          if (data.customer) {
+            displayAttachedCustomer(data.customer);
+          }
+        })
+        .catch(error => {
+          console.error('Error loading attached customer:', error);
+        });
+    }
+    
+    function displayAttachedCustomer(customer) {
+      const section = document.getElementById('attachedSection');
+      const info = document.getElementById('attachedInfo');
+      
+      info.innerHTML = `
+        <div class="customer-name">${customer.DisplayName || customer.name || 'Unnamed'}</div>
+        ${customer.PrimaryEmailAddr ? `<div class="customer-email">${customer.PrimaryEmailAddr.Address || customer.PrimaryEmailAddr}</div>` : ''}
+        ${customer.PrimaryPhone ? `<div>${customer.PrimaryPhone.FreeFormNumber || customer.PrimaryPhone}</div>` : ''}
+      `;
+      
+      section.style.display = 'block';
+    }
+    
+    function searchCustomers() {
+      const searchTerm = document.getElementById('searchInput').value.trim();
+      
+      if (!searchTerm) {
+        alert('Please enter a search term');
+        return;
+      }
+      
+      const resultsDiv = document.getElementById('searchResults');
+      resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
+      resultsDiv.style.display = 'block';
+      
+      fetch('/api/items/search?term=' + encodeURIComponent(searchTerm))
+        .then(response => {
+          if (!response.ok) throw new Error('Search failed');
+          return response.json();
+        })
+        .then(data => {
+          displaySearchResults(data.customers || []);
+        })
+        .catch(error => {
+          console.error('Search error:', error);
+          alert('Failed to search customers: ' + error.message);
+          resultsDiv.style.display = 'none';
+        });
+    }
+    
+    function displaySearchResults(customers) {
+      const resultsDiv = document.getElementById('searchResults');
+      
+      if (customers.length === 0) {
+        resultsDiv.innerHTML = '<div class="no-results">No customers found</div>';
+        return;
+      }
+      
+      let html = '<div class="results-list">';
+      customers.forEach(customer => {
+        html += `
+          <div class="result-item">
+            <div class="customer-info">
+              <div class="customer-name">${customer.DisplayName || 'Unnamed'}</div>
+              ${customer.PrimaryEmailAddr ? `<div class="customer-email">${customer.PrimaryEmailAddr.Address}</div>` : ''}
+            </div>
+            <button onclick="attachCustomer('${customer.Id}', '${(customer.DisplayName || '').replace(/'/g, "\\'")}')">Attach</button>
+          </div>
+        `;
+      });
+      html += '</div>';
+      
+      resultsDiv.innerHTML = html;
+    }
+    
+    function attachCustomer(qbCustomerId, customerName) {
+      if (!dealId) {
+        alert('No deal selected');
+        return;
+      }
+      
+      if (!confirm(`Attach "${customerName}" to this deal?`)) {
+        return;
+      }
+      
+      fetch('/api/attach-contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          dealId: dealId,
+          qbCustomerId: qbCustomerId
+        })
+      })
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to attach customer');
+        return response.json();
+      })
+      .then(data => {
+        pd.execute('TOAST', { message: 'Customer attached successfully!' });
+        loadAttachedCustomer();
+        document.getElementById('searchResults').style.display = 'none';
+        document.getElementById('searchInput').value = '';
+      })
+      .catch(error => {
+        console.error('Attach error:', error);
+        alert('Failed to attach customer: ' + error.message);
+      });
+    }
+    
+    function toggleCreateForm() {
+      const form = document.getElementById('createForm');
+      const btn = document.getElementById('createNewBtn');
+      
+      if (form.style.display === 'none' || form.style.display === '') {
+        form.style.display = 'block';
+        btn.style.display = 'none';
+      } else {
+        form.style.display = 'none';
+        btn.style.display = 'block';
+        // Clear form
+        document.getElementById('newName').value = '';
+        document.getElementById('newEmail').value = '';
+        document.getElementById('newPhone').value = '';
+      }
+    }
+    
+    function createAndAttach() {
+      const name = document.getElementById('newName').value.trim();
+      const email = document.getElementById('newEmail').value.trim();
+      const phone = document.getElementById('newPhone').value.trim();
+      
+      if (!name) {
+        alert('Name is required');
+        return;
+      }
+      
+      if (!dealId) {
+        alert('No deal selected');
+        return;
+      }
+      
+      // Create customer
+      fetch('/api/create-customer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: name,
+          email: email,
+          phone: phone
+        })
+      })
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to create customer');
+        return response.json();
+      })
+      .then(data => {
+        // Attach the newly created customer
+        return fetch('/api/attach-contact', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            dealId: dealId,
+            qbCustomerId: data.customer.Id
+          })
+        });
+      })
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to attach customer');
+        return response.json();
+      })
+      .then(data => {
+        pd.execute('TOAST', { message: 'Customer created and attached!' });
+        toggleCreateForm();
+        loadAttachedCustomer();
+      })
+      .catch(error => {
+        console.error('Create and attach error:', error);
+        alert('Failed to create and attach customer: ' + error.message);
+      });
+    }
+    
+    function showError(message) {
+      document.querySelector('.container').innerHTML = `
+        <div class="error">${message}</div>
+      `;
+    }
+  </script>
+</body>
+</html>
