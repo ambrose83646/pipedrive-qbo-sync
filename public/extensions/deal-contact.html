@@ -303,7 +303,7 @@
       const searchTerm = document.getElementById('searchInput').value.trim();
       
       if (!searchTerm) {
-        alert('Please enter a search term');
+        sdk.execute('TOAST', { message: 'Error: Please enter a search term' });
         return;
       }
       
@@ -321,7 +321,7 @@
         })
         .catch(error => {
           console.error('Search error:', error);
-          alert('Failed to search customers: ' + error.message);
+          sdk.execute('TOAST', { message: 'Error: Failed to search customers - ' + error.message });
           resultsDiv.style.display = 'none';
         });
     }
@@ -353,7 +353,7 @@
     
     function attachCustomer(qbCustomerId, customerName) {
       if (!dealId) {
-        alert('No deal selected');
+        sdk.execute('TOAST', { message: 'Error: No deal selected' });
         return;
       }
       
@@ -396,7 +396,7 @@
       })
       .catch(error => {
         console.error('Attach error:', error);
-        alert('Failed to attach customer: ' + error.message);
+        sdk.execute('TOAST', { message: 'Error: Failed to attach customer - ' + error.message });
       });
     }
     
@@ -423,12 +423,12 @@
       const phone = document.getElementById('newPhone').value.trim();
       
       if (!name) {
-        alert('Name is required');
+        sdk.execute('TOAST', { message: 'Error: Name is required' });
         return;
       }
       
       if (!dealId) {
-        alert('No deal selected');
+        sdk.execute('TOAST', { message: 'Error: No deal selected' });
         return;
       }
       
@@ -487,7 +487,7 @@
       })
       .catch(error => {
         console.error('Create and attach error:', error);
-        alert('Failed to create and attach customer: ' + error.message);
+        sdk.execute('TOAST', { message: 'Error: Failed to create and attach customer - ' + error.message });
       });
     }
     
