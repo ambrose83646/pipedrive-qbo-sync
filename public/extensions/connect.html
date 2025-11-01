@@ -110,10 +110,13 @@
           }
         })
         .catch(error => {
-          console.error('Error checking connection status:', error);
-          loadingDiv.style.display = 'none';
-          alert('Connection check failed—try again.');
-        });
+        console.error('Fetch error details:', error);
+        loadingDiv.style.display = 'none';
+        loadingDiv.innerHTML = '<p style="color: red;">Load failed: ' +         error.message + '</p><button onclick="location.reload()">Retry</button>';
+        // Also show button as fallback
+        connectButton.style.display = 'inline-block';
+        connectButton.onclick = function() { window.location.href = '/auth/qb'; };
+      });
     });
   </script>
 </body>
