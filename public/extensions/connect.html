@@ -89,20 +89,41 @@
       // Initialize Pipedrive SDK
       const sdk = await new AppExtensionsSDK().initialize();
       
-      // Get signed token from Pipedrive SDK
+      // Get signed token and user info from Pipedrive SDK
+      let userId = 'test';
+      let apiDomain = '';
+      
       try {
         const token = await sdk.execute('GET_SIGNED_TOKEN');
-        console.log('Token:', token);
+        console.log('Token received:', token);
+        
+        // Extract user info from token
+        if (token && token.api_domain) {
+          apiDomain = token.api_domain;
+          userId = apiDomain; // Use api_domain as userId
+          console.log('Using api_domain as userId:', userId);
+        }
+        
+        // Also try to get user context
+        const context = await sdk.execute('GET_CONTEXT');
+        console.log('Context:', context);
+        
       } catch (error) {
-        console.error('Error getting token:', error);
+        console.error('Error getting token/context:', error);
       }
+      
+      // Fallback to URL params if needed
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlUserId = urlParams.get('userId');
+      if (urlUserId) {
+        userId = urlUserId;
+        console.log('Using URL param userId:', userId);
+      }
+      
+      console.log('Final userId for API call:', userId);
       
       const statusText = document.getElementById('statusText');
       const reconnectBtn = document.getElementById('reconnectBtn');
-      
-      // Get userId from URL params or default to 'test'
-      const urlParams = new URLSearchParams(window.location.search);
-      const userId = urlParams.get('userId') || 'test';
       
       // Listen for messages from OAuth callback window
       window.addEventListener('message', function(event) {
@@ -132,24 +153,41 @@
         fetch('/api/user-status?userId=' + userId)
           .then(response => response.json())
           .then(data => {
+            console.log('User status response:', data);
+            
             if (data.connected === true) {
               statusText.textContent = 'QB Active';
               statusText.className = 'status-active';
               reconnectBtn.style.display = 'none';
               
+              // Remove existing company info if present
+              const existingInfo = document.getElementById('companyInfo');
+              if (existingInfo) {
+                existingInfo.remove();
+              }
+              
               // Display company name if available
               if (data.companyName) {
                 const companyInfo = document.createElement('div');
+                companyInfo.id = 'companyInfo';
                 companyInfo.style.fontSize = '14px';
                 companyInfo.style.color = '#666';
                 companyInfo.style.marginTop = '8px';
                 companyInfo.textContent = 'Connected to: ' + data.companyName;
                 statusText.parentElement.appendChild(companyInfo);
+              } else {
+                console.log('No company name in response');
               }
             } else {
               statusText.textContent = 'QB Inactive';
               statusText.className = 'status-inactive';
               reconnectBtn.style.display = 'inline-block';
+              
+              // Remove company info if disconnected
+              const existingInfo = document.getElementById('companyInfo');
+              if (existingInfo) {
+                existingInfo.remove();
+              }
               
               reconnectBtn.onclick = function() {
                 const authUrl = '/auth/qb?user_id=' + userId + '&extension=true';

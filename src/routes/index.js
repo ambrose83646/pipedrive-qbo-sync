@@ -256,6 +256,8 @@ router.get("/api/user-status", async (req, res) => {
       // Fetch QuickBooks company info
       let companyName = null;
       try {
+        console.log("Fetching company info for realm:", userData.qb_realm_id);
+        
         const oauthClient = new OAuthClient({
           clientId: process.env.QB_CLIENT_ID,
           clientSecret: process.env.QB_CLIENT_SECRET,
@@ -283,11 +285,19 @@ router.get("/api/user-status", async (req, res) => {
           }
         });
         
+        console.log("Company info response received:", companyInfoResponse.json ? "JSON data present" : "No JSON");
+        
         if (companyInfoResponse.json && companyInfoResponse.json.CompanyInfo) {
           companyName = companyInfoResponse.json.CompanyInfo.CompanyName;
+          console.log("Company name extracted:", companyName);
         }
       } catch (companyError) {
         console.error("Error fetching company info:", companyError);
+        console.error("Company error details:", {
+          message: companyError.message,
+          response: companyError.response,
+          statusCode: companyError.statusCode
+        });
         // Continue without company name if fetch fails
       }
       
