@@ -185,11 +185,6 @@
       window.addEventListener('message', function(event) {
         if (event.data && event.data.source === 'qb-callback') {
           if (event.data.success === true) {
-            // Update status to active
-            statusText.textContent = 'QB Active';
-            statusText.className = 'status-active';
-            reconnectBtn.style.display = 'none';
-            
             // Send toast notification
             sdk.execute('TOAST', { message: 'QuickBooks Connected Successfully!' });
             
@@ -215,38 +210,20 @@
             }
             
             if (data.connected === true) {
-              statusText.textContent = 'QB Active';
-              statusText.className = 'status-active';
-              reconnectBtn.style.display = 'none';
-              
-              // Remove existing company info if present
-              const existingInfo = document.getElementById('companyInfo');
-              if (existingInfo) {
-                existingInfo.remove();
-              }
-              
-              // Display company name if available
+              // Display company name inline with status
               if (data.companyName) {
-                const companyInfo = document.createElement('div');
-                companyInfo.id = 'companyInfo';
-                companyInfo.style.fontSize = '14px';
-                companyInfo.style.color = '#666';
-                companyInfo.style.marginTop = '8px';
-                companyInfo.textContent = 'Connected to: ' + data.companyName;
-                statusText.parentElement.appendChild(companyInfo);
+                statusText.textContent = 'QB Active - ' + data.companyName;
+                console.log('Displaying company name inline:', data.companyName);
               } else {
+                statusText.textContent = 'QB Active';
                 console.log('No company name in response');
               }
+              statusText.className = 'status-active';
+              reconnectBtn.style.display = 'none';
             } else {
               statusText.textContent = 'QB Inactive';
               statusText.className = 'status-inactive';
               reconnectBtn.style.display = 'inline-block';
-              
-              // Remove company info if disconnected
-              const existingInfo = document.getElementById('companyInfo');
-              if (existingInfo) {
-                existingInfo.remove();
-              }
               
               reconnectBtn.onclick = function() {
                 const authUrl = '/auth/qb?user_id=' + userId + '&extension=true';
