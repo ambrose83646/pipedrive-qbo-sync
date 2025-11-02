@@ -1,0 +1,126 @@
+# Overview
+
+This is a Node.js integration application that connects Pipedrive CRM with QuickBooks Online (QBO). The application synchronizes contact data from Pipedrive to QuickBooks, allowing users to manage their CRM contacts and accounting customers from a unified interface. The app uses OAuth 2.0 authentication for both services and stores user credentials in Replit's key-value database. It provides browser extensions for Pipedrive that enable users to connect their QuickBooks account and manage contact synchronization directly from within the Pipedrive interface.
+
+# User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+# System Architecture
+
+## Application Structure
+
+**Problem**: Need a lightweight server to handle OAuth flows, webhooks, and API requests for two external services.
+
+**Solution**: Express.js application with modular route handling and separated authentication logic.
+
+**Rationale**: Express provides a minimal, flexible framework suitable for API integration tasks. The modular structure separates concerns (routes, auth, controllers, config) making the codebase maintainable as integration complexity grows.
+
+## Authentication Architecture
+
+**Problem**: Need to securely authenticate with both Pipedrive and QuickBooks APIs on behalf of multiple users.
+
+**Solution**: OAuth 2.0 flow implementation for both services with separate authentication modules (`src/auth/pipedrive.js` and `src/auth/quickbooks.js`).
+
+**Key Design Decisions**:
+- Uses `intuit-oauth` library for QuickBooks authentication (handles token refresh and validation)
+- Custom axios-based implementation for Pipedrive OAuth (more control over request/response handling)
+- State parameter encoding to track user context and extension origin during OAuth callbacks
+- Sandbox environment for QuickBooks (configured for development/testing)
+
+**Pros**: Secure, industry-standard authentication; libraries handle token refresh complexity.
+
+**Cons**: Requires managing two separate OAuth flows; tokens must be securely stored and refreshed.
+
+## Data Storage
+
+**Problem**: Need persistent storage for user OAuth tokens, realm IDs, and configuration data.
+
+**Solution**: Replit Database (key-value store) with abstraction layer in `config/database.js`.
+
+**Key Design Decisions**:
+- Simple key-value storage using Pipedrive user ID as the primary key
+- Wrapper functions (getUser, setUser, deleteUser, listUsers) provide a consistent interface
+- Stores both Pipedrive and QuickBooks tokens per user in a single record
+
+**Pros**: No infrastructure setup required; simple API; adequate for credential storage.
+
+**Cons**: Limited querying capabilities; not suitable for complex relational data; potential scalability constraints for large user bases.
+
+**Alternatives Considered**: Traditional relational database (PostgreSQL) would provide better query capabilities but adds deployment complexity.
+
+## Frontend Architecture
+
+**Problem**: Need to integrate UI components directly into Pipedrive's interface.
+
+**Solution**: Browser-based Pipedrive App Extensions using the official SDK (`@pipedrive/app-extensions-sdk`).
+
+**Key Design Decisions**:
+- Static HTML files served from `public/extensions/` directory
+- Extensions include: connection management (`connect.html`) and deal-contact operations (`deal-contact.html`)
+- Client-side JavaScript communicates with backend API endpoints
+
+**Pros**: Native integration into Pipedrive UI; familiar user experience.
+
+**Cons**: Limited to Pipedrive's extension capabilities; requires hosting static assets.
+
+## Synchronization Logic
+
+**Problem**: Need to map and transfer contact data between two systems with different data models.
+
+**Solution**: Controller-based sync logic (`src/controllers/sync.js`) that orchestrates data flow.
+
+**Key Design Decisions**:
+- Fetches person data from Pipedrive API using stored OAuth tokens
+- Maps Pipedrive person fields to QuickBooks customer fields
+- Uses official `pipedrive` npm client for API calls
+- Handles authentication for both services within the sync function
+
+**Pros**: Centralized sync logic; clear separation of concerns.
+
+**Cons**: Currently appears to be one-way sync (Pipedrive → QuickBooks); potential for data consistency issues if networks fail mid-sync.
+
+# External Dependencies
+
+## Third-Party Services
+
+### Pipedrive CRM
+- **Purpose**: Source system for contact/person data
+- **Authentication**: OAuth 2.0 (custom implementation)
+- **API Access**: RESTful API via `pipedrive` npm package (v30.3.0)
+- **Required Scopes**: persons:full, organizations:full, deals:full
+- **Configuration**: Requires PIPEDRIVE_CLIENT_ID and PIPEDRIVE_CLIENT_SECRET environment variables
+
+### QuickBooks Online
+- **Purpose**: Destination system for customer data synchronization
+- **Authentication**: OAuth 2.0 via `intuit-oauth` library (v4.2.0)
+- **API Access**: Accounting API
+- **Environment**: Sandbox (development mode)
+- **Required Scopes**: com.intuit.quickbooks.accounting
+- **Configuration**: Requires QB_CLIENT_ID, QB_CLIENT_SECRET, and realm_id (company ID)
+
+## Database
+
+### Replit Database
+- **Type**: Key-value store
+- **Library**: `@replit/database` (v3.0.1)
+- **Usage**: Stores user OAuth tokens, refresh tokens, realm IDs, and API domain information
+- **Data Structure**: JSON objects keyed by Pipedrive user ID
+- **Stored Fields**: access_token, refresh_token, qb_access_token, qb_refresh_token, qb_realm_id, api_domain, timestamps
+
+## Key NPM Packages
+
+- **express** (v5.1.0): Web server framework
+- **axios** (v1.12.2): HTTP client for Pipedrive OAuth flow
+- **dotenv** (v17.2.3): Environment variable management
+- **intuit-oauth** (v4.2.0): QuickBooks OAuth client
+- **pipedrive** (v30.3.0): Official Pipedrive API client
+
+## Environment Variables Required
+
+- `PORT`: Server port (defaults to 3000)
+- `APP_URL`: Base URL for OAuth callbacks
+- `PIPEDRIVE_CLIENT_ID`: Pipedrive OAuth application ID
+- `PIPEDRIVE_CLIENT_SECRET`: Pipedrive OAuth application secret
+- `QB_CLIENT_ID`: QuickBooks application ID
+- `QB_CLIENT_SECRET`: QuickBooks application secret
