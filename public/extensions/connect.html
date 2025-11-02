@@ -94,30 +94,86 @@
       let apiDomain = '';
       
       try {
+        // Try to get the signed token
         const token = await sdk.execute('GET_SIGNED_TOKEN');
-        console.log('Token received:', token);
+        console.log('Token received:', JSON.stringify(token));
         
-        // Extract user info from token
-        if (token && token.api_domain) {
-          apiDomain = token.api_domain;
-          userId = apiDomain; // Use api_domain as userId
-          console.log('Using api_domain as userId:', userId);
+        // Try multiple ways to extract user identification
+        if (token) {
+          // Check for api_domain in various places
+          if (token.api_domain) {
+            apiDomain = token.api_domain;
+            userId = apiDomain;
+            console.log('Found api_domain in token:', userId);
+          } else if (token.data && token.data.api_domain) {
+            apiDomain = token.data.api_domain;
+            userId = apiDomain;
+            console.log('Found api_domain in token.data:', userId);
+          }
         }
         
-        // Also try to get user context
-        const context = await sdk.execute('GET_CONTEXT');
-        console.log('Context:', context);
+        // Try to get context for additional info
+        try {
+          const context = await sdk.execute('GET_CONTEXT');
+          console.log('Context received:', JSON.stringify(context));
+          
+          // Check if context has user info
+          if (context) {
+            if (context.company_domain) {
+              // Use company domain as a fallback
+              const companyUserId = context.company_domain + '.pipedrive.com';
+              if (userId === 'test') {
+                userId = companyUserId;
+                console.log('Using company_domain from context:', userId);
+              }
+            }
+            
+            if (context.user && context.user.company_domain) {
+              const userCompanyId = context.user.company_domain + '.pipedrive.com';
+              if (userId === 'test') {
+                userId = userCompanyId;
+                console.log('Using user.company_domain from context:', userId);
+              }
+            }
+          }
+        } catch (contextError) {
+          console.log('Could not get context:', contextError);
+        }
         
       } catch (error) {
-        console.error('Error getting token/context:', error);
+        console.error('Error getting SDK data:', error);
       }
       
       // Fallback to URL params if needed
       const urlParams = new URLSearchParams(window.location.search);
       const urlUserId = urlParams.get('userId');
-      if (urlUserId) {
+      if (urlUserId && urlUserId !== 'test') {
         userId = urlUserId;
         console.log('Using URL param userId:', userId);
+      }
+      
+      // Extract company domain from the parent URL if we still don't have a good userId
+      if (userId === 'test') {
+        try {
+          // Check if we're in an iframe and can access parent URL
+          if (window.parent !== window) {
+            const parentUrl = document.referrer;
+            console.log('Parent URL:', parentUrl);
+            const match = parentUrl.match(/https:\/\/([^\.]+)\.pipedrive\.com/);
+            if (match) {
+              userId = match[0].replace('https://', '');
+              console.log('Extracted userId from parent URL:', userId);
+            }
+          }
+        } catch (e) {
+          console.log('Could not access parent URL');
+        }
+      }
+      
+      // Normalize userId - remove https:// prefix for consistency
+      if (userId && userId.startsWith('https://')) {
+        userId = userId.replace('https://', '');
+        console.log('Normalized userId (removed https://):', userId);
       }
       
       console.log('Final userId for API call:', userId);
@@ -153,7 +209,10 @@
         fetch('/api/user-status?userId=' + userId)
           .then(response => response.json())
           .then(data => {
-            console.log('User status response:', data);
+            console.log('User status response:', JSON.stringify(data, null, 2));
+            if (data.debug) {
+              console.log('Debug info:', data.debug);
+            }
             
             if (data.connected === true) {
               statusText.textContent = 'QB Active';

@@ -4,6 +4,7 @@ const db = new Database();
 async function getUser(key) {
   try {
     const result = await db.get(key);
+    // db.get() returns { ok: true, value: {...} }
     return result?.value || null;
   } catch (error) {
     console.error(`Error getting user with key ${key}:`, error);
@@ -34,6 +35,7 @@ async function deleteUser(key) {
 async function listUsers(prefix = '') {
   try {
     const result = await db.list(prefix);
+    // db.list() returns { ok: true, value: [...] }
     return result?.value || [];
   } catch (error) {
     console.error('Error listing users:', error);

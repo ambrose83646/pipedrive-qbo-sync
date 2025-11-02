@@ -22,6 +22,37 @@ router.get("/test-db", async (req, res) => {
   }
 });
 
+// Diagnostic endpoint to see all users and their QuickBooks connection status
+router.get("/api/debug/users", async (req, res) => {
+  try {
+    const { listUsers } = require("../../config/database");
+    const allKeys = await listUsers();
+    
+    const users = [];
+    for (const key of allKeys) {
+      const userData = await getUser(key);
+      if (userData) {
+        users.push({
+          userId: key,
+          hasQBTokens: !!(userData.qb_access_token && userData.qb_realm_id),
+          qbRealmId: userData.qb_realm_id || null,
+          apiDomain: userData.api_domain || null,
+          createdAt: userData.created_at || null,
+          qbUpdatedAt: userData.qb_updated_at || null
+        });
+      }
+    }
+    
+    res.json({
+      totalUsers: users.length,
+      users: users
+    });
+  } catch (error) {
+    console.error("Debug users error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get("/auth/pipedrive", (req, res) => {
   const authUrl = getAuthUrl();
   res.redirect(authUrl);
@@ -38,8 +69,13 @@ router.get("/auth/pipedrive/callback", async (req, res) => {
   try {
     const tokenData = await getToken(code);
 
-    const userId =
-      tokenData.api_domain || tokenData.user_id || "pipedrive_user";
+    // Normalize userId by removing https:// prefix if present
+    let userId = tokenData.api_domain || tokenData.user_id || "pipedrive_user";
+    if (userId.startsWith('https://')) {
+      userId = userId.replace('https://', '');
+    }
+    
+    console.log(`[Pipedrive OAuth] Storing user data with userId: ${userId}`);
 
     // Save user tokens first
     await setUser(userId, {
@@ -168,6 +204,8 @@ router.get("/auth/qb/callback", async (req, res) => {
   try {
     const requestUrl = req.url;
     const qbTokenData = await qbAuth.handleToken(requestUrl);
+    
+    console.log(`[QB OAuth] Storing QB data for userId: ${userId}, realmId: ${qbTokenData.realm_id}`);
 
     const existingUser = (await getUser(userId)) || {};
 
@@ -183,6 +221,7 @@ router.get("/auth/qb/callback", async (req, res) => {
     };
 
     await setUser(userId, updatedUser);
+    console.log(`[QB OAuth] Successfully stored QB tokens for userId: ${userId}`);
 
     // If in extension/iframe, send message to parent
     if (isExtension) {
@@ -231,26 +270,51 @@ router.get("/success", (req, res) => {
 
 router.get("/api/user-status", async (req, res) => {
   try {
-    const pipedriveUserId = req.query.userId;
+    // Normalize userId by removing https:// prefix if present
+    let pipedriveUserId = req.query.userId;
+    if (pipedriveUserId && pipedriveUserId.startsWith('https://')) {
+      pipedriveUserId = pipedriveUserId.replace('https://', '');
+    }
+    
+    console.log(`[API User Status] Checking status for userId: ${pipedriveUserId}`);
 
     if (!pipedriveUserId) {
+      console.log('[API User Status] No userId provided');
       return res.json({
         connected: false,
         message: "Connect QuickBooks to start.",
+        debug: {
+          userId: null,
+          reason: "No userId provided"
+        }
       });
     }
 
-    const userData = await getUser(pipedriveUserId);
+    // Try to get user data with normalized userId
+    let userData = await getUser(pipedriveUserId);
+    
+    // If not found, try with https:// prefix for backward compatibility
+    if (!userData && pipedriveUserId && !pipedriveUserId.startsWith('https://')) {
+      const alternateUserId = 'https://' + pipedriveUserId;
+      console.log(`[API User Status] Trying alternate userId with https: ${alternateUserId}`);
+      userData = await getUser(alternateUserId);
+    }
 
     if (!userData) {
+      console.log(`[API User Status] No user data found for userId: ${pipedriveUserId}`);
       return res.json({
         connected: false,
         message: "Connect QuickBooks to start.",
+        debug: {
+          userId: pipedriveUserId,
+          reason: "No user data found in database"
+        }
       });
     }
 
     // Check if QuickBooks tokens exist
     const isConnected = !!(userData.qb_access_token && userData.qb_realm_id);
+    console.log(`[API User Status] User ${pipedriveUserId} - QB Connected: ${isConnected}, Realm ID: ${userData.qb_realm_id || 'none'}`);
 
     if (isConnected) {
       // Fetch QuickBooks company info
@@ -304,12 +368,21 @@ router.get("/api/user-status", async (req, res) => {
       res.json({
         connected: true,
         message: "Ready to sync!",
-        companyName: companyName
+        companyName: companyName,
+        debug: {
+          userId: pipedriveUserId,
+          realmId: userData.qb_realm_id,
+          hasCompanyName: !!companyName
+        }
       });
     } else {
       res.json({
         connected: false,
         message: "Connect QuickBooks to start.",
+        debug: {
+          userId: pipedriveUserId,
+          reason: "No QB tokens found"
+        }
       });
     }
   } catch (error) {
