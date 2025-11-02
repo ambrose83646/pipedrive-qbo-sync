@@ -253,9 +253,48 @@ router.get("/api/user-status", async (req, res) => {
     const isConnected = !!(userData.qb_access_token && userData.qb_realm_id);
 
     if (isConnected) {
+      // Fetch QuickBooks company info
+      let companyName = null;
+      try {
+        const oauthClient = new OAuthClient({
+          clientId: process.env.QB_CLIENT_ID,
+          clientSecret: process.env.QB_CLIENT_SECRET,
+          environment: "sandbox",
+          redirectUri: `${process.env.APP_URL}/auth/qb/callback`,
+        });
+        
+        // Set the tokens
+        oauthClient.setToken({
+          access_token: userData.qb_access_token,
+          refresh_token: userData.qb_refresh_token,
+          token_type: "Bearer",
+          expires_in: 3600,
+          x_refresh_token_expires_in: 8726400,
+          realmId: userData.qb_realm_id
+        });
+        
+        // Get company info
+        const companyInfoResponse = await oauthClient.makeApiCall({
+          url: `https://sandbox-quickbooks.api.intuit.com/v3/company/${userData.qb_realm_id}/companyinfo/${userData.qb_realm_id}`,
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (companyInfoResponse.json && companyInfoResponse.json.CompanyInfo) {
+          companyName = companyInfoResponse.json.CompanyInfo.CompanyName;
+        }
+      } catch (companyError) {
+        console.error("Error fetching company info:", companyError);
+        // Continue without company name if fetch fails
+      }
+      
       res.json({
         connected: true,
         message: "Ready to sync!",
+        companyName: companyName
       });
     } else {
       res.json({

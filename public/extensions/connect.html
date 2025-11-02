@@ -116,6 +116,9 @@
             // Send toast notification
             sdk.execute('TOAST', { message: 'QuickBooks Connected Successfully!' });
             
+            // Re-check status to get company name
+            checkStatus();
+            
             // Close modal after a delay
             setTimeout(function() {
               sdk.execute('CLOSE_MODAL');
@@ -133,6 +136,16 @@
               statusText.textContent = 'QB Active';
               statusText.className = 'status-active';
               reconnectBtn.style.display = 'none';
+              
+              // Display company name if available
+              if (data.companyName) {
+                const companyInfo = document.createElement('div');
+                companyInfo.style.fontSize = '14px';
+                companyInfo.style.color = '#666';
+                companyInfo.style.marginTop = '8px';
+                companyInfo.textContent = 'Connected to: ' + data.companyName;
+                statusText.parentElement.appendChild(companyInfo);
+              }
             } else {
               statusText.textContent = 'QB Inactive';
               statusText.className = 'status-inactive';
