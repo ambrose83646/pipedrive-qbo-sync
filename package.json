@@ -17,6 +17,8 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "intuit-oauth": "^4.2.0",
-    "pipedrive": "^30.3.0"
+    "node-cron": "^4.2.1",
+    "pipedrive": "^30.3.0",
+    "shipstation-node": "^1.5.6"
   }
 }
