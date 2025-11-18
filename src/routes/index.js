@@ -793,7 +793,15 @@ router.get("/api/user-status", async (req, res) => {
           isConnected = true;
         } catch (refreshError) {
           console.error(`[API User Status] Failed to refresh QB token for user ${pipedriveUserId}:`, refreshError);
-          isConnected = false;
+          
+          // Check if the error is due to invalid refresh token
+          if (refreshError.message && refreshError.message.includes('Refresh token is invalid')) {
+            // Mark as disconnected and clean up tokens
+            isConnected = false;
+            userData.tokenExpired = true; // Flag to indicate need for reconnection
+          } else {
+            isConnected = false;
+          }
         }
       }
     }
@@ -860,14 +868,27 @@ router.get("/api/user-status", async (req, res) => {
         }
       });
     } else {
-      res.json({
-        connected: false,
-        message: "Connect QuickBooks to start.",
-        debug: {
-          userId: pipedriveUserId,
-          reason: "No QB tokens found"
-        }
-      });
+      // Check if it's a token expiry issue
+      if (userData && userData.tokenExpired) {
+        res.json({
+          connected: false,
+          message: "QuickBooks session expired. Please reconnect.",
+          tokenExpired: true,
+          debug: {
+            userId: pipedriveUserId,
+            reason: "Refresh token expired - reconnection required"
+          }
+        });
+      } else {
+        res.json({
+          connected: false,
+          message: "Connect QuickBooks to start.",
+          debug: {
+            userId: pipedriveUserId,
+            reason: "No QB tokens found"
+          }
+        });
+      }
     }
   } catch (error) {
     console.error("User status check error:", error);

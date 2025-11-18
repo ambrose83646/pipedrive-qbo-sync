@@ -440,16 +440,32 @@
               console.log('Buttons visible - Reconnect/Disconnect should be clickable');
             } else {
               console.log('User is not connected, showing connect UI');
-              // Show disconnected state
-              statusText.textContent = 'QB Inactive';
-              statusText.className = 'status-inactive';
-              companyNameDiv.style.display = 'none';
               
-              // Show connect button, hide disconnect/reconnect buttons
-              connectBtn.style.display = 'inline-block';
-              connectBtn.textContent = 'Connect to QuickBooks';
-              connectBtn.onclick = handleConnect;
-              connectedActions.style.display = 'none';
+              // Check if it's due to expired tokens
+              if (data.tokenExpired === true) {
+                console.log('Token expired, showing reconnect UI');
+                // Show expired state
+                statusText.textContent = 'QB Session Expired';
+                statusText.className = 'status-inactive';
+                companyNameDiv.style.display = 'none';
+                
+                // Show reconnect button with appropriate text
+                connectBtn.style.display = 'inline-block';
+                connectBtn.textContent = 'Reconnect to QuickBooks';
+                connectBtn.onclick = handleConnect;
+                connectedActions.style.display = 'none';
+              } else {
+                // Show disconnected state
+                statusText.textContent = 'QB Inactive';
+                statusText.className = 'status-inactive';
+                companyNameDiv.style.display = 'none';
+                
+                // Show connect button, hide disconnect/reconnect buttons
+                connectBtn.style.display = 'inline-block';
+                connectBtn.textContent = 'Connect to QuickBooks';
+                connectBtn.onclick = handleConnect;
+                connectedActions.style.display = 'none';
+              }
             }
           })
           .catch(error => {
