@@ -81,7 +81,7 @@
   <div class="status-container">
     <div class="status-label">QuickBooks Connection Status:</div>
     <div id="statusText" class="status-inactive">Checking...</div>
-    <button id="reconnectBtn" style="display: none;">Reconnect</button>
+    <button id="connectBtn" style="display: none;">Connect to QuickBooks</button>
   </div>
   
   <script>
@@ -179,7 +179,7 @@
       console.log('Final userId for API call:', userId);
       
       const statusText = document.getElementById('statusText');
-      const reconnectBtn = document.getElementById('reconnectBtn');
+      const connectBtn = document.getElementById('connectBtn');
       
       // Listen for messages from OAuth callback window
       window.addEventListener('message', function(event) {
@@ -219,13 +219,14 @@
                 console.log('No company name in response');
               }
               statusText.className = 'status-active';
-              reconnectBtn.style.display = 'none';
+              connectBtn.style.display = 'none';
             } else {
               statusText.textContent = 'QB Inactive';
               statusText.className = 'status-inactive';
-              reconnectBtn.style.display = 'inline-block';
+              connectBtn.style.display = 'inline-block';
+              connectBtn.textContent = 'Connect to QuickBooks';
               
-              reconnectBtn.onclick = function() {
+              connectBtn.onclick = function() {
                 const authUrl = '/auth/qb?user_id=' + userId + '&extension=true';
                 window.open(authUrl, '_blank', 'width=600,height=700');
               };
@@ -235,9 +236,10 @@
             console.error('Error checking status:', error);
             statusText.textContent = 'Status Unknown';
             statusText.className = 'status-inactive';
-            reconnectBtn.style.display = 'inline-block';
+            connectBtn.style.display = 'inline-block';
+            connectBtn.textContent = 'Connect to QuickBooks';
             
-            reconnectBtn.onclick = function() {
+            connectBtn.onclick = function() {
               const authUrl = '/auth/qb?user_id=' + userId + '&extension=true';
               window.open(authUrl, '_blank', 'width=600,height=700');
             };
