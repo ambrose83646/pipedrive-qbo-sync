@@ -1081,9 +1081,9 @@ router.get("/api/field-key", async (req, res) => {
 router.get("/api/customers/search", async (req, res) => {
   try {
     const searchTerm = req.query.term;
-    const userId = req.query.userId || 'test';
+    const providedUserId = req.query.userId || 'test';
 
-    console.log('Search term:', searchTerm);
+    console.log('Search term:', searchTerm, 'User ID:', providedUserId);
 
     if (!searchTerm) {
       return res.status(400).json({
@@ -1092,8 +1092,51 @@ router.get("/api/customers/search", async (req, res) => {
       });
     }
 
-    // Get user tokens and realmId from DB
-    const userData = await getUser(userId);
+    // Try to find user with QB tokens - check multiple ID formats
+    let userData = null;
+    let actualUserId = providedUserId;
+    
+    // First try the provided user ID
+    userData = await getUser(providedUserId);
+    
+    // If no QB tokens, try different user ID formats
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      console.log(`No QB tokens for ${providedUserId}, checking alternative IDs...`);
+      
+      // Get all users to find one with QB tokens
+      const { listUsers } = require("../../config/database");
+      const allKeys = await listUsers();
+      
+      // Check if we can find a user with QB tokens that matches this domain
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.qb_access_token && testUserData.qb_realm_id) {
+          // Check if this user is related to the provided userId
+          // Could be same domain with/without https, or could be the numeric ID
+          const normalizedProvidedId = providedUserId.replace('https://', '');
+          const normalizedKey = key.replace('https://', '');
+          
+          if (normalizedKey === normalizedProvidedId ||
+              testUserData.api_domain?.includes(normalizedProvidedId) ||
+              normalizedProvidedId.includes(testUserData.api_domain?.replace('https://', '') || 'NOMATCH')) {
+            console.log(`Found QB tokens under alternative ID: ${key}`);
+            userData = testUserData;
+            actualUserId = key;
+            break;
+          }
+          
+          // Also check if this might be the right user based on having QB tokens
+          // (for the case where numeric ID has tokens but domain ID doesn't)
+          if (!userData && testUserData.qb_realm_id) {
+            // Save as potential match
+            userData = testUserData;
+            actualUserId = key;
+            // Continue searching for a better match
+          }
+        }
+      }
+    }
+    
     if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
       return res.status(400).json({
         success: false,
@@ -1108,8 +1151,8 @@ router.get("/api/customers/search", async (req, res) => {
     const query = `SELECT * FROM Customer WHERE DisplayName LIKE '%${searchTerm}%' MAXRESULTS 10`;
     const encodedQuery = encodeURIComponent(query);
     
-    // Make API call to QuickBooks with automatic token refresh - pass userId for correct persistence
-    const queryResponse = await makeQBApiCall(userId, userData, async (qbClient, currentUserData) => {
+    // Make API call to QuickBooks with automatic token refresh - pass actualUserId for correct persistence
+    const queryResponse = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
       return await qbClient.makeApiCall({
         url: `${baseUrl}/v3/company/${realmId}/query?query=${encodedQuery}`,
         method: 'GET',
