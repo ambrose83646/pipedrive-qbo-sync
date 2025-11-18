@@ -263,20 +263,50 @@
       
       if (disconnectBtn) {
         console.log('Attaching disconnect button handler');
+        
+        // Track confirmation state
+        let confirmationPending = false;
+        let confirmationTimeout = null;
+        
+        // Function to reset button state
+        function resetDisconnectButton() {
+          confirmationPending = false;
+          disconnectBtn.textContent = 'Disconnect';
+          disconnectBtn.classList.remove('btn-disconnect');
+          disconnectBtn.classList.add('btn-disconnect');
+          if (confirmationTimeout) {
+            clearTimeout(confirmationTimeout);
+            confirmationTimeout = null;
+          }
+        }
+        
         disconnectBtn.addEventListener('click', async function(event) {
           event.preventDefault();
           console.log('Disconnect button clicked - event listener triggered');
           console.log('Current userId:', userId);
+          console.log('Confirmation pending:', confirmationPending);
+          
+          // First click - show confirmation
+          if (!confirmationPending) {
+            console.log('First click - showing confirmation');
+            confirmationPending = true;
+            disconnectBtn.textContent = 'Click again to confirm';
+            disconnectBtn.style.background = '#dc3545';
+            
+            // Reset after 3 seconds if not confirmed
+            confirmationTimeout = setTimeout(() => {
+              console.log('Confirmation timed out, resetting button');
+              resetDisconnectButton();
+            }, 3000);
+            
+            return;
+          }
+          
+          // Second click - actually disconnect
+          console.log('Second click - performing disconnect');
+          resetDisconnectButton();
           
           try {
-            const confirmed = confirm('Are you sure you want to disconnect QuickBooks? This will remove all stored tokens and preferences.');
-            console.log('User confirmation:', confirmed);
-            
-            if (!confirmed) {
-              console.log('User cancelled disconnect');
-              return;
-            }
-            
             statusText.textContent = 'Disconnecting...';
             disconnectBtn.disabled = true;
             reconnectBtn.disabled = true;
@@ -332,6 +362,15 @@
             // Re-enable buttons
             disconnectBtn.disabled = false;
             reconnectBtn.disabled = false;
+            resetDisconnectButton();
+          }
+        });
+        
+        // Reset confirmation if user clicks elsewhere
+        document.addEventListener('click', function(event) {
+          if (confirmationPending && event.target !== disconnectBtn) {
+            console.log('Click outside disconnect button, resetting confirmation');
+            resetDisconnectButton();
           }
         });
       } else {
