@@ -716,12 +716,39 @@ router.get("/api/user-status", async (req, res) => {
 
     // Try to get user data with normalized userId
     let userData = await getUser(pipedriveUserId);
+    let foundUserId = pipedriveUserId;
     
     // If not found, try with https:// prefix for backward compatibility
     if (!userData && pipedriveUserId && !pipedriveUserId.startsWith('https://')) {
       const alternateUserId = 'https://' + pipedriveUserId;
       console.log(`[API User Status] Trying alternate userId with https: ${alternateUserId}`);
       userData = await getUser(alternateUserId);
+      if (userData) foundUserId = alternateUserId;
+    }
+    
+    // If still not found, check all users for one with QB tokens that matches this domain
+    if (!userData || (!userData.qb_access_token && !userData.qb_realm_id)) {
+      console.log(`[API User Status] Checking all users for QB connection...`);
+      const { listUsers } = require("../../config/database");
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.qb_access_token && testUserData.qb_realm_id) {
+          // Check if this user is related to the provided userId
+          const normalizedProvidedId = pipedriveUserId.replace('https://', '');
+          const normalizedKey = key.replace('https://', '');
+          
+          if (normalizedKey === normalizedProvidedId ||
+              testUserData.api_domain?.includes(normalizedProvidedId) ||
+              normalizedProvidedId.includes(testUserData.api_domain?.replace('https://', '') || 'NOMATCH')) {
+            console.log(`[API User Status] Found QB tokens under alternative ID: ${key}`);
+            userData = testUserData;
+            foundUserId = key;
+            break;
+          }
+        }
+      }
     }
 
     if (!userData) {
