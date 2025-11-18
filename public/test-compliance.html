@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuickBooks Compliance Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 40px;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+    .test-section {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    .test-section h3 {
+      color: #495057;
+      margin-top: 0;
+    }
+    .status {
+      padding: 10px;
+      border-radius: 5px;
+      margin: 10px 0;
+    }
+    .status.pass {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .status.fail {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .flow-diagram {
+      background: #f0f0f0;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 15px 0;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>QuickBooks Compliance Test</h1>
+    
+    <div class="test-section">
+      <h3>✅ Compliant Flow (Current Implementation)</h3>
+      <div class="flow-diagram">
+        1. User installs Pipedrive app
+        ↓
+        2. Pipedrive OAuth authentication
+        ↓
+        3. Success page shown (NO auto-redirect to QB)
+        ↓
+        4. User goes to Settings → Installed apps → OnitQb
+        ↓
+        5. User clicks "Connect to QuickBooks" button
+        ↓
+        6. QuickBooks OAuth begins
+      </div>
+      <div class="status pass">
+        ✅ This flow complies with QuickBooks requirements: User must explicitly click to connect
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h3>❌ Non-Compliant Flow (Previous Implementation)</h3>
+      <div class="flow-diagram">
+        1. User installs Pipedrive app
+        ↓
+        2. Pipedrive OAuth authentication
+        ↓
+        3. AUTO-REDIRECT to QuickBooks OAuth (❌ NOT ALLOWED)
+      </div>
+      <div class="status fail">
+        ❌ This automatic redirect violates QuickBooks certification requirements
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h3>Test the New Flow</h3>
+      <p>Simulate what happens in the Pipedrive extension:</p>
+      
+      <button onclick="testNonConnectedUser()">Test Non-Connected User</button>
+      <button onclick="testConnectedUser()">Test Connected User</button>
+      
+      <div id="testResults" style="margin-top: 20px;"></div>
+    </div>
+
+    <div class="test-section">
+      <h3>Key Compliance Points</h3>
+      <ul>
+        <li>✅ No automatic QuickBooks OAuth during installation</li>
+        <li>✅ Explicit "Connect to QuickBooks" button in app settings</li>
+        <li>✅ User must manually initiate QuickBooks connection</li>
+        <li>✅ Clear separation between Pipedrive and QuickBooks auth flows</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    function testNonConnectedUser() {
+      const results = document.getElementById('testResults');
+      
+      fetch('/api/user-status?userId=test-non-connected')
+        .then(response => response.json())
+        .then(data => {
+          results.innerHTML = `
+            <div class="status ${data.connected ? 'fail' : 'pass'}">
+              <strong>Non-Connected User Test:</strong><br>
+              Status: ${data.message}<br>
+              Connected: ${data.connected}<br>
+              Expected: User should see "Connect to QuickBooks" button<br>
+              ${!data.connected ? '✅ PASS: Button should be visible' : '❌ FAIL: Unexpected state'}
+            </div>
+          `;
+        })
+        .catch(error => {
+          results.innerHTML = `<div class="status fail">Error: ${error.message}</div>`;
+        });
+    }
+    
+    function testConnectedUser() {
+      const results = document.getElementById('testResults');
+      
+      // Test with the actual connected user we have
+      fetch('/api/user-status?userId=adam-sandbox12.pipedrive.com')
+        .then(response => response.json())
+        .then(data => {
+          results.innerHTML = `
+            <div class="status ${data.connected ? 'pass' : 'fail'}">
+              <strong>Connected User Test:</strong><br>
+              Status: ${data.message}<br>
+              Connected: ${data.connected}<br>
+              Company: ${data.companyName || 'N/A'}<br>
+              Expected: User should see "QB Active" with company name<br>
+              ${data.connected ? '✅ PASS: Connection active, no button shown' : '❌ FAIL: Unexpected state'}
+            </div>
+          `;
+        })
+        .catch(error => {
+          results.innerHTML = `<div class="status fail">Error: ${error.message}</div>`;
+        });
+    }
+  </script>
+</body>
+</html>
