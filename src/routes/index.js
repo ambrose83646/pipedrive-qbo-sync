@@ -1119,6 +1119,15 @@ router.get("/api/customers/search", async (req, res) => {
       });
     });
     
+    // Check if response exists and has body
+    if (!queryResponse || !queryResponse.body) {
+      console.error("Invalid QuickBooks response:", queryResponse);
+      return res.status(500).json({
+        success: false,
+        error: "Invalid response from QuickBooks"
+      });
+    }
+    
     const queryResult = JSON.parse(queryResponse.body);
     const customers = queryResult.QueryResponse?.Customer || [];
     

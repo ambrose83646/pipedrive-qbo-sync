@@ -972,9 +972,21 @@
         const response = await fetch(`/api/customers/search?term=${encodeURIComponent(searchTerm)}&userId=${userId}`);
         
         if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Search API error:', errorData);
-          resultsDiv.innerHTML = `<div class="loading"><p>${errorData.error || 'Error searching customers'}</p></div>`;
+          let errorMessage = 'Error searching customers';
+          try {
+            const errorData = await response.json();
+            console.error('Search API error:', errorData);
+            errorMessage = errorData.error || errorMessage;
+          } catch (e) {
+            console.error('Error parsing error response:', e);
+          }
+          
+          // Check if it's specifically a QB connection issue
+          if (response.status === 400 && errorMessage.includes('QuickBooks not connected')) {
+            resultsDiv.innerHTML = `<div class="loading"><p>QuickBooks is not connected. Please connect QuickBooks from the settings page first.</p></div>`;
+          } else {
+            resultsDiv.innerHTML = `<div class="loading"><p>${errorMessage}</p></div>`;
+          }
           return;
         }
         
