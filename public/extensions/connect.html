@@ -88,6 +88,18 @@
       background: #c82333;
     }
     
+    .btn-confirm {
+      background: #ff0000 !important;
+      animation: pulse 0.5s;
+      font-weight: bold;
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    
     .btn-reconnect {
       background: #28a745;
     }
@@ -272,8 +284,8 @@
         function resetDisconnectButton() {
           confirmationPending = false;
           disconnectBtn.textContent = 'Disconnect';
-          disconnectBtn.classList.remove('btn-disconnect');
-          disconnectBtn.classList.add('btn-disconnect');
+          disconnectBtn.classList.remove('btn-confirm');
+          disconnectBtn.style.background = ''; // Reset inline style
           if (confirmationTimeout) {
             clearTimeout(confirmationTimeout);
             confirmationTimeout = null;
@@ -290,8 +302,8 @@
           if (!confirmationPending) {
             console.log('First click - showing confirmation');
             confirmationPending = true;
-            disconnectBtn.textContent = 'Click again to confirm';
-            disconnectBtn.style.background = '#dc3545';
+            disconnectBtn.textContent = '⚠️ Click again to confirm';
+            disconnectBtn.classList.add('btn-confirm');
             
             // Reset after 3 seconds if not confirmed
             confirmationTimeout = setTimeout(() => {
