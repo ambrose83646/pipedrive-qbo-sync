@@ -53,6 +53,175 @@ router.get("/api/debug/users", async (req, res) => {
   }
 });
 
+// Setup preferences endpoints
+router.post("/api/setup/preferences", express.json(), async (req, res) => {
+  try {
+    const { token, userId, authorizeAllUsers, preferences } = req.body;
+    
+    if (!token || !userId) {
+      return res.status(400).json({ error: "Token and User ID are required" });
+    }
+    
+    // Normalize userId
+    let normalizedUserId = userId;
+    if (normalizedUserId.startsWith('https://')) {
+      normalizedUserId = normalizedUserId.replace('https://', '');
+    }
+    
+    // Get existing user data and verify token
+    const userData = await getUser(normalizedUserId);
+    if (!userData) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    // Validate the setup token
+    if (!userData.setup_token || userData.setup_token !== token) {
+      console.error(`[Setup] Invalid token for user ${normalizedUserId}`);
+      return res.status(403).json({ error: "Invalid or expired setup token" });
+    }
+    
+    // Check if token is expired
+    if (userData.setup_token_expires && new Date(userData.setup_token_expires) < new Date()) {
+      console.error(`[Setup] Expired token for user ${normalizedUserId}`);
+      return res.status(403).json({ error: "Setup token has expired" });
+    }
+    
+    // Save preferences and clear the setup token
+    await setUser(normalizedUserId, {
+      ...userData,
+      invoice_preferences: {
+        authorizeAllUsers,
+        ...preferences,
+        setup_completed_at: new Date().toISOString()
+      },
+      setup_token: null,
+      setup_token_expires: null
+    });
+    
+    console.log(`[Setup] Preferences saved for user: ${normalizedUserId}`);
+    res.json({ success: true, message: "Preferences saved successfully" });
+    
+  } catch (error) {
+    console.error("Setup preferences error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get setup preferences  
+router.get("/api/setup/preferences", async (req, res) => {
+  try {
+    const { userId, token } = req.query;
+    
+    if (!userId || !token) {
+      return res.status(400).json({ error: "User ID and token are required" });
+    }
+    
+    // Normalize userId
+    let normalizedUserId = userId;
+    if (normalizedUserId.startsWith('https://')) {
+      normalizedUserId = normalizedUserId.replace('https://', '');
+    }
+    
+    const userData = await getUser(normalizedUserId);
+    if (!userData) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    // Validate the setup token for security
+    if (!userData.setup_token || userData.setup_token !== token) {
+      console.error(`[Setup] Invalid token for user ${normalizedUserId}`);
+      return res.status(403).json({ error: "Invalid or expired setup token" });
+    }
+    
+    // Check if token is expired
+    if (userData.setup_token_expires && new Date(userData.setup_token_expires) < new Date()) {
+      console.error(`[Setup] Expired token for user ${normalizedUserId}`);
+      return res.status(403).json({ error: "Setup token has expired" });
+    }
+    
+    res.json({
+      preferences: userData.invoice_preferences || null,
+      hasCompleteSetup: !!(userData.invoice_preferences?.setup_completed_at)
+    });
+    
+  } catch (error) {
+    console.error("Get preferences error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Setup complete page
+router.get("/setup-complete", (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Setup Complete</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          margin: 0;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+          background: white;
+          padding: 40px;
+          border-radius: 10px;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+          text-align: center;
+          max-width: 500px;
+        }
+        h1 {
+          color: #28a745;
+          margin-bottom: 20px;
+        }
+        p {
+          color: #666;
+          line-height: 1.6;
+        }
+        .button {
+          display: inline-block;
+          margin-top: 20px;
+          padding: 12px 30px;
+          background: #2ca01c;
+          color: white;
+          text-decoration: none;
+          border-radius: 5px;
+        }
+        .button:hover {
+          background: #239018;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>✅ Setup Complete!</h1>
+        <p>Your QuickBooks integration is now fully configured.</p>
+        <p>You can now:</p>
+        <ul style="text-align: left; display: inline-block;">
+          <li>Create QuickBooks customers from Pipedrive deals</li>
+          <li>Generate invoices with your preferred field mappings</li>
+          <li>Sync contact information between both systems</li>
+        </ul>
+        <p>You can close this window and return to Pipedrive to start using the integration.</p>
+        <script>
+          // If opened in a popup, try to close it after a delay
+          setTimeout(() => {
+            if (window.opener) {
+              window.close();
+            }
+          }, 10000);
+        </script>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 router.get("/auth/pipedrive", (req, res) => {
   const authUrl = getAuthUrl();
   res.redirect(authUrl);
@@ -311,7 +480,27 @@ router.get("/auth/qb/callback", async (req, res) => {
     await setUser(userId, updatedUser);
     console.log(`[QB OAuth] Successfully stored QB tokens for userId: ${userId}`);
 
-    // If in extension/iframe, send message to parent
+    // Check if this user has already completed setup
+    const hasCompleteSetup = !!(updatedUser.invoice_preferences?.setup_completed_at);
+
+    // Generate a secure token for the setup session
+    const crypto = require('crypto');
+    const setupToken = crypto.randomBytes(32).toString('hex');
+    
+    // Store the setup token temporarily with the user data
+    await setUser(userId, {
+      ...updatedUser,
+      setup_token: setupToken,
+      setup_token_expires: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutes
+    });
+
+    // If in extension/iframe AND setup not complete, redirect to setup flow with secure token
+    if (isExtension && !hasCompleteSetup) {
+      // Redirect to the setup page with secure token instead of userId
+      return res.redirect(`/setup.html?token=${encodeURIComponent(setupToken)}&userId=${encodeURIComponent(userId)}`);
+    }
+    
+    // If in extension/iframe and setup is complete, send message to parent
     if (isExtension) {
       return res.send(`
         <html>
@@ -331,10 +520,15 @@ router.get("/auth/qb/callback", async (req, res) => {
       `);
     }
 
-    // For regular flow, show success page
-    res.send(
-      "<html><body><h1>Connected Successfully!</h1><p>You can close this window.</p></body></html>",
-    );
+    // For regular flow, redirect to setup if not complete
+    if (!hasCompleteSetup) {
+      res.redirect(`/setup.html?userId=${encodeURIComponent(userId)}`);
+    } else {
+      // For regular flow with complete setup, show success page
+      res.send(
+        "<html><body><h1>Connected Successfully!</h1><p>You can close this window.</p></body></html>",
+      );
+    }
   } catch (error) {
     console.error("QB OAuth callback error:", error);
 

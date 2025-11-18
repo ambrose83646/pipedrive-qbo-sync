@@ -4,6 +4,12 @@ This is a Node.js integration application that connects Pipedrive CRM with Quick
 
 **QuickBooks Compliance**: The app follows QuickBooks certification requirements by ensuring users must explicitly click "Connect to QuickBooks" in the app settings rather than automatically redirecting during installation.
 
+**Post-Installation Setup**: After connecting QuickBooks, administrators complete a two-step setup flow:
+1. User Authorization - Grant other users permission to create invoices
+2. Invoice Preferences - Configure field mappings (name, address, email, tax rate, default account) for automatic invoice population
+
+This setup uses secure tokens with 30-minute expiration to prevent unauthorized access to user preferences.
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
