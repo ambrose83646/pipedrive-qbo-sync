@@ -264,6 +264,10 @@
       function handleConnect() {
         const authUrl = '/auth/qb?user_id=' + userId + '&extension=true';
         window.open(authUrl, '_blank', 'width=600,height=700');
+        
+        // Start polling since we can't rely on postMessage from sandboxed iframe
+        console.log('Starting polling after opening OAuth window');
+        startPolling();
       }
       
       // Attach button handlers
@@ -367,11 +371,10 @@
             if (data.success) {
               console.log('Disconnect successful');
               sdk.execute('TOAST', { message: 'QuickBooks disconnected successfully' });
-              // Re-check status after a short delay to ensure DB is updated
-              setTimeout(function() {
-                console.log('Refreshing status after disconnect...');
-                checkStatus();
-              }, 500);
+              
+              // Start polling to update UI after disconnect
+              console.log('Starting polling after disconnect');
+              startPolling();
             } else {
               console.error('Disconnect failed:', data.error);
               sdk.execute('TOAST', { message: 'Failed to disconnect: ' + (data.error || 'Unknown error') });
@@ -408,6 +411,47 @@
         console.error('Disconnect button not found!');
       }
       
+      // Polling state management
+      let pollingInterval = null;
+      let pollAttempts = 0;
+      const MAX_POLL_ATTEMPTS = 15; // 30 seconds at 2-second intervals
+      
+      // Start polling for status updates
+      function startPolling() {
+        console.log('Starting status polling...');
+        pollAttempts = 0;
+        
+        // Clear any existing polling
+        stopPolling();
+        
+        // Start new polling interval
+        pollingInterval = setInterval(function() {
+          pollAttempts++;
+          console.log('Polling attempt', pollAttempts, 'of', MAX_POLL_ATTEMPTS);
+          
+          checkStatus();
+          
+          // Stop polling after max attempts
+          if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+            console.log('Max polling attempts reached, stopping polling');
+            stopPolling();
+          }
+        }, 2000); // Poll every 2 seconds
+        
+        // Also do an immediate check
+        checkStatus();
+      }
+      
+      // Stop polling
+      function stopPolling() {
+        if (pollingInterval) {
+          console.log('Stopping polling');
+          clearInterval(pollingInterval);
+          pollingInterval = null;
+          pollAttempts = 0;
+        }
+      }
+      
       // Check connection status
       function checkStatus() {
         console.log('Checking status for userId:', userId);
@@ -420,6 +464,11 @@
             }
             
             if (data.connected === true) {
+              // Stop polling if we're connected
+              if (pollingInterval) {
+                console.log('Connected status detected, stopping polling');
+                stopPolling();
+              }
               console.log('User is connected, showing connected UI');
               // Show connected state
               statusText.textContent = 'QB Active';
@@ -440,6 +489,12 @@
               console.log('Buttons visible - Reconnect/Disconnect should be clickable');
             } else {
               console.log('User is not connected, showing connect UI');
+              
+              // Stop polling if we're disconnected and not in the middle of connecting
+              if (pollingInterval && pollAttempts > 2) {
+                console.log('Disconnected status confirmed, stopping polling');
+                stopPolling();
+              }
               
               // Check if it's due to expired tokens
               if (data.tokenExpired === true) {
