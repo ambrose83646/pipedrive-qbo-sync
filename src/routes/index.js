@@ -763,16 +763,38 @@ router.get("/api/user-status", async (req, res) => {
       });
     }
 
-    // Check if QuickBooks tokens exist and are not expired
+    // Check if QuickBooks tokens exist
     let isConnected = !!(userData.qb_access_token && userData.qb_realm_id);
     
-    // Additional check for token expiration if connected
+    // If connected, check for token expiration and attempt refresh
     if (isConnected && userData.qb_expires_at) {
       const expiresAt = new Date(userData.qb_expires_at);
       const now = new Date();
-      if (expiresAt < now) {
-        console.log(`[API User Status] QB tokens expired for user ${pipedriveUserId}`);
-        isConnected = false;
+      if (expiresAt < now && userData.qb_refresh_token) {
+        console.log(`[API User Status] QB tokens expired for user ${pipedriveUserId}, attempting refresh...`);
+        
+        // Try to refresh the token
+        try {
+          const newTokens = await qbAuth.refreshToken(userData.qb_refresh_token);
+          
+          // Update user data with new tokens
+          userData = {
+            ...userData,
+            qb_access_token: newTokens.access_token,
+            qb_refresh_token: newTokens.refresh_token,
+            qb_expires_in: newTokens.expires_in,
+            qb_expires_at: new Date(Date.now() + (newTokens.expires_in * 1000)).toISOString()
+          };
+          
+          // Save updated tokens to database with the correct user ID
+          await setUser(foundUserId, userData);
+          
+          console.log(`[API User Status] QB token refreshed successfully for user ${pipedriveUserId}`);
+          isConnected = true;
+        } catch (refreshError) {
+          console.error(`[API User Status] Failed to refresh QB token for user ${pipedriveUserId}:`, refreshError);
+          isConnected = false;
+        }
       }
     }
     
