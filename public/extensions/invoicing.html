@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoicing - QuickBooks Integration</title>
+  <script src="https://cdn.jsdelivr.net/npm/@pipedrive/app-extensions-sdk@latest/dist/index.umd.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #333;
+      background: white;
+    }
+    
+    .panel-container {
+      width: 100%;
+      min-height: 100vh;
+      background: white;
+    }
+    
+    /* Header */
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid #e0e0e0;
+      background: white;
+    }
+    
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .header-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1a1a1a;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+    
+    .expand-icon {
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 5px solid #666;
+      transition: transform 0.2s;
+    }
+    
+    .header-title.expanded .expand-icon {
+      transform: rotate(180deg);
+    }
+    
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .icon-btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+      transition: background 0.2s;
+    }
+    
+    .icon-btn:hover {
+      background: #f5f5f5;
+    }
+    
+    /* Warning Box */
+    .warning-box {
+      margin: 16px 20px;
+      padding: 12px 16px;
+      background: #fff9e6;
+      border: 1px solid #ffd666;
+      border-radius: 4px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    
+    .warning-icon {
+      color: #faad14;
+      font-size: 18px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    
+    .warning-content {
+      flex: 1;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #595959;
+    }
+    
+    .warning-close {
+      width: 20px;
+      height: 20px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      color: #8c8c8c;
+      font-size: 18px;
+      line-height: 1;
+      padding: 0;
+    }
+    
+    /* Contact Section */
+    .section {
+      padding: 0 20px;
+      margin-bottom: 24px;
+    }
+    
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 12px;
+    }
+    
+    .contact-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .contact-item:last-child {
+      border-bottom: none;
+    }
+    
+    .contact-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+    
+    .plus-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1px solid #d9d9d9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+      font-size: 16px;
+    }
+    
+    .contact-name {
+      color: #1890ff;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    
+    .contact-name:hover {
+      text-decoration: underline;
+    }
+    
+    .contact-actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .action-icon {
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      color: #8c8c8c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+    
+    .action-icon:hover {
+      color: #1890ff;
+    }
+    
+    /* Linked Contact Display */
+    .linked-contact {
+      padding: 0 20px;
+      margin-bottom: 24px;
+    }
+    
+    .linked-contact-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    
+    .contact-icon {
+      width: 20px;
+      height: 20px;
+      color: #1890ff;
+    }
+    
+    .linked-contact-name {
+      font-size: 16px;
+      font-weight: 500;
+      color: #1a1a1a;
+    }
+    
+    .linked-contact-subtitle {
+      font-size: 13px;
+      color: #8c8c8c;
+      margin-left: 28px;
+    }
+    
+    .date-range {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+    }
+    
+    .date-icon {
+      width: 20px;
+      height: 20px;
+      color: #666;
+    }
+    
+    .date-text {
+      font-size: 14px;
+      font-weight: 500;
+      color: #1a1a1a;
+    }
+    
+    .date-period {
+      font-size: 13px;
+      color: #8c8c8c;
+      margin-left: 28px;
+    }
+    
+    .edit-icon {
+      margin-left: auto;
+      width: 20px;
+      height: 20px;
+      color: #8c8c8c;
+      cursor: pointer;
+    }
+    
+    /* Overview Section */
+    .overview {
+      padding: 0 20px;
+      margin-bottom: 24px;
+    }
+    
+    .overview-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 16px;
+    }
+    
+    .overview-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .overview-row:last-child {
+      border-bottom: none;
+      font-weight: 600;
+      padding-top: 12px;
+    }
+    
+    .overview-label {
+      font-size: 14px;
+      color: #595959;
+    }
+    
+    .overview-value {
+      font-size: 14px;
+      color: #1a1a1a;
+      font-weight: 500;
+    }
+    
+    /* Buttons */
+    .btn-container {
+      padding: 0 20px;
+      margin-bottom: 20px;
+    }
+    
+    .btn-primary {
+      width: 100%;
+      padding: 10px 16px;
+      background: white;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #1a1a1a;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary:hover {
+      border-color: #40a9ff;
+      color: #40a9ff;
+    }
+    
+    /* Footer */
+    .panel-footer {
+      padding: 16px 20px;
+      border-top: 1px solid #f0f0f0;
+      font-size: 12px;
+      color: #8c8c8c;
+      line-height: 1.6;
+    }
+    
+    .footer-row {
+      display: flex;
+      gap: 4px;
+    }
+    
+    .footer-label {
+      font-weight: 500;
+    }
+    
+    /* Search Modal */
+    .search-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+    }
+    
+    .search-modal.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .search-content {
+      background: white;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    
+    .search-header {
+      padding: 20px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .search-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 16px;
+    }
+    
+    .search-box {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .search-input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    .search-btn {
+      padding: 8px 20px;
+      background: #1890ff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    
+    .search-btn:hover {
+      background: #40a9ff;
+    }
+    
+    .search-results {
+      padding: 20px;
+      min-height: 200px;
+    }
+    
+    .result-item {
+      padding: 12px;
+      border: 1px solid #f0f0f0;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .result-item:hover {
+      background: #f5f5f5;
+      border-color: #1890ff;
+    }
+    
+    .result-name {
+      font-weight: 500;
+      color: #1a1a1a;
+      margin-bottom: 4px;
+    }
+    
+    .result-email {
+      font-size: 12px;
+      color: #8c8c8c;
+    }
+    
+    .search-footer {
+      padding: 16px 20px;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    
+    .btn-cancel {
+      padding: 8px 20px;
+      background: white;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #8c8c8c;
+    }
+    
+    .spinner {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #1890ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="panel-container">
+    <!-- Header -->
+    <div class="panel-header">
+      <div class="header-left">
+        <div class="header-title" onclick="togglePanel()">
+          <span class="expand-icon"></span>
+          <span>Invoicing</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" onclick="refreshData()" title="Refresh">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M13.65 2.35A8 8 0 1 0 14 8h-2a6 6 0 1 1-.22-1.62L9 7h5V2l-1.35 1.35z"/>
+          </svg>
+        </button>
+        <button class="icon-btn" onclick="showMenu()" title="Menu">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <circle cx="8" cy="3" r="1.5"/>
+            <circle cx="8" cy="8" r="1.5"/>
+            <circle cx="8" cy="13" r="1.5"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Content will be dynamically inserted here -->
+    <div id="panelContent"></div>
+    
+    <!-- Footer -->
+    <div class="panel-footer" id="panelFooter" style="display: none;">
+      <div class="footer-row">
+        <span class="footer-label">Updated:</span>
+        <span id="updatedTime">--</span>
+      </div>
+      <div class="footer-row">
+        <span class="footer-label">Created:</span>
+        <span id="createdTime">--</span>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Search Modal -->
+  <div class="search-modal" id="searchModal">
+    <div class="search-content">
+      <div class="search-header">
+        <h3 class="search-title">Link QuickBooks Contact</h3>
+        <div class="search-box">
+          <input type="text" class="search-input" id="searchInput" placeholder="Search by name or email...">
+          <button class="search-btn" onclick="searchContacts()">Search</button>
+        </div>
+      </div>
+      <div class="search-results" id="searchResults">
+        <div class="loading">
+          <p>Enter a search term to find QuickBooks contacts</p>
+        </div>
+      </div>
+      <div class="search-footer">
+        <button class="btn-cancel" onclick="closeSearchModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    let sdk = null;
+    let dealId = null;
+    let userId = null;
+    let linkedContact = null;
+    let dealData = null;
+    
+    // Initialize SDK and load data
+    document.addEventListener('DOMContentLoaded', async function() {
+      try {
+        // Initialize Pipedrive SDK
+        sdk = await new AppExtensionsSDK().initialize();
+        
+        // Get user context
+        const user = await sdk.execute('GET_USER');
+        userId = user?.id || 'test';
+        
+        // Get deal ID from context
+        const context = await sdk.execute('GET_CONTEXT');
+        dealId = context?.selectedIds?.[0] || context?.id;
+        
+        if (!dealId) {
+          showError('No deal selected');
+          return;
+        }
+        
+        // Load deal data and check for linked contact
+        await loadDealData();
+        
+      } catch (error) {
+        console.error('Initialization error:', error);
+        showError('Failed to initialize');
+      }
+    });
+    
+    async function loadDealData() {
+      try {
+        // Get deal data
+        const response = await sdk.execute('GET_ENTITY', {
+          id: dealId,
+          entity: 'deal'
+        });
+        
+        dealData = response?.data;
+        
+        // Check for QB customer ID in custom field
+        const qbCustomerId = dealData?.qb_customer_id || dealData?.['qb_customer_id'];
+        
+        if (qbCustomerId) {
+          // Load linked contact data
+          await loadLinkedContact(qbCustomerId);
+        } else {
+          // Show unlinked state
+          showUnlinkedState();
+        }
+        
+        // Update footer times
+        updateFooterTimes();
+        
+      } catch (error) {
+        console.error('Error loading deal data:', error);
+        showUnlinkedState();
+      }
+    }
+    
+    async function loadLinkedContact(qbCustomerId) {
+      try {
+        // Fetch customer details from backend
+        const response = await fetch(`/api/customer/${qbCustomerId}?userId=${userId}`);
+        if (response.ok) {
+          const data = await response.json();
+          linkedContact = data.customer;
+          showLinkedState();
+        } else {
+          showUnlinkedState();
+        }
+      } catch (error) {
+        console.error('Error loading linked contact:', error);
+        showUnlinkedState();
+      }
+    }
+    
+    function showUnlinkedState() {
+      const content = document.getElementById('panelContent');
+      content.innerHTML = `
+        <!-- Warning Box -->
+        <div class="warning-box">
+          <span class="warning-icon">⚠️</span>
+          <div class="warning-content">
+            Link this deal to an existing QuickBooks contact to get invoicing information on payments and invoice statuses
+          </div>
+          <button class="warning-close" onclick="dismissWarning(this)">×</button>
+        </div>
+        
+        <!-- Contact Section -->
+        <div class="section">
+          <div class="section-title">Contact</div>
+          <div class="contact-item">
+            <div class="contact-info">
+              <span class="plus-icon">+</span>
+              <a href="#" class="contact-name" onclick="openSearchModal(); return false;">Link QuickBooks Contact</a>
+            </div>
+            <div class="contact-actions">
+              <button class="action-icon" onclick="copyToClipboard('contact')" title="Copy">
+                📋
+              </button>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-info">
+              <span class="plus-icon">+</span>
+              <a href="#" class="contact-name" onclick="createNewContact(); return false;">Create New Contact</a>
+            </div>
+            <div class="contact-actions">
+              <button class="action-icon" onclick="showContactDetails()" title="View">
+                👤
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Overview Section -->
+        <div class="overview">
+          <div class="overview-title">Overview</div>
+          <div class="overview-row">
+            <span class="overview-label">Outstanding</span>
+            <span class="overview-value">$0</span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Overdue</span>
+            <span class="overview-value">$0</span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Paid</span>
+            <span class="overview-value">$0</span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Total</span>
+            <span class="overview-value">$0</span>
+          </div>
+        </div>
+        
+        <!-- View Invoices Button -->
+        <div class="btn-container">
+          <button class="btn-primary" onclick="viewAllInvoices()">View all invoices</button>
+        </div>
+      `;
+      
+      document.getElementById('panelFooter').style.display = 'block';
+    }
+    
+    function showLinkedState() {
+      const content = document.getElementById('panelContent');
+      const contactName = linkedContact?.DisplayName || linkedContact?.CompanyName || 'Unknown Contact';
+      
+      // Get current quarter dates
+      const now = new Date();
+      const quarter = Math.floor(now.getMonth() / 3);
+      const startMonth = quarter * 3;
+      const startDate = new Date(now.getFullYear(), startMonth, 1);
+      const endDate = new Date(now.getFullYear(), startMonth + 3, 0);
+      
+      const formatDate = (date) => {
+        return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      };
+      
+      content.innerHTML = `
+        <!-- Linked Contact Display -->
+        <div class="linked-contact">
+          <div class="linked-contact-main">
+            <svg class="contact-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 10a3 3 0 100-6 3 3 0 000 6zm0 2c-4.418 0-8 1.79-8 4v1h16v-1c0-2.21-3.582-4-8-4z"/>
+            </svg>
+            <span class="linked-contact-name">${contactName}</span>
+          </div>
+          <div class="linked-contact-subtitle">QuickBooks</div>
+        </div>
+        
+        <!-- Date Range -->
+        <div class="section">
+          <div class="date-range">
+            <svg class="date-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zM4 8h12v8H4V8z"/>
+            </svg>
+            <span class="date-text">This quarter</span>
+            <svg class="edit-icon" viewBox="0 0 20 20" fill="currentColor" onclick="editDateRange()">
+              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+            </svg>
+          </div>
+          <div class="date-period">${formatDate(startDate)} - ${formatDate(endDate)}</div>
+        </div>
+        
+        <!-- Overview Section -->
+        <div class="overview">
+          <div class="overview-title">Overview</div>
+          <div class="overview-row">
+            <span class="overview-label">Outstanding</span>
+            <span class="overview-value">$0</span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Overdue</span>
+            <span class="overview-value">$0</span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Paid</span>
+            <span class="overview-value">$0</span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Total</span>
+            <span class="overview-value">$0</span>
+          </div>
+        </div>
+        
+        <!-- View Invoices Button -->
+        <div class="btn-container">
+          <button class="btn-primary" onclick="viewAllInvoices()">View all invoices</button>
+        </div>
+      `;
+      
+      // Load invoice data
+      loadInvoiceData();
+    }
+    
+    async function loadInvoiceData() {
+      if (!linkedContact?.Id) return;
+      
+      try {
+        // Get current quarter dates for date filtering
+        const now = new Date();
+        const quarter = Math.floor(now.getMonth() / 3);
+        const startMonth = quarter * 3;
+        const startDate = new Date(now.getFullYear(), startMonth, 1);
+        const endDate = new Date(now.getFullYear(), startMonth + 3, 0);
+        
+        // Format dates as YYYY-MM-DD for API
+        const formatApiDate = (date) => {
+          return date.toISOString().split('T')[0];
+        };
+        
+        // Fetch invoice data from backend
+        const response = await fetch(
+          `/api/customer/${linkedContact.Id}/invoices?` +
+          `userId=${userId}&` +
+          `startDate=${formatApiDate(startDate)}&` +
+          `endDate=${formatApiDate(endDate)}`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Update the overview section with real data
+          const overviewRows = document.querySelectorAll('.overview-row .overview-value');
+          if (overviewRows.length >= 4) {
+            overviewRows[0].textContent = `$${(data.overview.outstanding || 0).toFixed(2)}`;
+            overviewRows[1].textContent = `$${(data.overview.overdue || 0).toFixed(2)}`;
+            overviewRows[2].textContent = `$${(data.overview.paid || 0).toFixed(2)}`;
+            overviewRows[3].textContent = `$${(data.overview.total || 0).toFixed(2)}`;
+          }
+          
+          // Store invoice data for later use
+          window.invoiceData = data;
+        }
+      } catch (error) {
+        console.error('Error loading invoice data:', error);
+      }
+    }
+    
+    function updateFooterTimes() {
+      const now = new Date();
+      const formatTime = (date) => {
+        return date.toLocaleDateString('en-US', { 
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }).replace(' at ', ' ');
+      };
+      
+      document.getElementById('updatedTime').textContent = formatTime(now);
+      document.getElementById('createdTime').textContent = formatTime(new Date(dealData?.add_time || now));
+    }
+    
+    function togglePanel() {
+      const title = document.querySelector('.header-title');
+      title.classList.toggle('expanded');
+    }
+    
+    function refreshData() {
+      loadDealData();
+      sdk.execute('TOAST', { message: 'Data refreshed' });
+    }
+    
+    function showMenu() {
+      // TODO: Implement menu options
+      console.log('Menu clicked');
+    }
+    
+    function dismissWarning(button) {
+      button.parentElement.style.display = 'none';
+    }
+    
+    function openSearchModal() {
+      document.getElementById('searchModal').classList.add('active');
+      document.getElementById('searchInput').focus();
+    }
+    
+    function closeSearchModal() {
+      document.getElementById('searchModal').classList.remove('active');
+      document.getElementById('searchInput').value = '';
+      document.getElementById('searchResults').innerHTML = '<div class="loading"><p>Enter a search term to find QuickBooks contacts</p></div>';
+    }
+    
+    async function searchContacts() {
+      const searchTerm = document.getElementById('searchInput').value.trim();
+      
+      if (!searchTerm) {
+        sdk.execute('TOAST', { message: 'Please enter a search term' });
+        return;
+      }
+      
+      const resultsDiv = document.getElementById('searchResults');
+      resultsDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Searching...</p></div>';
+      
+      try {
+        const response = await fetch(`/api/customers/search?term=${encodeURIComponent(searchTerm)}&userId=${userId}`);
+        const customers = await response.json();
+        
+        if (!customers || customers.length === 0) {
+          resultsDiv.innerHTML = '<div class="loading"><p>No customers found</p></div>';
+          return;
+        }
+        
+        let html = '';
+        customers.forEach(customer => {
+          html += `
+            <div class="result-item" onclick="linkContact('${customer.id}', '${(customer.name || '').replace(/'/g, "\\'")}')">
+              <div class="result-name">${customer.name || 'Unnamed'}</div>
+              ${customer.email ? `<div class="result-email">${customer.email}</div>` : ''}
+            </div>
+          `;
+        });
+        
+        resultsDiv.innerHTML = html;
+        
+      } catch (error) {
+        console.error('Search error:', error);
+        sdk.execute('TOAST', { message: 'Search failed' });
+        resultsDiv.innerHTML = '<div class="loading"><p>Search failed. Please try again.</p></div>';
+      }
+    }
+    
+    async function linkContact(qbCustomerId, customerName) {
+      if (!confirm(`Link "${customerName}" to this deal?`)) {
+        return;
+      }
+      
+      try {
+        // Get the field key from backend
+        const fieldResponse = await fetch(`/api/field-key?userId=${userId}`);
+        const fieldData = await fieldResponse.json();
+        const fieldKey = fieldData.fieldKey || 'qb_customer_id';
+        
+        // Update deal with QB customer ID
+        const updateData = {};
+        updateData[fieldKey] = qbCustomerId;
+        
+        await sdk.execute('UPDATE_ENTITY', {
+          id: dealId,
+          entity: 'deal',
+          data: updateData
+        });
+        
+        sdk.execute('TOAST', { message: 'Contact linked successfully!' });
+        closeSearchModal();
+        
+        // Reload to show linked state
+        await loadDealData();
+        
+      } catch (error) {
+        console.error('Link error:', error);
+        sdk.execute('TOAST', { message: 'Failed to link contact' });
+      }
+    }
+    
+    function createNewContact() {
+      // TODO: Implement create new contact flow
+      sdk.execute('TOAST', { message: 'Create new contact feature coming soon' });
+    }
+    
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text);
+      sdk.execute('TOAST', { message: 'Copied to clipboard' });
+    }
+    
+    function showContactDetails() {
+      // TODO: Implement contact details view
+      console.log('Show contact details');
+    }
+    
+    function editDateRange() {
+      // TODO: Implement date range editor
+      sdk.execute('TOAST', { message: 'Date range editor coming soon' });
+    }
+    
+    function viewAllInvoices() {
+      // TODO: Implement invoice viewer
+      sdk.execute('TOAST', { message: 'Invoice viewer coming soon' });
+    }
+    
+    function showError(message) {
+      document.getElementById('panelContent').innerHTML = `
+        <div style="padding: 20px; text-align: center; color: #dc3545;">
+          ${message}
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

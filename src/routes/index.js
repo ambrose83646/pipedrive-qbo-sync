@@ -745,6 +745,146 @@ async function createQBClient(userId) {
   return { qbClient, companyId: userData.qb_realm_id };
 }
 
+// Get a specific QuickBooks customer by ID
+router.get("/api/customer/:customerId", async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const userId = req.query.userId || 'test';
+    
+    if (!customerId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Customer ID is required" 
+      });
+    }
+    
+    // Normalize userId
+    let normalizedUserId = userId;
+    if (normalizedUserId.startsWith('https://')) {
+      normalizedUserId = normalizedUserId.replace('https://', '');
+    }
+    
+    const { qbClient, companyId } = await createQBClient(normalizedUserId);
+    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    
+    const customerResponse = await qbClient.makeApiCall({
+      url: `${baseUrl}/v3/company/${companyId}/customer/${customerId}?minorversion=65`,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const customer = JSON.parse(customerResponse.body).Customer;
+    
+    res.json({
+      success: true,
+      customer: customer
+    });
+    
+  } catch (error) {
+    console.error('Error fetching customer:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch customer'
+    });
+  }
+});
+
+// Get invoices for a QuickBooks customer
+router.get("/api/customer/:customerId/invoices", async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const userId = req.query.userId || 'test';
+    const { startDate, endDate } = req.query;
+    
+    if (!customerId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Customer ID is required" 
+      });
+    }
+    
+    // Normalize userId
+    let normalizedUserId = userId;
+    if (normalizedUserId.startsWith('https://')) {
+      normalizedUserId = normalizedUserId.replace('https://', '');
+    }
+    
+    const { qbClient, companyId } = await createQBClient(normalizedUserId);
+    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    
+    // Build query for invoices
+    let query = `select * from Invoice where CustomerRef='${customerId}'`;
+    
+    // Add date filters if provided
+    if (startDate) {
+      query += ` and TxnDate >= '${startDate}'`;
+    }
+    if (endDate) {
+      query += ` and TxnDate <= '${endDate}'`;
+    }
+    
+    const invoiceResponse = await qbClient.makeApiCall({
+      url: `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const responseData = JSON.parse(invoiceResponse.body);
+    const invoices = responseData.QueryResponse?.Invoice || [];
+    
+    // Calculate overview totals
+    const overview = {
+      outstanding: 0,
+      overdue: 0,
+      paid: 0,
+      total: 0
+    };
+    
+    const today = new Date();
+    
+    invoices.forEach(invoice => {
+      const amount = parseFloat(invoice.TotalAmt || 0);
+      const balance = parseFloat(invoice.Balance || 0);
+      const dueDate = new Date(invoice.DueDate);
+      
+      overview.total += amount;
+      
+      if (balance > 0) {
+        overview.outstanding += balance;
+        
+        if (dueDate < today) {
+          overview.overdue += balance;
+        }
+      } else {
+        overview.paid += amount;
+      }
+    });
+    
+    res.json({
+      success: true,
+      invoices: invoices,
+      overview: overview
+    });
+    
+  } catch (error) {
+    console.error('Error fetching invoices:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch invoices',
+      overview: {
+        outstanding: 0,
+        overdue: 0,
+        paid: 0,
+        total: 0
+      }
+    });
+  }
+});
+
 // Get the custom field key for QB Customer ID
 router.get("/api/field-key", async (req, res) => {
   try {
@@ -823,7 +963,7 @@ router.get("/api/customers/search", async (req, res) => {
       }
     });
     
-    const queryResult = JSON.parse(queryResponse.text());
+    const queryResult = JSON.parse(queryResponse.body);
     const customers = queryResult.QueryResponse?.Customer || [];
     
     // Transform to simplified format { id, name, email }
@@ -885,7 +1025,7 @@ router.post("/api/create-customer", express.json(), async (req, res) => {
       body: JSON.stringify(customerData)
     });
     
-    const createdCustomer = JSON.parse(createResponse.text()).Customer;
+    const createdCustomer = JSON.parse(createResponse.body).Customer;
     
     res.json({
       success: true,
@@ -1011,7 +1151,7 @@ router.get("/api/deal-contact", async (req, res) => {
         }
       });
       
-      const customer = JSON.parse(customerResponse.text()).Customer;
+      const customer = JSON.parse(customerResponse.body).Customer;
       
       res.json({
         success: true,

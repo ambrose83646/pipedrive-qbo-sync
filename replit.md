@@ -88,6 +88,14 @@ Preferred communication style: Simple, everyday language.
 
 **Cons**: Currently appears to be one-way sync (Pipedrive → QuickBooks); potential for data consistency issues if networks fail mid-sync.
 
+# Recent Changes
+
+- **November 18, 2025**: Implemented new invoicing panel extension with modern UI design
+  - Created professional two-column layout matching QuickBooks design standards
+  - Added linked/unlinked states with appropriate visual feedback
+  - Integrated real-time invoice data fetching with overview calculations
+  - Fixed QuickBooks API response parsing (changed `.text()` to `.body`)
+
 # External Dependencies
 
 ## Third-Party Services
