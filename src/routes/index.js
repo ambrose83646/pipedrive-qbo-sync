@@ -898,7 +898,7 @@ async function createQBClient(userId) {
 router.get("/api/customer/:customerId", async (req, res) => {
   try {
     const { customerId } = req.params;
-    const userId = req.query.userId || 'test';
+    const providedUserId = req.query.userId || 'test';
     
     if (!customerId) {
       return res.status(400).json({ 
@@ -907,14 +907,47 @@ router.get("/api/customer/:customerId", async (req, res) => {
       });
     }
     
-    // Normalize userId
-    let normalizedUserId = userId;
-    if (normalizedUserId.startsWith('https://')) {
-      normalizedUserId = normalizedUserId.replace('https://', '');
+    // Try to find user with QB tokens - check multiple ID formats
+    let userData = null;
+    let actualUserId = providedUserId;
+    
+    // First try the provided user ID
+    userData = await getUser(providedUserId);
+    
+    // If no QB tokens, try different user ID formats
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      console.log(`No QB tokens for ${providedUserId}, checking alternative IDs for customer detail...`);
+      
+      // Get all users to find one with QB tokens
+      const { listUsers } = require("../../config/database");
+      const allKeys = await listUsers();
+      
+      // Check if we can find a user with QB tokens that matches this domain
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.qb_access_token && testUserData.qb_realm_id) {
+          // Check if this user is related to the provided userId
+          const normalizedProvidedId = providedUserId.replace('https://', '');
+          const normalizedKey = key.replace('https://', '');
+          
+          if (normalizedKey === normalizedProvidedId ||
+              testUserData.api_domain?.includes(normalizedProvidedId) ||
+              normalizedProvidedId.includes(testUserData.api_domain?.replace('https://', '') || 'NOMATCH')) {
+            console.log(`Found QB tokens under alternative ID: ${key}`);
+            userData = testUserData;
+            actualUserId = key;
+            break;
+          }
+          
+          // Also check if this might be the right user based on having QB tokens
+          if (!userData && testUserData.qb_realm_id) {
+            userData = testUserData;
+            actualUserId = key;
+          }
+        }
+      }
     }
     
-    // Get user data
-    const userData = await getUser(normalizedUserId);
     if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
       return res.status(400).json({
         success: false,
@@ -925,8 +958,8 @@ router.get("/api/customer/:customerId", async (req, res) => {
     const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
     const companyId = userData.qb_realm_id;
     
-    // Make API call with automatic token refresh - pass normalizedUserId for correct persistence
-    const customerResponse = await makeQBApiCall(normalizedUserId, userData, async (qbClient, currentUserData) => {
+    // Make API call with automatic token refresh - pass actualUserId for correct persistence
+    const customerResponse = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
       return await qbClient.makeApiCall({
         url: `${baseUrl}/v3/company/${companyId}/customer/${customerId}?minorversion=65`,
         method: 'GET',
@@ -956,7 +989,7 @@ router.get("/api/customer/:customerId", async (req, res) => {
 router.get("/api/customer/:customerId/invoices", async (req, res) => {
   try {
     const { customerId } = req.params;
-    const userId = req.query.userId || 'test';
+    const providedUserId = req.query.userId || 'test';
     const { startDate, endDate } = req.query;
     
     if (!customerId) {
@@ -966,14 +999,47 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
       });
     }
     
-    // Normalize userId
-    let normalizedUserId = userId;
-    if (normalizedUserId.startsWith('https://')) {
-      normalizedUserId = normalizedUserId.replace('https://', '');
+    // Try to find user with QB tokens - check multiple ID formats
+    let userData = null;
+    let actualUserId = providedUserId;
+    
+    // First try the provided user ID
+    userData = await getUser(providedUserId);
+    
+    // If no QB tokens, try different user ID formats
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      console.log(`No QB tokens for ${providedUserId}, checking alternative IDs for invoices...`);
+      
+      // Get all users to find one with QB tokens
+      const { listUsers } = require("../../config/database");
+      const allKeys = await listUsers();
+      
+      // Check if we can find a user with QB tokens that matches this domain
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.qb_access_token && testUserData.qb_realm_id) {
+          // Check if this user is related to the provided userId
+          const normalizedProvidedId = providedUserId.replace('https://', '');
+          const normalizedKey = key.replace('https://', '');
+          
+          if (normalizedKey === normalizedProvidedId ||
+              testUserData.api_domain?.includes(normalizedProvidedId) ||
+              normalizedProvidedId.includes(testUserData.api_domain?.replace('https://', '') || 'NOMATCH')) {
+            console.log(`Found QB tokens under alternative ID: ${key}`);
+            userData = testUserData;
+            actualUserId = key;
+            break;
+          }
+          
+          // Also check if this might be the right user based on having QB tokens
+          if (!userData && testUserData.qb_realm_id) {
+            userData = testUserData;
+            actualUserId = key;
+          }
+        }
+      }
     }
     
-    // Get user data
-    const userData = await getUser(normalizedUserId);
     if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
       return res.status(400).json({
         success: false,
@@ -995,8 +1061,8 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
       query += ` and TxnDate <= '${endDate}'`;
     }
     
-    // Make API call with automatic token refresh - pass normalizedUserId for correct persistence
-    const invoiceResponse = await makeQBApiCall(normalizedUserId, userData, async (qbClient, currentUserData) => {
+    // Make API call with automatic token refresh - pass actualUserId for correct persistence
+    const invoiceResponse = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
       return await qbClient.makeApiCall({
         url: `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`,
         method: 'GET',
