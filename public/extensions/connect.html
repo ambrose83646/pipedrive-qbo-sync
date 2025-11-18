@@ -72,6 +72,35 @@
       background: #ccc;
       cursor: not-allowed;
     }
+    
+    .button-group {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 15px;
+    }
+    
+    .btn-disconnect {
+      background: #dc3545;
+    }
+    
+    .btn-disconnect:hover {
+      background: #c82333;
+    }
+    
+    .btn-reconnect {
+      background: #28a745;
+    }
+    
+    .btn-reconnect:hover {
+      background: #218838;
+    }
+    
+    .company-name {
+      font-size: 14px;
+      color: #666;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
@@ -81,7 +110,12 @@
   <div class="status-container">
     <div class="status-label">QuickBooks Connection Status:</div>
     <div id="statusText" class="status-inactive">Checking...</div>
+    <div id="companyName" class="company-name" style="display: none;"></div>
     <button id="connectBtn" style="display: none;">Connect to QuickBooks</button>
+    <div id="connectedActions" class="button-group" style="display: none;">
+      <button id="reconnectBtn" class="btn-reconnect">Reconnect</button>
+      <button id="disconnectBtn" class="btn-disconnect">Disconnect</button>
+    </div>
   </div>
   
   <script>
@@ -179,7 +213,11 @@
       console.log('Final userId for API call:', userId);
       
       const statusText = document.getElementById('statusText');
+      const companyNameDiv = document.getElementById('companyName');
       const connectBtn = document.getElementById('connectBtn');
+      const connectedActions = document.getElementById('connectedActions');
+      const reconnectBtn = document.getElementById('reconnectBtn');
+      const disconnectBtn = document.getElementById('disconnectBtn');
       
       // Listen for messages from OAuth callback window
       window.addEventListener('message', function(event) {
@@ -199,6 +237,56 @@
         }
       });
       
+      // Handle connect button
+      function handleConnect() {
+        const authUrl = '/auth/qb?user_id=' + userId + '&extension=true';
+        window.open(authUrl, '_blank', 'width=600,height=700');
+      }
+      
+      // Handle reconnect button
+      reconnectBtn.onclick = function() {
+        handleConnect();
+      };
+      
+      // Handle disconnect button
+      disconnectBtn.onclick = async function() {
+        if (confirm('Are you sure you want to disconnect QuickBooks? This will remove all stored tokens and preferences.')) {
+          statusText.textContent = 'Disconnecting...';
+          
+          // Get a signed token from SDK for authentication
+          let authToken = null;
+          try {
+            const token = await sdk.execute('GET_SIGNED_TOKEN');
+            authToken = JSON.stringify(token);
+          } catch (e) {
+            console.error('Could not get signed token:', e);
+          }
+          
+          fetch('/api/disconnect-qb', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Pipedrive-Token': authToken || ''
+            },
+            body: JSON.stringify({ userId: userId })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              sdk.execute('TOAST', { message: 'QuickBooks disconnected successfully' });
+              checkStatus();
+            } else {
+              sdk.execute('TOAST', { message: 'Failed to disconnect: ' + (data.error || 'Unknown error') });
+            }
+          })
+          .catch(error => {
+            console.error('Disconnect error:', error);
+            sdk.execute('TOAST', { message: 'Error disconnecting QuickBooks' });
+            checkStatus();
+          });
+        }
+      };
+      
       // Check connection status
       function checkStatus() {
         fetch('/api/user-status?userId=' + userId)
@@ -210,39 +298,46 @@
             }
             
             if (data.connected === true) {
-              // Display company name inline with status
-              if (data.companyName) {
-                statusText.textContent = 'QB Active - ' + data.companyName;
-                console.log('Displaying company name inline:', data.companyName);
-              } else {
-                statusText.textContent = 'QB Active';
-                console.log('No company name in response');
-              }
+              // Show connected state
+              statusText.textContent = 'QB Active';
               statusText.className = 'status-active';
+              
+              // Show company name if available
+              if (data.companyName) {
+                companyNameDiv.textContent = data.companyName;
+                companyNameDiv.style.display = 'block';
+                console.log('Displaying company name:', data.companyName);
+              } else {
+                companyNameDiv.style.display = 'none';
+              }
+              
+              // Hide connect button, show disconnect/reconnect buttons
               connectBtn.style.display = 'none';
+              connectedActions.style.display = 'flex';
             } else {
+              // Show disconnected state
               statusText.textContent = 'QB Inactive';
               statusText.className = 'status-inactive';
+              companyNameDiv.style.display = 'none';
+              
+              // Show connect button, hide disconnect/reconnect buttons
               connectBtn.style.display = 'inline-block';
               connectBtn.textContent = 'Connect to QuickBooks';
-              
-              connectBtn.onclick = function() {
-                const authUrl = '/auth/qb?user_id=' + userId + '&extension=true';
-                window.open(authUrl, '_blank', 'width=600,height=700');
-              };
+              connectBtn.onclick = handleConnect;
+              connectedActions.style.display = 'none';
             }
           })
           .catch(error => {
             console.error('Error checking status:', error);
             statusText.textContent = 'Status Unknown';
             statusText.className = 'status-inactive';
+            companyNameDiv.style.display = 'none';
+            
+            // Show connect button on error
             connectBtn.style.display = 'inline-block';
             connectBtn.textContent = 'Connect to QuickBooks';
-            
-            connectBtn.onclick = function() {
-              const authUrl = '/auth/qb?user_id=' + userId + '&extension=true';
-              window.open(authUrl, '_blank', 'width=600,height=700');
-            };
+            connectBtn.onclick = handleConnect;
+            connectedActions.style.display = 'none';
           });
       }
       

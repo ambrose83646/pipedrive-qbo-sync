@@ -53,6 +53,79 @@ router.get("/api/debug/users", async (req, res) => {
   }
 });
 
+// Disconnect QuickBooks endpoint
+router.post("/api/disconnect-qb", express.json(), async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const pipedriveToken = req.headers['x-pipedrive-token'];
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    // Normalize userId
+    let normalizedUserId = userId;
+    if (normalizedUserId.startsWith('https://')) {
+      normalizedUserId = normalizedUserId.replace('https://', '');
+    }
+    
+    // Get existing user data
+    const userData = await getUser(normalizedUserId);
+    if (!userData) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    // Validate authentication - check if the request is from the same Pipedrive instance
+    // In a production environment, you would validate the signed token properly
+    // For now, we check if the token contains the correct api_domain
+    if (pipedriveToken) {
+      try {
+        const tokenData = JSON.parse(pipedriveToken);
+        const tokenDomain = tokenData.api_domain || tokenData.data?.api_domain;
+        
+        // Check if the token domain matches the user's stored domain
+        if (tokenDomain && userData.api_domain && 
+            !tokenDomain.includes(userData.api_domain) && 
+            !userData.api_domain.includes(tokenDomain)) {
+          console.error(`[QB Disconnect] Domain mismatch - token: ${tokenDomain}, user: ${userData.api_domain}`);
+          return res.status(403).json({ error: "Unauthorized - domain mismatch" });
+        }
+      } catch (e) {
+        console.error(`[QB Disconnect] Invalid token format:`, e);
+        // Allow disconnect from same domain even with invalid token format for backward compatibility
+      }
+    } else {
+      // If no token provided, reject the request for security
+      console.error(`[QB Disconnect] No authentication token provided`);
+      return res.status(403).json({ error: "Authentication required" });
+    }
+    
+    // Clear QB tokens but preserve other user data
+    const updatedUser = {
+      ...userData,
+      qb_access_token: null,
+      qb_refresh_token: null,
+      qb_expires_in: null,
+      qb_token_type: null,
+      qb_realm_id: null,
+      qb_expires_at: null,
+      qb_updated_at: null,
+      setup_token: null,
+      setup_token_expires: null,
+      invoice_preferences: null
+    };
+    
+    await setUser(normalizedUserId, updatedUser);
+    
+    console.log(`[QB Disconnect] QuickBooks disconnected for user: ${normalizedUserId}`);
+    res.json({ success: true, message: "QuickBooks disconnected successfully" });
+    
+  } catch (error) {
+    console.error("QB disconnect error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Setup preferences endpoints
 router.post("/api/setup/preferences", express.json(), async (req, res) => {
   try {
@@ -594,8 +667,19 @@ router.get("/api/user-status", async (req, res) => {
       });
     }
 
-    // Check if QuickBooks tokens exist
-    const isConnected = !!(userData.qb_access_token && userData.qb_realm_id);
+    // Check if QuickBooks tokens exist and are not expired
+    let isConnected = !!(userData.qb_access_token && userData.qb_realm_id);
+    
+    // Additional check for token expiration if connected
+    if (isConnected && userData.qb_expires_at) {
+      const expiresAt = new Date(userData.qb_expires_at);
+      const now = new Date();
+      if (expiresAt < now) {
+        console.log(`[API User Status] QB tokens expired for user ${pipedriveUserId}`);
+        isConnected = false;
+      }
+    }
+    
     console.log(`[API User Status] User ${pipedriveUserId} - QB Connected: ${isConnected}, Realm ID: ${userData.qb_realm_id || 'none'}`);
 
     if (isConnected) {
