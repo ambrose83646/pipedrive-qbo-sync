@@ -219,6 +219,13 @@
       const reconnectBtn = document.getElementById('reconnectBtn');
       const disconnectBtn = document.getElementById('disconnectBtn');
       
+      console.log('Button elements found:', {
+        connectBtn: !!connectBtn,
+        reconnectBtn: !!reconnectBtn,
+        disconnectBtn: !!disconnectBtn,
+        connectedActions: !!connectedActions
+      });
+      
       // Listen for messages from OAuth callback window
       window.addEventListener('message', function(event) {
         if (event.data && event.data.source === 'qb-callback') {
@@ -250,40 +257,73 @@
       
       // Handle disconnect button
       disconnectBtn.onclick = async function() {
-        if (confirm('Are you sure you want to disconnect QuickBooks? This will remove all stored tokens and preferences.')) {
+        console.log('Disconnect button clicked');
+        console.log('Current userId:', userId);
+        
+        try {
+          const confirmed = confirm('Are you sure you want to disconnect QuickBooks? This will remove all stored tokens and preferences.');
+          console.log('User confirmation:', confirmed);
+          
+          if (!confirmed) {
+            console.log('User cancelled disconnect');
+            return;
+          }
+          
           statusText.textContent = 'Disconnecting...';
+          disconnectBtn.disabled = true;
+          reconnectBtn.disabled = true;
           
           // Get a signed token from SDK for authentication
           let authToken = null;
           try {
+            console.log('Attempting to get signed token from SDK...');
             const token = await sdk.execute('GET_SIGNED_TOKEN');
             authToken = JSON.stringify(token);
+            console.log('Got signed token successfully');
           } catch (e) {
             console.error('Could not get signed token:', e);
+            console.log('Proceeding without signed token');
           }
           
-          fetch('/api/disconnect-qb', {
+          console.log('Sending disconnect request to server...');
+          const response = await fetch('/api/disconnect-qb', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'X-Pipedrive-Token': authToken || ''
             },
             body: JSON.stringify({ userId: userId })
-          })
-          .then(response => response.json())
-          .then(data => {
-            if (data.success) {
-              sdk.execute('TOAST', { message: 'QuickBooks disconnected successfully' });
-              checkStatus();
-            } else {
-              sdk.execute('TOAST', { message: 'Failed to disconnect: ' + (data.error || 'Unknown error') });
-            }
-          })
-          .catch(error => {
-            console.error('Disconnect error:', error);
-            sdk.execute('TOAST', { message: 'Error disconnecting QuickBooks' });
-            checkStatus();
           });
+          
+          console.log('Response status:', response.status);
+          const data = await response.json();
+          console.log('Response data:', data);
+          
+          if (data.success) {
+            console.log('Disconnect successful');
+            sdk.execute('TOAST', { message: 'QuickBooks disconnected successfully' });
+            checkStatus();
+          } else {
+            console.error('Disconnect failed:', data.error);
+            sdk.execute('TOAST', { message: 'Failed to disconnect: ' + (data.error || 'Unknown error') });
+            statusText.textContent = 'QB Active';
+          }
+        } catch (error) {
+          console.error('Error in disconnect handler:', error);
+          console.error('Error stack:', error.stack);
+          
+          // Try to show toast even if there's an error
+          try {
+            sdk.execute('TOAST', { message: 'Error disconnecting QuickBooks' });
+          } catch (toastError) {
+            console.error('Could not show toast:', toastError);
+          }
+          
+          statusText.textContent = 'QB Active';
+        } finally {
+          // Re-enable buttons
+          disconnectBtn.disabled = false;
+          reconnectBtn.disabled = false;
         }
       };
       
