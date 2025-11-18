@@ -252,6 +252,7 @@
       
       // Handle reconnect button
       reconnectBtn.onclick = function() {
+        console.log('Reconnect button clicked');
         handleConnect();
       };
       
@@ -329,6 +330,7 @@
       
       // Check connection status
       function checkStatus() {
+        console.log('Checking status for userId:', userId);
         fetch('/api/user-status?userId=' + userId)
           .then(response => response.json())
           .then(data => {
@@ -338,6 +340,7 @@
             }
             
             if (data.connected === true) {
+              console.log('User is connected, showing connected UI');
               // Show connected state
               statusText.textContent = 'QB Active';
               statusText.className = 'status-active';
@@ -354,7 +357,9 @@
               // Hide connect button, show disconnect/reconnect buttons
               connectBtn.style.display = 'none';
               connectedActions.style.display = 'flex';
+              console.log('Buttons visible - Reconnect/Disconnect should be clickable');
             } else {
+              console.log('User is not connected, showing connect UI');
               // Show disconnected state
               statusText.textContent = 'QB Inactive';
               statusText.className = 'status-inactive';
@@ -369,6 +374,7 @@
           })
           .catch(error => {
             console.error('Error checking status:', error);
+            console.error('Error stack:', error.stack);
             statusText.textContent = 'Status Unknown';
             statusText.className = 'status-inactive';
             companyNameDiv.style.display = 'none';
