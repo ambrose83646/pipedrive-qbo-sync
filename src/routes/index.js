@@ -7,6 +7,71 @@ const { syncContact } = require("../controllers/sync");
 const OAuthClient = require("intuit-oauth");
 const axios = require("axios");
 
+// Helper function to make QuickBooks API call with automatic token refresh
+async function makeQBApiCall(userId, userData, apiCallFunction) {
+  // Create initial client with current tokens
+  const createClient = (tokenData) => {
+    const qbClient = new OAuthClient({
+      clientId: process.env.QB_CLIENT_ID,
+      clientSecret: process.env.QB_CLIENT_SECRET,
+      environment: 'sandbox',
+      redirectUri: process.env.APP_URL + '/auth/qb/callback',
+      logging: false
+    });
+    
+    qbClient.setToken({
+      access_token: tokenData.qb_access_token,
+      refresh_token: tokenData.qb_refresh_token,
+      token_type: 'Bearer',
+      expires_in: tokenData.qb_expires_in || 3600,
+      x_refresh_token_expires_in: 8726400,
+      realmId: tokenData.qb_realm_id  // Use tokenData's realm_id
+    });
+    
+    return qbClient;
+  };
+  
+  try {
+    // First attempt with existing token
+    const qbClient = createClient(userData);
+    return await apiCallFunction(qbClient, userData);
+  } catch (error) {
+    // Check if error is due to unauthorized (expired token)
+    if (error.response && (error.response.statusCode === 401 || error.response.status === 401)) {
+      console.log(`QB token expired for user ${userId}, attempting refresh...`);
+      
+      try {
+        // Refresh the token
+        const newTokens = await qbAuth.refreshToken(userData.qb_refresh_token);
+        
+        // Update user data with new tokens
+        const updatedUserData = {
+          ...userData,
+          qb_access_token: newTokens.access_token,
+          qb_refresh_token: newTokens.refresh_token,
+          qb_expires_in: newTokens.expires_in,
+          qb_expires_at: new Date(Date.now() + (newTokens.expires_in * 1000)).toISOString()
+        };
+        
+        // Save updated tokens to database with the correct user ID
+        await setUser(userId, updatedUserData);
+        
+        console.log(`QB token refreshed successfully for user ${userId}`);
+        
+        // Create new client with refreshed token and retry
+        const refreshedClient = createClient(updatedUserData);
+        return await apiCallFunction(refreshedClient, updatedUserData);
+      } catch (refreshError) {
+        console.error(`Failed to refresh QB token for user ${userId}:`, refreshError);
+        throw new Error('QuickBooks authentication failed. Please reconnect.');
+      }
+    }
+    
+    // Re-throw if not an auth error
+    throw error;
+  }
+}
+
 router.get("/", (req, res) => {
   res.send("Hello!");
 });
@@ -848,15 +913,27 @@ router.get("/api/customer/:customerId", async (req, res) => {
       normalizedUserId = normalizedUserId.replace('https://', '');
     }
     
-    const { qbClient, companyId } = await createQBClient(normalizedUserId);
-    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    // Get user data
+    const userData = await getUser(normalizedUserId);
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      return res.status(400).json({
+        success: false,
+        error: "QuickBooks not connected for this user"
+      });
+    }
     
-    const customerResponse = await qbClient.makeApiCall({
-      url: `${baseUrl}/v3/company/${companyId}/customer/${customerId}?minorversion=65`,
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
+    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const companyId = userData.qb_realm_id;
+    
+    // Make API call with automatic token refresh - pass normalizedUserId for correct persistence
+    const customerResponse = await makeQBApiCall(normalizedUserId, userData, async (qbClient, currentUserData) => {
+      return await qbClient.makeApiCall({
+        url: `${baseUrl}/v3/company/${companyId}/customer/${customerId}?minorversion=65`,
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
     });
     
     const customer = JSON.parse(customerResponse.body).Customer;
@@ -895,8 +972,17 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
       normalizedUserId = normalizedUserId.replace('https://', '');
     }
     
-    const { qbClient, companyId } = await createQBClient(normalizedUserId);
+    // Get user data
+    const userData = await getUser(normalizedUserId);
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      return res.status(400).json({
+        success: false,
+        error: "QuickBooks not connected for this user"
+      });
+    }
+    
     const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const companyId = userData.qb_realm_id;
     
     // Build query for invoices
     let query = `select * from Invoice where CustomerRef='${customerId}'`;
@@ -909,12 +995,15 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
       query += ` and TxnDate <= '${endDate}'`;
     }
     
-    const invoiceResponse = await qbClient.makeApiCall({
-      url: `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`,
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
+    // Make API call with automatic token refresh - pass normalizedUserId for correct persistence
+    const invoiceResponse = await makeQBApiCall(normalizedUserId, userData, async (qbClient, currentUserData) => {
+      return await qbClient.makeApiCall({
+        url: `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`,
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
     });
     
     const responseData = JSON.parse(invoiceResponse.body);
@@ -1012,25 +1101,6 @@ router.get("/api/customers/search", async (req, res) => {
       });
     }
 
-    // Create QuickBooks client
-    const qbClient = new OAuthClient({
-      clientId: process.env.QB_CLIENT_ID,
-      clientSecret: process.env.QB_CLIENT_SECRET,
-      environment: 'sandbox',
-      redirectUri: process.env.APP_URL + '/auth/qb/callback',
-      logging: false
-    });
-
-    // Set the token
-    qbClient.setToken({
-      access_token: userData.qb_access_token,
-      refresh_token: userData.qb_refresh_token,
-      token_type: 'Bearer',
-      expires_in: userData.qb_expires_in,
-      x_refresh_token_expires_in: 8726400,
-      realmId: userData.qb_realm_id
-    });
-
     const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
     const realmId = userData.qb_realm_id;
     
@@ -1038,13 +1108,15 @@ router.get("/api/customers/search", async (req, res) => {
     const query = `SELECT * FROM Customer WHERE DisplayName LIKE '%${searchTerm}%' MAXRESULTS 10`;
     const encodedQuery = encodeURIComponent(query);
     
-    // Make API call to QuickBooks
-    const queryResponse = await qbClient.makeApiCall({
-      url: `${baseUrl}/v3/company/${realmId}/query?query=${encodedQuery}`,
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
+    // Make API call to QuickBooks with automatic token refresh - pass userId for correct persistence
+    const queryResponse = await makeQBApiCall(userId, userData, async (qbClient, currentUserData) => {
+      return await qbClient.makeApiCall({
+        url: `${baseUrl}/v3/company/${realmId}/query?query=${encodedQuery}`,
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
     });
     
     const queryResult = JSON.parse(queryResponse.body);

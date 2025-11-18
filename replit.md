@@ -98,6 +98,8 @@ Preferred communication style: Simple, everyday language.
   - Fixed initialization error in deal-contact extension by using URL parameters as primary source
   - Implemented auto-search with dropdown for QuickBooks contact search (triggers at 2+ characters with 300ms debounce)
   - Added proper error handling for search API to prevent console errors
+  - Implemented automatic QuickBooks token refresh for all API endpoints to handle expired tokens (1-hour expiry)
+  - Fixed token persistence issue to ensure refreshed tokens are saved under the correct user key
 
 # External Dependencies
 
