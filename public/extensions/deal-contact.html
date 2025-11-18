@@ -387,35 +387,64 @@
     }
     
     .search-box {
-      display: flex;
-      gap: 8px;
+      position: relative;
     }
     
     .search-input {
-      flex: 1;
-      padding: 8px 12px;
+      width: 100%;
+      padding: 10px 12px;
       border: 1px solid #d9d9d9;
       border-radius: 4px;
       font-size: 14px;
+      box-sizing: border-box;
     }
     
-    .search-btn {
-      padding: 8px 20px;
-      background: #1890ff;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      font-size: 14px;
-      cursor: pointer;
+    .search-input:focus {
+      outline: none;
+      border-color: #1890ff;
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
     }
     
-    .search-btn:hover {
-      background: #40a9ff;
+    .search-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #d9d9d9;
+      border-top: none;
+      border-radius: 0 0 4px 4px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      margin-top: -1px;
+      max-height: 300px;
+      overflow-y: auto;
     }
     
     .search-results {
+      padding: 0;
+      min-height: auto;
+    }
+    
+    .search-results .loading {
       padding: 20px;
-      min-height: 200px;
+      text-align: center;
+      color: #666;
+    }
+    
+    .search-results .result-item {
+      padding: 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background-color 0.2s;
+    }
+    
+    .search-results .result-item:hover {
+      background-color: #f5f5f5;
+    }
+    
+    .search-results .result-item:last-child {
+      border-bottom: none;
     }
     
     .result-item {
@@ -530,13 +559,14 @@
       <div class="search-header">
         <h3 class="search-title">Link QuickBooks Contact</h3>
         <div class="search-box">
-          <input type="text" class="search-input" id="searchInput" placeholder="Search by name or email...">
-          <button class="search-btn" onclick="searchContacts()">Search</button>
-        </div>
-      </div>
-      <div class="search-results" id="searchResults">
-        <div class="loading">
-          <p>Enter a search term to find QuickBooks contacts</p>
+          <input type="text" class="search-input" id="searchInput" placeholder="Start typing to search (min 2 characters)..." autocomplete="off">
+          <div class="search-dropdown" id="searchDropdown" style="display: none;">
+            <div class="search-results" id="searchResults">
+              <div class="loading">
+                <p>Type at least 2 characters to search</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="search-footer">
@@ -555,27 +585,47 @@
     // Initialize SDK and load data
     document.addEventListener('DOMContentLoaded', async function() {
       try {
+        // Get URL parameters first as fallback
+        const urlParams = new URLSearchParams(window.location.search);
+        
         // Initialize Pipedrive SDK
         sdk = await new AppExtensionsSDK().initialize();
         
-        // Get user context
+        // Get user context - try SDK first, then URL params
         try {
           const user = await sdk.execute('GET_USER');
-          userId = user?.id || 'test';
+          userId = user?.id || urlParams.get('userId') || 'test';
         } catch (e) {
-          // Fallback to URL parameter if SDK method fails
-          const urlParams = new URLSearchParams(window.location.search);
+          console.log('GET_USER not available, using URL parameter');
           userId = urlParams.get('userId') || 'test';
         }
         
-        // Get deal ID from context
-        const context = await sdk.execute('GET_CONTEXT');
-        dealId = context?.selectedIds?.[0] || context?.id;
+        // Get deal ID - try URL params first, then SDK methods
+        dealId = urlParams.get('selectedIds') || urlParams.get('id');
+        
+        if (!dealId) {
+          // Try SDK methods as fallback
+          try {
+            const context = await sdk.execute('GET_CONTEXT');
+            dealId = context?.selectedIds?.[0] || context?.id;
+          } catch (e) {
+            console.log('GET_CONTEXT not available');
+            // Try getting from entity
+            try {
+              const entity = await sdk.execute('GET_ENTITY', { entity: 'deal' });
+              dealId = entity?.id;
+            } catch (e2) {
+              console.log('GET_ENTITY not available');
+            }
+          }
+        }
         
         if (!dealId) {
           showError('No deal selected');
           return;
         }
+        
+        console.log('Initialized with dealId:', dealId, 'userId:', userId);
         
         // Load deal data and check for linked contact
         await loadDealData();
@@ -854,30 +904,80 @@
       button.parentElement.style.display = 'none';
     }
     
+    // Auto-search with debouncing
+    let searchTimeout = null;
+    
     function openSearchModal() {
       document.getElementById('searchModal').classList.add('active');
       document.getElementById('searchInput').focus();
+      setupAutoSearch(); // Initialize auto-search when modal opens
     }
     
     function closeSearchModal() {
       document.getElementById('searchModal').classList.remove('active');
       document.getElementById('searchInput').value = '';
-      document.getElementById('searchResults').innerHTML = '<div class="loading"><p>Enter a search term to find QuickBooks contacts</p></div>';
+      document.getElementById('searchDropdown').style.display = 'none';
+      document.getElementById('searchResults').innerHTML = '<div class="loading"><p>Type at least 2 characters to search</p></div>';
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
     }
     
-    async function searchContacts() {
-      const searchTerm = document.getElementById('searchInput').value.trim();
+    function setupAutoSearch() {
+      const searchInput = document.getElementById('searchInput');
+      const searchDropdown = document.getElementById('searchDropdown');
+      const searchResults = document.getElementById('searchResults');
       
-      if (!searchTerm) {
-        sdk.execute('TOAST', { message: 'Please enter a search term' });
-        return;
-      }
+      // Remove any existing listeners to avoid duplicates
+      searchInput.oninput = null;
       
+      searchInput.oninput = function(e) {
+        const searchTerm = e.target.value.trim();
+        
+        // Clear previous timeout
+        if (searchTimeout) {
+          clearTimeout(searchTimeout);
+        }
+        
+        // Hide dropdown if less than 2 characters
+        if (searchTerm.length < 2) {
+          searchDropdown.style.display = 'none';
+          searchResults.innerHTML = '<div class="loading"><p>Type at least 2 characters to search</p></div>';
+          return;
+        }
+        
+        // Show dropdown with loading state
+        searchDropdown.style.display = 'block';
+        searchResults.innerHTML = '<div class="loading"><div class="spinner"></div><p>Searching...</p></div>';
+        
+        // Debounce search - wait 300ms after user stops typing
+        searchTimeout = setTimeout(() => {
+          performSearch(searchTerm);
+        }, 300);
+      };
+      
+      // Show dropdown when input is focused and has enough characters
+      searchInput.onfocus = function(e) {
+        if (e.target.value.trim().length >= 2) {
+          searchDropdown.style.display = 'block';
+        }
+      };
+    }
+    
+    async function performSearch(searchTerm) {
       const resultsDiv = document.getElementById('searchResults');
-      resultsDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Searching...</p></div>';
+      const searchDropdown = document.getElementById('searchDropdown');
       
       try {
         const response = await fetch(`/api/customers/search?term=${encodeURIComponent(searchTerm)}&userId=${userId}`);
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Search API error:', errorData);
+          resultsDiv.innerHTML = `<div class="loading"><p>${errorData.error || 'Error searching customers'}</p></div>`;
+          return;
+        }
+        
         const customers = await response.json();
         
         if (!customers || customers.length === 0) {
@@ -890,17 +990,17 @@
           html += `
             <div class="result-item" onclick="linkContact('${customer.id}', '${(customer.name || '').replace(/'/g, "\\'")}')">
               <div class="result-name">${customer.name || 'Unnamed'}</div>
-              ${customer.email ? `<div class="result-email">${customer.email}</div>` : ''}
+              ${customer.email ? `<div class="result-email" style="font-size: 12px; color: #666;">${customer.email}</div>` : ''}
             </div>
           `;
         });
         
         resultsDiv.innerHTML = html;
+        searchDropdown.style.display = 'block';
         
       } catch (error) {
         console.error('Search error:', error);
-        sdk.execute('TOAST', { message: 'Search failed' });
-        resultsDiv.innerHTML = '<div class="loading"><p>Search failed. Please try again.</p></div>';
+        resultsDiv.innerHTML = '<div class="loading"><p>Error searching customers. Please check QuickBooks connection.</p></div>';
       }
     }
     

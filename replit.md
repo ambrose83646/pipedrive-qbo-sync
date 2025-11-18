@@ -95,6 +95,9 @@ Preferred communication style: Simple, everyday language.
   - Added linked/unlinked states with appropriate visual feedback
   - Integrated real-time invoice data fetching with overview calculations
   - Fixed QuickBooks API response parsing (changed `.text()` to `.body`)
+  - Fixed initialization error in deal-contact extension by using URL parameters as primary source
+  - Implemented auto-search with dropdown for QuickBooks contact search (triggers at 2+ characters with 300ms debounce)
+  - Added proper error handling for search API to prevent console errors
 
 # External Dependencies
 
