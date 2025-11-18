@@ -323,16 +323,27 @@
             disconnectBtn.disabled = true;
             reconnectBtn.disabled = true;
             
-            // Get a signed token from SDK for authentication
+            // Try to get a signed token from SDK for authentication (optional)
+            // Note: GET_SIGNED_TOKEN may not be available in all Pipedrive extension contexts
             let authToken = null;
             try {
-              console.log('Attempting to get signed token from SDK...');
-              const token = await sdk.execute('GET_SIGNED_TOKEN');
-              authToken = JSON.stringify(token);
-              console.log('Got signed token successfully');
+              console.log('Attempting to get authentication token (optional)...');
+              // Try different SDK commands that might work
+              try {
+                // This command may not exist in all contexts
+                const token = await sdk.execute('GET_SIGNED_TOKEN');
+                authToken = JSON.stringify(token);
+                console.log('Got signed token successfully');
+              } catch (tokenError) {
+                // Try getting context as fallback
+                const context = await sdk.execute('GET_CONTEXT');
+                if (context) {
+                  authToken = JSON.stringify({ context: context });
+                  console.log('Using context as authentication');
+                }
+              }
             } catch (e) {
-              console.error('Could not get signed token:', e);
-              console.log('Proceeding without signed token');
+              console.log('No authentication token available, proceeding without (server allows this for disconnect)');
             }
             
             console.log('Sending disconnect request to server...');

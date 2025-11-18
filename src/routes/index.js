@@ -160,9 +160,13 @@ router.post("/api/disconnect-qb", express.json(), async (req, res) => {
         // Allow disconnect from same domain even with invalid token format for backward compatibility
       }
     } else {
-      // If no token provided, reject the request for security
-      console.error(`[QB Disconnect] No authentication token provided`);
-      return res.status(403).json({ error: "Authentication required" });
+      // If no token provided, allow disconnect if user has QB tokens (they're already authenticated to have connected)
+      // This is less secure but necessary since GET_SIGNED_TOKEN doesn't work in some Pipedrive contexts
+      console.log(`[QB Disconnect] No authentication token provided, but allowing disconnect for existing QB user`);
+      if (!userData.qb_access_token && !userData.qb_realm_id) {
+        console.error(`[QB Disconnect] User has no QB connection to disconnect`);
+        return res.status(400).json({ error: "No QuickBooks connection found" });
+      }
     }
     
     // Clear QB tokens but preserve other user data
