@@ -142,7 +142,95 @@ router.get("/auth/pipedrive/callback", async (req, res) => {
       // Continue even if field creation fails
     }
 
-    res.redirect("/auth/qb?user_id=" + encodeURIComponent(userId));
+    // Instead of auto-redirecting to QuickBooks OAuth, show a success page
+    // This is required for QuickBooks compliance - user must explicitly click to connect
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Installation Successful</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          }
+          .success-container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+          }
+          h1 {
+            color: #28a745;
+            margin-bottom: 20px;
+          }
+          p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+          }
+          .success-icon {
+            font-size: 60px;
+            color: #28a745;
+            margin-bottom: 20px;
+          }
+          .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: left;
+          }
+          .info-box h3 {
+            margin-top: 0;
+            color: #333;
+          }
+          button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+          }
+          button:hover {
+            background: #0056b3;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="success-container">
+          <div class="success-icon">✓</div>
+          <h1>Installation Successful!</h1>
+          <p>Your Pipedrive app has been successfully installed and authenticated.</p>
+          
+          <div class="info-box">
+            <h3>Next Steps:</h3>
+            <p>1. Navigate to your Pipedrive Settings → Installed apps → OnitQb</p>
+            <p>2. Click the "Settings" tab in the app</p>
+            <p>3. Click "Connect to QuickBooks" to complete the integration</p>
+          </div>
+          
+          <button onclick="window.close()">Close This Window</button>
+        </div>
+        <script>
+          // Try to close the window after 5 seconds
+          setTimeout(function() {
+            window.close();
+          }, 5000);
+        </script>
+      </body>
+      </html>
+    `);
   } catch (error) {
     console.error("OAuth callback error:", error);
     console.log("Callback full error:" + JSON.stringify(error, null, 2));
