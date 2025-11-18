@@ -2,6 +2,8 @@
 
 This is a Node.js integration application that connects Pipedrive CRM with QuickBooks Online (QBO). The application synchronizes contact data from Pipedrive to QuickBooks, allowing users to manage their CRM contacts and accounting customers from a unified interface. The app uses OAuth 2.0 authentication for both services and stores user credentials in Replit's key-value database. It provides browser extensions for Pipedrive that enable users to connect their QuickBooks account and manage contact synchronization directly from within the Pipedrive interface.
 
+**QuickBooks Compliance**: The app follows QuickBooks certification requirements by ensuring users must explicitly click "Connect to QuickBooks" in the app settings rather than automatically redirecting during installation.
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
