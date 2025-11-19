@@ -650,11 +650,26 @@ router.get("/auth/qb/callback", async (req, res) => {
             <h3>Success! QuickBooks connected.</h3>
             <p>This window will close automatically...</p>
             <script>
-              if (window.opener) {
-                window.opener.postMessage({ success: true, source: 'qb-callback' }, '*');
+              // Log window.opener status for debugging
+              console.log('window.opener:', window.opener);
+              console.log('window.opener is null:', window.opener === null);
+              
+              if (window.opener && !window.opener.closed) {
+                console.log('Attempting to send postMessage to opener');
+                try {
+                  window.opener.postMessage({ success: true, source: 'qb-callback' }, '*');
+                  console.log('postMessage sent successfully');
+                } catch (error) {
+                  console.error('Failed to send postMessage:', error);
+                }
                 setTimeout(() => window.close(), 2000);
               } else if (parent !== window) {
+                console.log('No window.opener, trying parent');
                 parent.postMessage({ success: true, source: 'qb-callback' }, '*');
+              } else {
+                console.log('No window.opener available (sandboxed environment)');
+                // Just close the window since polling will handle the refresh
+                setTimeout(() => window.close(), 2000);
               }
             </script>
           </body>
