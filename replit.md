@@ -96,6 +96,7 @@ Preferred communication style: Simple, everyday language.
   - Implemented database-based deal-to-QB customer mapping via `setDealMapping`/`getDealMapping` functions
   - Fixed Pipedrive OAuth to use Bearer token in Authorization header (not query string api_token param)
   - Fixed `/api/deal-contact` endpoint to return stored mapping even when QB tokens unavailable
+  - **Fixed extension to show linked contacts**: Updated `loadDealData()` to call `/api/deal-contact` endpoint instead of looking for Pipedrive custom field
   - Implemented automatic Pipedrive token refresh (similar to QuickBooks refresh logic)
   - Fixed frontend SDK commands: replaced invalid 'TOAST' with `AppExtensionsSDK.Command.SHOW_SNACKBAR`
   - Note: Pipedrive refresh tokens expire after 60 days of non-use; users must re-authenticate if tokens are fully expired
