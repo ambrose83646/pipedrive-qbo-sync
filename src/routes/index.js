@@ -107,6 +107,85 @@ router.get("/test-db", async (req, res) => {
   }
 });
 
+// Debug endpoint to test QuickBooks API call
+router.get("/api/debug/qb-test", async (req, res) => {
+  try {
+    const providedUserId = req.query.userId || 'test';
+    
+    // Find user with QB tokens
+    let userData = await getUser(providedUserId);
+    let actualUserId = providedUserId;
+    
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      const { listUsers } = require("../../config/database");
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.qb_access_token && testUserData.qb_realm_id) {
+          userData = testUserData;
+          actualUserId = key;
+          break;
+        }
+      }
+    }
+    
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      return res.json({
+        step: "find_user",
+        error: "No QB tokens found",
+        providedUserId
+      });
+    }
+    
+    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const realmId = userData.qb_realm_id;
+    const query = `SELECT * FROM Customer MAXRESULTS 1`;
+    const encodedQuery = encodeURIComponent(query);
+    
+    try {
+      const queryResponse = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
+        return await qbClient.makeApiCall({
+          url: `${baseUrl}/v3/company/${realmId}/query?query=${encodedQuery}`,
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+      });
+      
+      return res.json({
+        step: "api_call_completed",
+        actualUserId,
+        realmId,
+        responseType: typeof queryResponse,
+        hasResponse: !!queryResponse,
+        hasBody: queryResponse ? !!queryResponse.body : false,
+        hasJson: queryResponse ? !!queryResponse.json : false,
+        hasGetJson: queryResponse ? typeof queryResponse.getJson === 'function' : false,
+        responseKeys: queryResponse ? Object.keys(queryResponse) : [],
+        bodyPreview: queryResponse?.body ? (typeof queryResponse.body === 'string' ? queryResponse.body.substring(0, 200) : 'not a string') : null
+      });
+    } catch (apiError) {
+      return res.json({
+        step: "api_call_error",
+        actualUserId,
+        realmId,
+        errorName: apiError.name,
+        errorMessage: apiError.message,
+        errorCode: apiError.code,
+        statusCode: apiError.response?.statusCode || apiError.statusCode,
+        responseBody: apiError.response?.body || apiError.body,
+        intuit_tid: apiError.intuit_tid
+      });
+    }
+  } catch (error) {
+    res.json({
+      step: "unexpected_error",
+      error: error.message,
+      stack: error.stack?.split('\n').slice(0, 5)
+    });
+  }
+});
+
 // Diagnostic endpoint to see all users and their QuickBooks connection status
 router.get("/api/debug/users", async (req, res) => {
   try {
@@ -1441,19 +1520,36 @@ router.get("/api/customers/search", async (req, res) => {
       responseType: typeof queryResponse,
       hasBody: queryResponse ? !!queryResponse.body : false,
       hasJson: queryResponse ? !!queryResponse.json : false,
+      hasGetJson: queryResponse ? typeof queryResponse.getJson === 'function' : false,
       keys: queryResponse ? Object.keys(queryResponse) : []
     });
     
-    // Check if response exists and has body
-    if (!queryResponse || !queryResponse.body) {
-      console.error("[Search] Invalid QuickBooks response - missing body:", queryResponse);
+    // Check if response exists
+    if (!queryResponse) {
+      console.error("[Search] Invalid QuickBooks response - no response");
       return res.status(500).json({
         success: false,
         error: "Invalid response from QuickBooks"
       });
     }
     
-    const queryResult = JSON.parse(queryResponse.body);
+    // Try different ways to get the response data (intuit-oauth library can return different formats)
+    let queryResult;
+    if (queryResponse.body) {
+      queryResult = typeof queryResponse.body === 'string' ? JSON.parse(queryResponse.body) : queryResponse.body;
+    } else if (queryResponse.json) {
+      queryResult = typeof queryResponse.json === 'string' ? JSON.parse(queryResponse.json) : queryResponse.json;
+    } else if (typeof queryResponse.getJson === 'function') {
+      queryResult = queryResponse.getJson();
+    } else if (queryResponse.response && queryResponse.response.body) {
+      queryResult = typeof queryResponse.response.body === 'string' ? JSON.parse(queryResponse.response.body) : queryResponse.response.body;
+    } else {
+      console.error("[Search] Could not extract data from QB response:", JSON.stringify(queryResponse, null, 2));
+      return res.status(500).json({
+        success: false,
+        error: "Could not parse QuickBooks response"
+      });
+    }
     const customers = queryResult.QueryResponse?.Customer || [];
     
     // Transform to simplified format { id, name, email }
@@ -1468,7 +1564,13 @@ router.get("/api/customers/search", async (req, res) => {
     console.error("Search customers error:", error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
+      debug: {
+        errorName: error.name,
+        statusCode: error.response?.statusCode || error.statusCode,
+        responseBody: error.response?.body,
+        intuit_tid: error.intuit_tid
+      }
     });
   }
 });
