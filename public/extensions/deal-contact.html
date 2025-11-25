@@ -940,22 +940,33 @@
     
     async function loadDealData() {
       try {
-        // Get deal data
-        const response = await sdk.execute('GET_ENTITY', {
-          id: dealId,
-          entity: 'deal'
-        });
+        // Get deal data from Pipedrive
+        try {
+          const response = await sdk.execute('GET_ENTITY', {
+            id: dealId,
+            entity: 'deal'
+          });
+          dealData = response?.data;
+        } catch (e) {
+          console.log('Could not get deal entity data:', e);
+        }
         
-        dealData = response?.data;
-        
-        // Check for QB customer ID in custom field
-        const qbCustomerId = dealData?.qb_customer_id || dealData?.['qb_customer_id'];
-        
-        if (qbCustomerId) {
-          // Load linked contact data
-          await loadLinkedContact(qbCustomerId);
+        // Check our database for existing QB customer mapping
+        const mappingResponse = await fetch(`/api/deal-contact?dealId=${dealId}&userId=${userId}`);
+        if (mappingResponse.ok) {
+          const mappingData = await mappingResponse.json();
+          console.log('Deal-contact mapping response:', mappingData);
+          
+          if (mappingData.success && mappingData.customer) {
+            // We have a linked contact - set it and show linked state
+            linkedContact = mappingData.customer;
+            showLinkedState();
+          } else {
+            // No linked contact
+            showUnlinkedState();
+          }
         } else {
-          // Show unlinked state
+          console.error('Error checking deal-contact mapping:', mappingResponse.status);
           showUnlinkedState();
         }
         
@@ -964,23 +975,6 @@
         
       } catch (error) {
         console.error('Error loading deal data:', error);
-        showUnlinkedState();
-      }
-    }
-    
-    async function loadLinkedContact(qbCustomerId) {
-      try {
-        // Fetch customer details from backend
-        const response = await fetch(`/api/customer/${qbCustomerId}?userId=${userId}`);
-        if (response.ok) {
-          const data = await response.json();
-          linkedContact = data.customer;
-          showLinkedState();
-        } else {
-          showUnlinkedState();
-        }
-      } catch (error) {
-        console.error('Error loading linked contact:', error);
         showUnlinkedState();
       }
     }
