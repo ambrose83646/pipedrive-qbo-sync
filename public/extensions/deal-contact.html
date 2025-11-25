@@ -1320,11 +1320,9 @@
     }
     
     async function linkContact(qbCustomerId, customerName) {
-      if (!confirm(`Link "${customerName}" to this deal?`)) {
-        return;
-      }
-      
       try {
+        // Show linking in progress
+        sdk.execute('TOAST', { message: `Linking ${customerName}...` });
         // Get the field key from backend
         const fieldResponse = await fetch(`/api/field-key?userId=${userId}`);
         const fieldData = await fieldResponse.json();
