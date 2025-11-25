@@ -43,9 +43,46 @@ async function listUsers(prefix = '') {
   }
 }
 
+// Deal-to-QB Customer mapping functions
+async function setDealMapping(dealId, qbCustomerId, customerName) {
+  const key = `deal_mapping:${dealId}`;
+  try {
+    await db.set(key, { qbCustomerId, customerName, linkedAt: new Date().toISOString() });
+    return true;
+  } catch (error) {
+    console.error(`Error setting deal mapping for deal ${dealId}:`, error);
+    throw error;
+  }
+}
+
+async function getDealMapping(dealId) {
+  const key = `deal_mapping:${dealId}`;
+  try {
+    const result = await db.get(key);
+    return result?.value || null;
+  } catch (error) {
+    console.error(`Error getting deal mapping for deal ${dealId}:`, error);
+    throw error;
+  }
+}
+
+async function deleteDealMapping(dealId) {
+  const key = `deal_mapping:${dealId}`;
+  try {
+    await db.delete(key);
+    return true;
+  } catch (error) {
+    console.error(`Error deleting deal mapping for deal ${dealId}:`, error);
+    throw error;
+  }
+}
+
 module.exports = {
   getUser,
   setUser,
   deleteUser,
-  listUsers
+  listUsers,
+  setDealMapping,
+  getDealMapping,
+  deleteDealMapping
 };

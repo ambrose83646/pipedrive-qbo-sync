@@ -1666,13 +1666,21 @@ router.post("/api/attach-contact", express.json(), async (req, res) => {
       const { listUsers } = require("../../config/database");
       const allKeys = await listUsers();
       
-      let fallbackUser = null;
-      let fallbackUserId = null;
-      let bestFallbackUser = null;
-      let bestFallbackUserId = null;
+      // Collect all users with Pipedrive tokens, tracking their freshness
+      const usersWithPipedriveTokens = [];
+      const qbTokensByDomain = {}; // Track QB tokens by api_domain for safe merging
       
       for (const key of allKeys) {
         const testUserData = await getUser(key);
+        
+        // Track users with QB tokens, indexed by their api_domain for tenant-safe merging
+        if (testUserData && testUserData.qb_access_token && testUserData.qb_realm_id && testUserData.api_domain) {
+          const normalizedDomain = testUserData.api_domain.replace('https://', '');
+          if (!qbTokensByDomain[normalizedDomain]) {
+            qbTokensByDomain[normalizedDomain] = { key, data: testUserData };
+          }
+        }
+        
         if (testUserData && testUserData.access_token) {
           // Check if this user is related to the provided userId
           const normalizedProvidedId = providedUserId.replace('https://', '');
@@ -1687,30 +1695,56 @@ router.post("/api/attach-contact", express.json(), async (req, res) => {
             break;
           }
           
-          // Prefer users with both Pipedrive AND QB tokens (more likely to be valid)
-          if (testUserData.qb_access_token && testUserData.qb_realm_id) {
-            if (!bestFallbackUser) {
-              bestFallbackUser = testUserData;
-              bestFallbackUserId = key;
-            }
-          } else if (!fallbackUser) {
-            // Save first user with just Pipedrive tokens as secondary fallback
-            fallbackUser = testUserData;
-            fallbackUserId = key;
-          }
+          // Collect this user for freshness comparison
+          usersWithPipedriveTokens.push({
+            key,
+            data: testUserData,
+            createdAt: testUserData.created_at ? new Date(testUserData.created_at) : new Date(0),
+            hasQBTokens: !!(testUserData.qb_access_token && testUserData.qb_realm_id),
+            apiDomain: testUserData.api_domain?.replace('https://', '') || null
+          });
         }
       }
       
-      // Use best fallback (with both tokens) if available, otherwise use any user with Pipedrive tokens
-      if (!userData) {
-        if (bestFallbackUser) {
-          console.log(`[Attach Contact] Using best fallback user with both tokens: ${bestFallbackUserId}`);
-          userData = bestFallbackUser;
-          actualUserId = bestFallbackUserId;
-        } else if (fallbackUser) {
-          console.log(`[Attach Contact] Using fallback user with Pipedrive tokens: ${fallbackUserId}`);
-          userData = fallbackUser;
-          actualUserId = fallbackUserId;
+      // If no direct match found, use the FRESHEST Pipedrive tokens (most recently created)
+      if (!userData && usersWithPipedriveTokens.length > 0) {
+        // Sort by creation date, newest first
+        usersWithPipedriveTokens.sort((a, b) => b.createdAt - a.createdAt);
+        
+        const freshest = usersWithPipedriveTokens[0];
+        console.log(`[Attach Contact] Using freshest Pipedrive tokens from: ${freshest.key} (created: ${freshest.data.created_at || 'unknown'})`);
+        
+        userData = freshest.data;
+        actualUserId = freshest.key;
+        
+        // If freshest user doesn't have QB tokens, try to find QB tokens from SAME tenant only
+        // We check both api_domain AND ensure QB realm consistency
+        if (!freshest.hasQBTokens && freshest.apiDomain) {
+          const sameTenantQB = qbTokensByDomain[freshest.apiDomain];
+          // Only merge if:
+          // 1. Same api_domain (Pipedrive tenant)
+          // 2. AND the freshest user has a known qb_realm_id that matches (if set)
+          // OR the freshest user has no qb_realm_id yet (first time linking)
+          const canMerge = sameTenantQB && (
+            !userData.qb_realm_id || // No existing realm - safe to merge
+            userData.qb_realm_id === sameTenantQB.data.qb_realm_id // Same realm - safe to merge
+          );
+          
+          if (canMerge) {
+            console.log(`[Attach Contact] Merging QB tokens from same tenant ${sameTenantQB.key} (realm: ${sameTenantQB.data.qb_realm_id}) into ${actualUserId}`);
+            userData.qb_access_token = sameTenantQB.data.qb_access_token;
+            userData.qb_refresh_token = sameTenantQB.data.qb_refresh_token;
+            userData.qb_realm_id = sameTenantQB.data.qb_realm_id;
+            
+            // Persist the merged data
+            const { setUser } = require("../../config/database");
+            await setUser(actualUserId, userData);
+            console.log(`[Attach Contact] Merged and saved user data under ${actualUserId}`);
+          } else if (sameTenantQB) {
+            console.log(`[Attach Contact] Skipping QB token merge - realm mismatch: user has ${userData.qb_realm_id}, found ${sameTenantQB.data.qb_realm_id}`);
+          } else {
+            console.log(`[Attach Contact] No QB tokens found for tenant ${freshest.apiDomain}`);
+          }
         }
       }
     }
@@ -1734,16 +1768,29 @@ router.post("/api/attach-contact", express.json(), async (req, res) => {
     // Helper function to make Pipedrive API call with auto token refresh
     const makePipedriveCall = async (method, endpoint, data = null, retryCount = 0) => {
       const accessToken = userData.access_token;
-      const url = `https://${apiDomain}${endpoint}?api_token=${accessToken}`;
+      const url = `https://${apiDomain}${endpoint}`;
+      const headers = {
+        'Authorization': `Bearer ${accessToken}`
+      };
       
       console.log(`[Attach Contact] Making ${method} request to ${endpoint} (attempt ${retryCount + 1})`);
       
       try {
         let response;
         if (method === 'GET') {
-          response = await axios.get(url);
-        } else if (method === 'PUT') {
-          response = await axios.put(url, data);
+          response = await axios.get(url, { headers });
+        } else if (method === 'PUT' || method === 'POST') {
+          // Use form-urlencoded for PUT/POST requests (Pipedrive v1 API preference)
+          const formData = new URLSearchParams();
+          for (const [key, value] of Object.entries(data)) {
+            formData.append(key, value);
+          }
+          const requestHeaders = { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' };
+          if (method === 'PUT') {
+            response = await axios.put(url, formData, { headers: requestHeaders });
+          } else {
+            response = await axios.post(url, formData, { headers: requestHeaders });
+          }
         }
         return response;
       } catch (error) {
@@ -1782,18 +1829,12 @@ router.post("/api/attach-contact", express.json(), async (req, res) => {
       }
     };
 
-    // Get existing deal data
-    const existingDeal = await makePipedriveCall('GET', `/v1/deals/${dealId}`);
-    const currentNotes = existingDeal.data.data.notes || '';
+    // Store the deal-to-QB customer mapping in our database
+    // This is more reliable than trying to store it in Pipedrive's notes field
+    const { setDealMapping } = require("../../config/database");
+    await setDealMapping(dealId, qbCustomerId, customerName);
     
-    const updatedNotes = currentNotes.includes(`QB_CUSTOMER_ID:${qbCustomerId}`) 
-      ? currentNotes 
-      : `${currentNotes}\n\nQB_CUSTOMER_ID:${qbCustomerId}`;
-    
-    // Update deal with QB customer ID
-    await makePipedriveCall('PUT', `/v1/deals/${dealId}`, {
-      notes: updatedNotes
-    });
+    console.log(`[Attach Contact] Successfully linked deal ${dealId} to QB customer ${qbCustomerId}`);
 
     res.json({
       success: true,
@@ -1823,38 +1864,18 @@ router.get("/api/deal-contact", async (req, res) => {
       });
     }
 
-    // Get user's Pipedrive tokens
-    const userData = await getUser(userId);
-    if (!userData || !userData.access_token) {
-      return res.status(400).json({
-        success: false,
-        error: "Pipedrive not connected for this user"
-      });
-    }
-
-    // Get deal data from Pipedrive
-    // Handle api_domain with or without https:// prefix
-    let apiDomain = userData.api_domain || 'api.pipedrive.com';
-    if (apiDomain.startsWith('https://')) {
-      apiDomain = apiDomain.replace('https://', '');
-    }
-    const dealUrl = `https://${apiDomain}/v1/deals/${dealId}?api_token=${userData.access_token}`;
+    // Get the deal-to-QB customer mapping from our database
+    const { getDealMapping } = require("../../config/database");
+    const mapping = await getDealMapping(dealId);
     
-    const dealResponse = await axios.get(dealUrl);
-    const dealData = dealResponse.data.data;
-    
-    // Extract QB Customer ID from notes (in production, use custom field)
-    const notes = dealData.notes || '';
-    const qbIdMatch = notes.match(/QB_CUSTOMER_ID:(\w+)/);
-    
-    if (!qbIdMatch) {
+    if (!mapping) {
       return res.json({
         success: true,
         customer: null
       });
     }
 
-    const qbCustomerId = qbIdMatch[1];
+    const qbCustomerId = mapping.qbCustomerId;
     
     // Get customer details from QuickBooks
     try {
