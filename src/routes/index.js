@@ -1897,17 +1897,47 @@ router.get("/api/deal-contact", async (req, res) => {
         customer: customer
       });
     } catch (qbError) {
-      // If QB fetch fails, just return the ID
+      // If QB fetch fails, use the stored customer name from the mapping
       res.json({
         success: true,
         customer: {
           Id: qbCustomerId,
-          DisplayName: "QuickBooks Customer #" + qbCustomerId
+          DisplayName: mapping.customerName || "QuickBooks Customer #" + qbCustomerId
         }
       });
     }
   } catch (error) {
     console.error("Get deal contact error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Delete deal-contact association (unlink)
+router.delete("/api/deal-contact", async (req, res) => {
+  try {
+    const { dealId } = req.query;
+
+    if (!dealId) {
+      return res.status(400).json({
+        success: false,
+        error: "dealId is required"
+      });
+    }
+
+    const { deleteDealMapping } = require("../../config/database");
+    await deleteDealMapping(dealId);
+    
+    console.log(`[Unlink Contact] Successfully unlinked deal ${dealId}`);
+
+    res.json({
+      success: true,
+      message: "Contact unlinked from deal"
+    });
+  } catch (error) {
+    console.error("Unlink contact error:", error);
     res.status(500).json({
       success: false,
       error: error.message

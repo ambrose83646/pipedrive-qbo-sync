@@ -228,6 +228,26 @@
       color: #1a1a1a;
     }
     
+    .unlink-btn {
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #999;
+      margin-left: 8px;
+      transition: all 0.2s;
+    }
+    
+    .unlink-btn:hover {
+      background: #fee;
+      color: #dc3545;
+    }
+    
     .linked-contact-subtitle {
       font-size: 13px;
       color: #8c8c8c;
@@ -1071,6 +1091,11 @@
               <path d="M10 10a3 3 0 100-6 3 3 0 000 6zm0 2c-4.418 0-8 1.79-8 4v1h16v-1c0-2.21-3.582-4-8-4z"/>
             </svg>
             <span class="linked-contact-name">${contactName}</span>
+            <button class="unlink-btn" onclick="unlinkContact()" title="Unlink contact">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+              </svg>
+            </button>
           </div>
           <div class="linked-contact-subtitle">QuickBooks</div>
         </div>
@@ -1347,6 +1372,39 @@
       } catch (error) {
         console.error('Link error:', error);
         sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Failed to link contact: ' + error.message });
+      }
+    }
+    
+    async function unlinkContact() {
+      if (!confirm('Are you sure you want to unlink this QuickBooks contact from this deal?')) {
+        return;
+      }
+      
+      try {
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Unlinking contact...' });
+        
+        const response = await fetch(`/api/deal-contact?dealId=${dealId}`, {
+          method: 'DELETE',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to unlink contact');
+        }
+        
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Contact unlinked successfully!' });
+        
+        // Clear linked contact and show unlinked state
+        linkedContact = null;
+        showUnlinkedState();
+        
+      } catch (error) {
+        console.error('Unlink error:', error);
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Failed to unlink contact: ' + error.message });
       }
     }
     
