@@ -16,7 +16,7 @@ async function makeQBApiCall(userId, userData, apiCallFunction) {
       clientSecret: process.env.QB_CLIENT_SECRET,
       environment: 'sandbox',
       redirectUri: process.env.APP_URL + '/auth/qb/callback',
-      logging: false
+      logging: true
     });
     
     qbClient.setToken({
@@ -25,20 +25,40 @@ async function makeQBApiCall(userId, userData, apiCallFunction) {
       token_type: 'Bearer',
       expires_in: tokenData.qb_expires_in || 3600,
       x_refresh_token_expires_in: 8726400,
-      realmId: tokenData.qb_realm_id  // Use tokenData's realm_id
+      realmId: tokenData.qb_realm_id
     });
     
     return qbClient;
   };
   
   try {
+    console.log(`[makeQBApiCall] Starting API call for user ${userId}`);
+    console.log(`[makeQBApiCall] Has access token: ${!!userData.qb_access_token}, Has realm: ${!!userData.qb_realm_id}`);
+    
     // First attempt with existing token
     const qbClient = createClient(userData);
-    return await apiCallFunction(qbClient, userData);
+    const response = await apiCallFunction(qbClient, userData);
+    
+    console.log(`[makeQBApiCall] API call successful, response type: ${typeof response}`);
+    if (response) {
+      console.log(`[makeQBApiCall] Response has body: ${!!response.body}, has json: ${!!response.json}`);
+    }
+    
+    return response;
   } catch (error) {
+    console.error(`[makeQBApiCall] API call error for user ${userId}:`, error.message);
+    console.error(`[makeQBApiCall] Error details:`, {
+      name: error.name,
+      statusCode: error.response?.statusCode || error.response?.status,
+      errorBody: error.response?.body || error.response?.data,
+      authHeader: error.authHeader,
+      intuit_tid: error.intuit_tid
+    });
+    
     // Check if error is due to unauthorized (expired token)
-    if (error.response && (error.response.statusCode === 401 || error.response.status === 401)) {
-      console.log(`QB token expired for user ${userId}, attempting refresh...`);
+    const statusCode = error.response?.statusCode || error.response?.status || error.statusCode;
+    if (statusCode === 401) {
+      console.log(`[makeQBApiCall] QB token expired for user ${userId}, attempting refresh...`);
       
       try {
         // Refresh the token
@@ -56,13 +76,13 @@ async function makeQBApiCall(userId, userData, apiCallFunction) {
         // Save updated tokens to database with the correct user ID
         await setUser(userId, updatedUserData);
         
-        console.log(`QB token refreshed successfully for user ${userId}`);
+        console.log(`[makeQBApiCall] QB token refreshed successfully for user ${userId}`);
         
         // Create new client with refreshed token and retry
         const refreshedClient = createClient(updatedUserData);
         return await apiCallFunction(refreshedClient, updatedUserData);
       } catch (refreshError) {
-        console.error(`Failed to refresh QB token for user ${userId}:`, refreshError);
+        console.error(`[makeQBApiCall] Failed to refresh QB token for user ${userId}:`, refreshError.message);
         throw new Error('QuickBooks authentication failed. Please reconnect.');
       }
     }
@@ -1387,18 +1407,23 @@ router.get("/api/customers/search", async (req, res) => {
     }
     
     if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      console.log(`[Search] No QB connection found for userId: ${providedUserId}`);
       return res.status(400).json({
         success: false,
         error: "QuickBooks not connected for this user"
       });
     }
 
+    console.log(`[Search] Found QB connection for user: ${actualUserId}, realm: ${userData.qb_realm_id}`);
+    
     const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
     const realmId = userData.qb_realm_id;
     
     // Build query to search customers by DisplayName
     const query = `SELECT * FROM Customer WHERE DisplayName LIKE '%${searchTerm}%' MAXRESULTS 10`;
     const encodedQuery = encodeURIComponent(query);
+    
+    console.log(`[Search] Executing QB query: ${query}`);
     
     // Make API call to QuickBooks with automatic token refresh - pass actualUserId for correct persistence
     const queryResponse = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
@@ -1411,9 +1436,17 @@ router.get("/api/customers/search", async (req, res) => {
       });
     });
     
+    console.log(`[Search] QB API response received:`, {
+      hasResponse: !!queryResponse,
+      responseType: typeof queryResponse,
+      hasBody: queryResponse ? !!queryResponse.body : false,
+      hasJson: queryResponse ? !!queryResponse.json : false,
+      keys: queryResponse ? Object.keys(queryResponse) : []
+    });
+    
     // Check if response exists and has body
     if (!queryResponse || !queryResponse.body) {
-      console.error("Invalid QuickBooks response:", queryResponse);
+      console.error("[Search] Invalid QuickBooks response - missing body:", queryResponse);
       return res.status(500).json({
         success: false,
         error: "Invalid response from QuickBooks"
