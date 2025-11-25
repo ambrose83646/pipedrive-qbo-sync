@@ -169,7 +169,7 @@ router.post("/api/disconnect-qb", express.json(), async (req, res) => {
     // If not found with direct lookups, scan all users
     if (!userData) {
       console.log(`[QB Disconnect] Direct lookup failed, scanning all users...`);
-      const { listUsers } = require("../config/database");
+      const { listUsers } = require("../../config/database");
       const allKeys = await listUsers();
       
       for (const key of allKeys) {
