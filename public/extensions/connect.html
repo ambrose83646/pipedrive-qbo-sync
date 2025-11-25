@@ -306,11 +306,26 @@
       // Handle connect button
       function handleConnect() {
         const authUrl = '/auth/qb?user_id=' + userId + '&extension=true';
-        window.open(authUrl, '_blank', 'width=600,height=700');
+        var popup = window.open(authUrl, '_blank', 'width=600,height=700');
         
-        // Start polling since we can't rely on postMessage from sandboxed iframe
-        console.log('Starting polling after opening OAuth window');
-        startPolling();
+        // Simple approach: watch for popup to close, then reload the page
+        // This is more reliable than polling or postMessage in sandboxed iframes
+        console.log('Opened OAuth popup, watching for it to close...');
+        
+        var checkPopupClosed = setInterval(function() {
+          try {
+            if (!popup || popup.closed) {
+              console.log('Popup closed, reloading page to refresh status...');
+              clearInterval(checkPopupClosed);
+              // Give the server a moment to process, then reload
+              setTimeout(function() {
+                window.location.reload();
+              }, 1000);
+            }
+          } catch (e) {
+            // Cross-origin errors can happen, just keep checking
+          }
+        }, 500);
       }
       
       // Attach button handlers
@@ -415,10 +430,12 @@
               console.log('Disconnect successful');
               sdk.execute('TOAST', { message: 'QuickBooks disconnected successfully' });
               
-              // Use polling to detect when disconnect is reflected in status
-              // This is the same approach that works for connect
-              console.log('Starting polling to detect disconnect status change');
-              startPolling();
+              // Simple approach: just reload the page after a brief delay
+              // This is more reliable than polling for status changes
+              console.log('Reloading page to refresh status...');
+              setTimeout(function() {
+                window.location.reload();
+              }, 500);
             } else {
               console.error('Disconnect failed:', data.error);
               sdk.execute('TOAST', { message: 'Failed to disconnect: ' + (data.error || 'Unknown error') });
