@@ -1195,7 +1195,7 @@
     
     function refreshData() {
       loadDealData();
-      sdk.execute('TOAST', { message: 'Data refreshed' });
+      sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Data refreshed' });
     }
     
     function showMenu() {
@@ -1322,23 +1322,29 @@
     async function linkContact(qbCustomerId, customerName) {
       try {
         // Show linking in progress
-        sdk.execute('TOAST', { message: `Linking ${customerName}...` });
-        // Get the field key from backend
-        const fieldResponse = await fetch(`/api/field-key?userId=${userId}`);
-        const fieldData = await fieldResponse.json();
-        const fieldKey = fieldData.fieldKey || 'qb_customer_id';
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: `Linking ${customerName}...` });
         
-        // Update deal with QB customer ID
-        const updateData = {};
-        updateData[fieldKey] = qbCustomerId;
-        
-        await sdk.execute('UPDATE_ENTITY', {
-          id: dealId,
-          entity: 'deal',
-          data: updateData
+        // Call backend to update deal with QB customer ID
+        const response = await fetch(`/api/attach-contact?userId=${userId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache'
+          },
+          body: JSON.stringify({
+            dealId: dealId,
+            qbCustomerId: qbCustomerId,
+            customerName: customerName
+          })
         });
         
-        sdk.execute('TOAST', { message: 'Contact linked successfully!' });
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to link contact');
+        }
+        
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Contact linked successfully!' });
         closeSearchModal();
         
         // Reload to show linked state
@@ -1346,18 +1352,18 @@
         
       } catch (error) {
         console.error('Link error:', error);
-        sdk.execute('TOAST', { message: 'Failed to link contact' });
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Failed to link contact: ' + error.message });
       }
     }
     
     function createNewContact() {
       // TODO: Implement create new contact flow
-      sdk.execute('TOAST', { message: 'Create new contact feature coming soon' });
+      sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Create new contact feature coming soon' });
     }
     
     function copyToClipboard(text) {
       navigator.clipboard.writeText(text);
-      sdk.execute('TOAST', { message: 'Copied to clipboard' });
+      sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Copied to clipboard' });
     }
     
     function showContactDetails() {
@@ -1367,12 +1373,12 @@
     
     function editDateRange() {
       // TODO: Implement date range editor
-      sdk.execute('TOAST', { message: 'Date range editor coming soon' });
+      sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Date range editor coming soon' });
     }
     
     function viewAllInvoices() {
       // TODO: Implement invoice viewer
-      sdk.execute('TOAST', { message: 'Invoice viewer coming soon' });
+      sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Invoice viewer coming soon' });
     }
     
     function showError(message) {
@@ -1391,7 +1397,7 @@
     
     function openInvoiceModal() {
       if (!linkedContact) {
-        sdk.execute('TOAST', { message: 'Please link a QuickBooks contact first' });
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Please link a QuickBooks contact first' });
         return;
       }
       
@@ -1607,14 +1613,14 @@
     
     async function submitInvoice() {
       if (lineItems.length === 0) {
-        sdk.execute('TOAST', { message: 'Please add at least one line item' });
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Please add at least one line item' });
         return;
       }
       
       // Validate line items have prices
       const invalidItems = lineItems.filter(item => !item.unitPrice || item.unitPrice <= 0);
       if (invalidItems.length > 0) {
-        sdk.execute('TOAST', { message: 'All line items must have a price greater than 0' });
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'All line items must have a price greater than 0' });
         return;
       }
       
@@ -1648,18 +1654,18 @@
         const result = await response.json();
         
         if (result.success) {
-          sdk.execute('TOAST', { message: `Invoice #${result.invoice.docNumber || result.invoice.id} created successfully!` });
+          sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: `Invoice #${result.invoice.docNumber || result.invoice.id} created successfully!` });
           closeInvoiceModal();
           
           // Reload invoice data
           await loadInvoiceData();
         } else {
-          sdk.execute('TOAST', { message: `Failed to create invoice: ${result.error}` });
+          sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: `Failed to create invoice: ${result.error}` });
         }
         
       } catch (error) {
         console.error('Create invoice error:', error);
-        sdk.execute('TOAST', { message: 'Error creating invoice' });
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Error creating invoice' });
       } finally {
         createBtn.disabled = false;
         createBtn.textContent = 'Create Invoice';
