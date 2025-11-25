@@ -238,6 +238,47 @@
         connectedActions: !!connectedActions
       });
       
+      // Polling state management - MUST be defined before handleConnect
+      var pollingInterval = null;
+      var pollAttempts = 0;
+      var MAX_POLL_ATTEMPTS = 15; // 30 seconds at 2-second intervals
+      
+      // Start polling for status updates
+      function startPolling() {
+        console.log('Starting status polling...');
+        pollAttempts = 0;
+        
+        // Clear any existing polling
+        stopPolling();
+        
+        // Start new polling interval
+        pollingInterval = setInterval(function() {
+          pollAttempts++;
+          console.log('Polling attempt', pollAttempts, 'of', MAX_POLL_ATTEMPTS);
+          
+          checkStatus();
+          
+          // Stop polling after max attempts
+          if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+            console.log('Max polling attempts reached, stopping polling');
+            stopPolling();
+          }
+        }, 2000); // Poll every 2 seconds
+        
+        // Also do an immediate check
+        checkStatus();
+      }
+      
+      // Stop polling
+      function stopPolling() {
+        if (pollingInterval) {
+          console.log('Stopping polling');
+          clearInterval(pollingInterval);
+          pollingInterval = null;
+          pollAttempts = 0;
+        }
+      }
+      
       // Listen for messages from OAuth callback window
       window.addEventListener('message', function(event) {
         if (event.data && event.data.source === 'qb-callback') {
@@ -246,7 +287,8 @@
             // Send toast notification
             sdk.execute('TOAST', { message: 'QuickBooks Connected Successfully!' });
             
-            // Re-check status after a short delay to ensure DB is updated
+            // Stop polling and do immediate refresh
+            stopPolling();
             setTimeout(function() {
               console.log('Refreshing status after OAuth connection...');
               checkStatus();
@@ -409,47 +451,6 @@
         });
       } else {
         console.error('Disconnect button not found!');
-      }
-      
-      // Polling state management
-      let pollingInterval = null;
-      let pollAttempts = 0;
-      const MAX_POLL_ATTEMPTS = 15; // 30 seconds at 2-second intervals
-      
-      // Start polling for status updates
-      function startPolling() {
-        console.log('Starting status polling...');
-        pollAttempts = 0;
-        
-        // Clear any existing polling
-        stopPolling();
-        
-        // Start new polling interval
-        pollingInterval = setInterval(function() {
-          pollAttempts++;
-          console.log('Polling attempt', pollAttempts, 'of', MAX_POLL_ATTEMPTS);
-          
-          checkStatus();
-          
-          // Stop polling after max attempts
-          if (pollAttempts >= MAX_POLL_ATTEMPTS) {
-            console.log('Max polling attempts reached, stopping polling');
-            stopPolling();
-          }
-        }, 2000); // Poll every 2 seconds
-        
-        // Also do an immediate check
-        checkStatus();
-      }
-      
-      // Stop polling
-      function stopPolling() {
-        if (pollingInterval) {
-          console.log('Stopping polling');
-          clearInterval(pollingInterval);
-          pollingInterval = null;
-          pollAttempts = 0;
-        }
       }
       
       // Check connection status
