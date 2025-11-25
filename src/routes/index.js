@@ -128,16 +128,76 @@ router.post("/api/disconnect-qb", express.json(), async (req, res) => {
       return res.status(400).json({ error: "User ID is required" });
     }
     
-    // Normalize userId
-    let normalizedUserId = userId;
-    if (normalizedUserId.startsWith('https://')) {
-      normalizedUserId = normalizedUserId.replace('https://', '');
+    // Helper function to normalize userId - strip https://, http://, and .pipedrive.com suffix
+    function normalizeUserId(id) {
+      if (!id) return id;
+      let normalized = id.toString();
+      normalized = normalized.replace(/^https?:\/\//, '');
+      normalized = normalized.replace(/\.pipedrive\.com$/, '');
+      return normalized;
     }
     
-    // Get existing user data
-    const userData = await getUser(normalizedUserId);
+    const normalizedInput = normalizeUserId(userId);
+    console.log(`[QB Disconnect] Looking for user: ${userId} (normalized: ${normalizedInput})`);
+    
+    // Try multiple userId formats
+    const possibleUserIds = [
+      userId,
+      normalizedInput,
+      normalizedInput + '.pipedrive.com',
+      'https://' + normalizedInput + '.pipedrive.com',
+      'https://' + userId
+    ];
+    
+    // Remove duplicates
+    const uniqueUserIds = [...new Set(possibleUserIds.filter(id => id))];
+    
+    let userData = null;
+    let foundUserId = null;
+    
+    // Try each format until we find one with QB tokens
+    for (const tryUserId of uniqueUserIds) {
+      const tryUserData = await getUser(tryUserId);
+      if (tryUserData && tryUserData.qb_access_token && tryUserData.qb_realm_id) {
+        userData = tryUserData;
+        foundUserId = tryUserId;
+        console.log(`[QB Disconnect] Found user with QB tokens under key: ${tryUserId}`);
+        break;
+      }
+    }
+    
+    // If not found with direct lookups, scan all users
     if (!userData) {
-      return res.status(404).json({ error: "User not found" });
+      console.log(`[QB Disconnect] Direct lookup failed, scanning all users...`);
+      const { listUsers } = require("../config/database");
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.qb_access_token && testUserData.qb_realm_id) {
+          const normalizedKey = normalizeUserId(key);
+          
+          const isMatch = 
+            normalizedKey === normalizedInput ||
+            key === userId ||
+            testUserData.api_domain?.includes(normalizedInput) ||
+            normalizedInput.includes(normalizedKey) ||
+            normalizedKey.includes(normalizedInput) ||
+            (testUserData.pipedrive_user_id && testUserData.pipedrive_user_id.toString() === normalizedInput);
+          
+          if (isMatch) {
+            userData = testUserData;
+            foundUserId = key;
+            console.log(`[QB Disconnect] Found matching user under key: ${key}`);
+            break;
+          }
+        }
+      }
+    }
+    
+    if (!userData) {
+      console.log(`[QB Disconnect] No user found with QB tokens for: ${userId}`);
+      return res.status(404).json({ error: "User not found or no QuickBooks connection" });
     }
     
     // Validate authentication - check if the request is from the same Pipedrive instance
@@ -184,9 +244,9 @@ router.post("/api/disconnect-qb", express.json(), async (req, res) => {
       invoice_preferences: null
     };
     
-    await setUser(normalizedUserId, updatedUser);
+    await setUser(foundUserId, updatedUser);
     
-    console.log(`[QB Disconnect] QuickBooks disconnected for user: ${normalizedUserId}`);
+    console.log(`[QB Disconnect] QuickBooks disconnected for user: ${foundUserId}`);
     res.json({ success: true, message: "QuickBooks disconnected successfully" });
     
   } catch (error) {
@@ -709,13 +769,19 @@ router.get("/success", (req, res) => {
 
 router.get("/api/user-status", async (req, res) => {
   try {
-    // Normalize userId by removing https:// prefix if present
-    let pipedriveUserId = req.query.userId;
-    if (pipedriveUserId && pipedriveUserId.startsWith('https://')) {
-      pipedriveUserId = pipedriveUserId.replace('https://', '');
+    // Helper function to normalize userId - strip https://, http://, and .pipedrive.com suffix
+    function normalizeUserId(id) {
+      if (!id) return id;
+      let normalized = id.toString();
+      normalized = normalized.replace(/^https?:\/\//, '');
+      normalized = normalized.replace(/\.pipedrive\.com$/, '');
+      return normalized;
     }
     
-    console.log(`[API User Status] Checking status for userId: ${pipedriveUserId}`);
+    let pipedriveUserId = req.query.userId;
+    const normalizedInput = normalizeUserId(pipedriveUserId);
+    
+    console.log(`[API User Status] Checking status for userId: ${pipedriveUserId} (normalized: ${normalizedInput})`);
 
     if (!pipedriveUserId) {
       console.log('[API User Status] No userId provided');
@@ -729,35 +795,63 @@ router.get("/api/user-status", async (req, res) => {
       });
     }
 
-    // Try to get user data with normalized userId
-    let userData = await getUser(pipedriveUserId);
-    let foundUserId = pipedriveUserId;
+    // Try multiple userId formats
+    const possibleUserIds = [
+      pipedriveUserId,                                    // Original input
+      normalizedInput,                                     // Normalized (no https, no .pipedrive.com)
+      normalizedInput + '.pipedrive.com',                  // Add suffix back
+      'https://' + normalizedInput + '.pipedrive.com',     // Full URL
+      'https://' + pipedriveUserId                         // With https prefix
+    ];
     
-    // If not found, try with https:// prefix for backward compatibility
-    if (!userData && pipedriveUserId && !pipedriveUserId.startsWith('https://')) {
-      const alternateUserId = 'https://' + pipedriveUserId;
-      console.log(`[API User Status] Trying alternate userId with https: ${alternateUserId}`);
-      userData = await getUser(alternateUserId);
-      if (userData) foundUserId = alternateUserId;
+    // Remove duplicates
+    const uniqueUserIds = [...new Set(possibleUserIds.filter(id => id))];
+    console.log(`[API User Status] Trying userId formats:`, uniqueUserIds);
+    
+    let userData = null;
+    let foundUserId = null;
+    
+    // Try each format until we find one with data
+    for (const tryUserId of uniqueUserIds) {
+      const tryUserData = await getUser(tryUserId);
+      if (tryUserData) {
+        userData = tryUserData;
+        foundUserId = tryUserId;
+        console.log(`[API User Status] Found user data under key: ${tryUserId}`);
+        // If this user has QB tokens, use it immediately
+        if (tryUserData.qb_access_token && tryUserData.qb_realm_id) {
+          console.log(`[API User Status] User has QB tokens`);
+          break;
+        }
+      }
     }
     
-    // If still not found, check all users for one with QB tokens that matches this domain
+    // If no QB tokens found, scan all users for matching QB connection
     if (!userData || (!userData.qb_access_token && !userData.qb_realm_id)) {
-      console.log(`[API User Status] Checking all users for QB connection...`);
+      console.log(`[API User Status] No QB tokens found, checking all users...`);
       const { listUsers } = require("../../config/database");
       const allKeys = await listUsers();
+      
+      console.log(`[API User Status] Scanning ${allKeys.length} stored users for QB connection...`);
       
       for (const key of allKeys) {
         const testUserData = await getUser(key);
         if (testUserData && testUserData.qb_access_token && testUserData.qb_realm_id) {
-          // Check if this user is related to the provided userId
-          const normalizedProvidedId = pipedriveUserId.replace('https://', '');
-          const normalizedKey = key.replace('https://', '');
+          // Normalize both IDs for comparison
+          const normalizedKey = normalizeUserId(key);
           
-          if (normalizedKey === normalizedProvidedId ||
-              testUserData.api_domain?.includes(normalizedProvidedId) ||
-              normalizedProvidedId.includes(testUserData.api_domain?.replace('https://', '') || 'NOMATCH')) {
-            console.log(`[API User Status] Found QB tokens under alternative ID: ${key}`);
+          // Check various matching conditions
+          const isMatch = 
+            normalizedKey === normalizedInput ||
+            key === pipedriveUserId ||
+            testUserData.api_domain?.includes(normalizedInput) ||
+            normalizedInput.includes(normalizedKey) ||
+            normalizedKey.includes(normalizedInput) ||
+            // Check if stored numeric user ID matches
+            (testUserData.pipedrive_user_id && testUserData.pipedrive_user_id.toString() === normalizedInput);
+          
+          if (isMatch) {
+            console.log(`[API User Status] Found QB tokens under alternative ID: ${key} (normalized: ${normalizedKey})`);
             userData = testUserData;
             foundUserId = key;
             break;
