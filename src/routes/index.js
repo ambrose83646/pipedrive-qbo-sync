@@ -198,6 +198,7 @@ router.get("/api/debug/users", async (req, res) => {
       if (userData) {
         users.push({
           userId: key,
+          hasPipedriveTokens: !!userData.access_token,
           hasQBTokens: !!(userData.qb_access_token && userData.qb_realm_id),
           qbRealmId: userData.qb_realm_id || null,
           apiDomain: userData.api_domain || null,
@@ -1635,8 +1636,10 @@ router.post("/api/create-customer", express.json(), async (req, res) => {
 // Attach QuickBooks customer to Pipedrive deal
 router.post("/api/attach-contact", express.json(), async (req, res) => {
   try {
-    const { dealId, qbCustomerId } = req.body;
-    const userId = req.query.userId || req.body.userId || 'test';
+    const { dealId, qbCustomerId, customerName } = req.body;
+    const providedUserId = req.query.userId || req.body.userId || 'test';
+
+    console.log('[Attach Contact] dealId:', dealId, 'qbCustomerId:', qbCustomerId, 'userId:', providedUserId);
 
     if (!dealId || !qbCustomerId) {
       return res.status(400).json({
@@ -1645,31 +1648,150 @@ router.post("/api/attach-contact", express.json(), async (req, res) => {
       });
     }
 
-    // Get user's Pipedrive tokens
-    const userData = await getUser(userId);
+    // Try to find user with Pipedrive tokens - check multiple ID formats
+    let userData = null;
+    let actualUserId = providedUserId;
+    
+    // First try the provided user ID
+    const initialUserData = await getUser(providedUserId);
+    if (initialUserData && initialUserData.access_token) {
+      userData = initialUserData;
+    }
+    
+    // If no Pipedrive tokens, try different user ID formats
+    if (!userData) {
+      console.log(`[Attach Contact] No Pipedrive tokens for ${providedUserId}, checking alternative IDs...`);
+      
+      // Get all users to find one with Pipedrive tokens
+      const { listUsers } = require("../../config/database");
+      const allKeys = await listUsers();
+      
+      let fallbackUser = null;
+      let fallbackUserId = null;
+      let bestFallbackUser = null;
+      let bestFallbackUserId = null;
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.access_token) {
+          // Check if this user is related to the provided userId
+          const normalizedProvidedId = providedUserId.replace('https://', '');
+          const normalizedKey = key.replace('https://', '');
+          
+          if (normalizedKey === normalizedProvidedId ||
+              testUserData.api_domain?.includes(normalizedProvidedId) ||
+              normalizedProvidedId.includes(testUserData.api_domain?.replace('https://', '') || 'NOMATCH')) {
+            console.log(`[Attach Contact] Found Pipedrive tokens under alternative ID: ${key}`);
+            userData = testUserData;
+            actualUserId = key;
+            break;
+          }
+          
+          // Prefer users with both Pipedrive AND QB tokens (more likely to be valid)
+          if (testUserData.qb_access_token && testUserData.qb_realm_id) {
+            if (!bestFallbackUser) {
+              bestFallbackUser = testUserData;
+              bestFallbackUserId = key;
+            }
+          } else if (!fallbackUser) {
+            // Save first user with just Pipedrive tokens as secondary fallback
+            fallbackUser = testUserData;
+            fallbackUserId = key;
+          }
+        }
+      }
+      
+      // Use best fallback (with both tokens) if available, otherwise use any user with Pipedrive tokens
+      if (!userData) {
+        if (bestFallbackUser) {
+          console.log(`[Attach Contact] Using best fallback user with both tokens: ${bestFallbackUserId}`);
+          userData = bestFallbackUser;
+          actualUserId = bestFallbackUserId;
+        } else if (fallbackUser) {
+          console.log(`[Attach Contact] Using fallback user with Pipedrive tokens: ${fallbackUserId}`);
+          userData = fallbackUser;
+          actualUserId = fallbackUserId;
+        }
+      }
+    }
+
     if (!userData || !userData.access_token) {
+      console.log(`[Attach Contact] No Pipedrive connection found for userId: ${providedUserId}`);
       return res.status(400).json({
         success: false,
         error: "Pipedrive not connected for this user"
       });
     }
-
-    // Update deal with custom field containing QB Customer ID
-    // Note: You'll need to create a custom field in Pipedrive for QB Customer ID
-    // and replace 'custom_field_key' with the actual field key
-    const apiDomain = userData.api_domain || 'api.pipedrive.com';
-    const updateUrl = `https://${apiDomain}/v1/deals/${dealId}?api_token=${userData.access_token}`;
     
-    // For now, we'll store in notes field as a placeholder
-    // In production, use a proper custom field
-    const existingDeal = await axios.get(updateUrl);
+    console.log(`[Attach Contact] Using user: ${actualUserId}`);
+
+    // Handle api_domain with or without https:// prefix
+    let apiDomain = userData.api_domain || 'api.pipedrive.com';
+    if (apiDomain.startsWith('https://')) {
+      apiDomain = apiDomain.replace('https://', '');
+    }
+
+    // Helper function to make Pipedrive API call with auto token refresh
+    const makePipedriveCall = async (method, endpoint, data = null, retryCount = 0) => {
+      const accessToken = userData.access_token;
+      const url = `https://${apiDomain}${endpoint}?api_token=${accessToken}`;
+      
+      console.log(`[Attach Contact] Making ${method} request to ${endpoint} (attempt ${retryCount + 1})`);
+      
+      try {
+        let response;
+        if (method === 'GET') {
+          response = await axios.get(url);
+        } else if (method === 'PUT') {
+          response = await axios.put(url, data);
+        }
+        return response;
+      } catch (error) {
+        // If 401 and we haven't retried yet, try to refresh token
+        if (error.response?.status === 401 && userData.refresh_token && retryCount === 0) {
+          console.log('[Attach Contact] Token expired, attempting refresh...');
+          try {
+            const pipedriveAuth = require('../auth/pipedrive');
+            const newTokens = await pipedriveAuth.refreshToken(userData.refresh_token);
+            
+            console.log('[Attach Contact] Token refresh response received, new token prefix:', newTokens.access_token?.substring(0, 20) + '...');
+            
+            // Update userData with new tokens (in memory)
+            userData.access_token = newTokens.access_token;
+            userData.refresh_token = newTokens.refresh_token;
+            
+            // Persist updated tokens to database
+            const { setUser } = require("../../config/database");
+            await setUser(actualUserId, {
+              ...userData,
+              access_token: newTokens.access_token,
+              refresh_token: newTokens.refresh_token,
+              pipedrive_updated_at: new Date().toISOString()
+            });
+            
+            console.log('[Attach Contact] Token refreshed and persisted successfully');
+            
+            // Retry with new token (recursive call with incremented retry count)
+            return await makePipedriveCall(method, endpoint, data, retryCount + 1);
+          } catch (refreshError) {
+            console.error('[Attach Contact] Token refresh failed:', refreshError.message);
+            throw new Error('Pipedrive session expired. Please go to the QuickBooks Contact Manager settings and click "Reconnect to Pipedrive".');
+          }
+        }
+        throw error;
+      }
+    };
+
+    // Get existing deal data
+    const existingDeal = await makePipedriveCall('GET', `/v1/deals/${dealId}`);
     const currentNotes = existingDeal.data.data.notes || '';
     
     const updatedNotes = currentNotes.includes(`QB_CUSTOMER_ID:${qbCustomerId}`) 
       ? currentNotes 
       : `${currentNotes}\n\nQB_CUSTOMER_ID:${qbCustomerId}`;
     
-    await axios.put(updateUrl, {
+    // Update deal with QB customer ID
+    await makePipedriveCall('PUT', `/v1/deals/${dealId}`, {
       notes: updatedNotes
     });
 
@@ -1711,7 +1833,11 @@ router.get("/api/deal-contact", async (req, res) => {
     }
 
     // Get deal data from Pipedrive
-    const apiDomain = userData.api_domain || 'api.pipedrive.com';
+    // Handle api_domain with or without https:// prefix
+    let apiDomain = userData.api_domain || 'api.pipedrive.com';
+    if (apiDomain.startsWith('https://')) {
+      apiDomain = apiDomain.replace('https://', '');
+    }
     const dealUrl = `https://${apiDomain}/v1/deals/${dealId}?api_token=${userData.access_token}`;
     
     const dealResponse = await axios.get(dealUrl);

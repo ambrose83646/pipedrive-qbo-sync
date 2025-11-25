@@ -90,6 +90,15 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **November 25, 2025**: Fixed contact linking and added Pipedrive token refresh
+  - Fixed `/api/attach-contact` endpoint with robust user lookup logic that prefers users with both Pipedrive and QB tokens
+  - Fixed URL construction to handle api_domain with/without https:// prefix
+  - Implemented automatic Pipedrive token refresh (similar to QuickBooks refresh logic)
+  - Added `refreshToken` function to `src/auth/pipedrive.js` for OAuth token refresh
+  - Fixed frontend SDK commands: replaced invalid 'TOAST' with `AppExtensionsSDK.Command.SHOW_SNACKBAR`
+  - Fixed frontend to call backend API instead of non-existent SDK `UPDATE_ENTITY` command
+  - Note: Pipedrive refresh tokens expire after 60 days of non-use; users must re-authenticate if tokens are fully expired
+
 - **November 25, 2025**: Added invoice creation functionality with product search
   - Implemented `/api/items/search` endpoint for searching QuickBooks inventory (products and services)
   - Implemented `/api/invoices` POST endpoint for creating invoices in QuickBooks

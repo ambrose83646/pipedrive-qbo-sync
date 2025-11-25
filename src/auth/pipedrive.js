@@ -49,7 +49,37 @@ const getToken = async (code) => {
   }
 };
 
+const refreshToken = async (refreshTokenValue) => {
+  const clientId = process.env.PIPEDRIVE_CLIENT_ID;
+  const clientSecret = process.env.PIPEDRIVE_CLIENT_SECRET;
+
+  const authHeader = 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+  const params = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: refreshTokenValue
+  });
+
+  try {
+    console.log('[Pipedrive] Refreshing access token...');
+
+    const response = await axios.post('https://oauth.pipedrive.com/oauth/token', params, {
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    });
+
+    console.log('[Pipedrive] Token refresh successful');
+    return response.data;
+  } catch (error) {
+    console.error('[Pipedrive] Token refresh error:', error.response?.status, error.response?.data || error.message);
+    throw error;
+  }
+};
+
 module.exports = {
   getAuthUrl,
-  getToken
+  getToken,
+  refreshToken
 };
