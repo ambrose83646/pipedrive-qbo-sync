@@ -414,9 +414,20 @@
               console.log('Disconnect successful');
               sdk.execute('TOAST', { message: 'QuickBooks disconnected successfully' });
               
-              // Start polling to update UI after disconnect
-              console.log('Starting polling after disconnect');
-              startPolling();
+              // Immediately update UI to show disconnected state
+              console.log('Updating UI to show disconnected state');
+              statusText.textContent = 'QB Inactive';
+              statusText.className = 'status-inactive';
+              companyNameDiv.style.display = 'none';
+              
+              // Show connect button, hide disconnect/reconnect buttons
+              connectBtn.style.display = 'inline-block';
+              connectBtn.textContent = 'Connect to QuickBooks';
+              connectBtn.onclick = handleConnect;
+              connectedActions.style.display = 'none';
+              
+              // Stop any existing polling since we've already updated
+              stopPolling();
             } else {
               console.error('Disconnect failed:', data.error);
               sdk.execute('TOAST', { message: 'Failed to disconnect: ' + (data.error || 'Unknown error') });
