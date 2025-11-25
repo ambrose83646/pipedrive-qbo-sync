@@ -1,572 +1,619 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Connect QuickBooks - Pipedrive App</title>
-  <script src="https://cdn.jsdelivr.net/npm/@pipedrive/app-extensions-sdk@latest/dist/index.umd.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 20px;
-      max-width: 600px;
-      margin: 0 auto;
-    }
-    
-    h2 {
-      color: #333;
-      margin-bottom: 20px;
-    }
-    
-    p {
-      color: #666;
-      line-height: 1.6;
-      margin-bottom: 30px;
-    }
-    
-    .status-container {
-      background: #f5f5f5;
-      padding: 20px;
-      border-radius: 8px;
-      margin: 20px 0;
-    }
-    
-    .status-label {
-      font-size: 14px;
-      color: #666;
-      margin-bottom: 10px;
-    }
-    
-    .status-active {
-      color: #28a745;
-      font-size: 18px;
-      font-weight: bold;
-      margin: 10px 0;
-    }
-    
-    .status-inactive {
-      color: #dc3545;
-      font-size: 18px;
-      font-weight: bold;
-      margin: 10px 0;
-    }
-    
-    button {
-      background: #007cba;
-      color: white;
-      padding: 10px 20px;
-      border: none;
-      cursor: pointer;
-      font-size: 16px;
-      border-radius: 4px;
-      transition: background-color 0.3s;
-      margin-top: 15px;
-    }
-    
-    button:hover {
-      background: #005a8b;
-    }
-    
-    button:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
-    
-    .button-group {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      margin-top: 15px;
-    }
-    
-    .btn-disconnect {
-      background: #dc3545;
-    }
-    
-    .btn-disconnect:hover {
-      background: #c82333;
-    }
-    
-    .btn-confirm {
-      background: #ff0000 !important;
-      animation: pulse 0.5s;
-      font-weight: bold;
-    }
-    
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-      100% { transform: scale(1); }
-    }
-    
-    .btn-reconnect {
-      background: #28a745;
-    }
-    
-    .btn-reconnect:hover {
-      background: #218838;
-    }
-    
-    .company-name {
-      font-size: 14px;
-      color: #666;
-      margin-top: 5px;
-    }
-  </style>
-</head>
-<body>
-  <h2>Connect QuickBooks</h2>
-  <p>Link your Pipedrive to QuickBooks to sync contacts and invoices.</p>
-  
-  <div class="status-container">
-    <div class="status-label">QuickBooks Connection Status:</div>
-    <div id="statusText" class="status-inactive">Checking...</div>
-    <div id="companyName" class="company-name" style="display: none;"></div>
-    <button id="connectBtn" style="display: none;">Connect to QuickBooks</button>
-    <div id="connectedActions" class="button-group" style="display: none;">
-      <button id="reconnectBtn" class="btn-reconnect">Reconnect</button>
-      <button id="disconnectBtn" class="btn-disconnect">Disconnect</button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Connect QuickBooks - Pipedrive App</title>
+    <script src="https://cdn.jsdelivr.net/npm/@pipedrive/app-extensions-sdk@latest/dist/index.umd.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        padding: 20px;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      h2 {
+        color: #333;
+        margin-bottom: 20px;
+      }
+
+      p {
+        color: #666;
+        line-height: 1.6;
+        margin-bottom: 30px;
+      }
+
+      .status-container {
+        background: #f5f5f5;
+        padding: 20px;
+        border-radius: 8px;
+        margin: 20px 0;
+      }
+
+      .status-label {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 10px;
+      }
+
+      .status-active {
+        color: #28a745;
+        font-size: 18px;
+        font-weight: bold;
+        margin: 10px 0;
+      }
+
+      .status-inactive {
+        color: #dc3545;
+        font-size: 18px;
+        font-weight: bold;
+        margin: 10px 0;
+      }
+
+      button {
+        background: #007cba;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        border-radius: 4px;
+        transition: background-color 0.3s;
+        margin-top: 15px;
+      }
+
+      button:hover {
+        background: #005a8b;
+      }
+
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 15px;
+      }
+
+      .btn-disconnect {
+        background: #dc3545;
+      }
+
+      .btn-disconnect:hover {
+        background: #c82333;
+      }
+
+      .btn-confirm {
+        background: #ff0000 !important;
+        animation: pulse 0.5s;
+        font-weight: bold;
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.05);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      .btn-reconnect {
+        background: #28a745;
+      }
+
+      .btn-reconnect:hover {
+        background: #218838;
+      }
+
+      .company-name {
+        font-size: 14px;
+        color: #666;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Connect QuickBooks</h2>
+    <p>Link your Pipedrive to QuickBooks to sync contacts and invoices.</p>
+
+    <div class="status-container">
+      <div class="status-label">QuickBooks Connection Status:</div>
+      <div id="statusText" class="status-inactive">Checking...</div>
+      <div id="companyName" class="company-name" style="display: none"></div>
+      <button id="connectBtn" style="display: none">
+        Connect to QuickBooks
+      </button>
+      <div id="connectedActions" class="button-group" style="display: none">
+        <button id="reconnectBtn" class="btn-reconnect">Reconnect</button>
+        <button id="disconnectBtn" class="btn-disconnect">Disconnect</button>
+      </div>
     </div>
-  </div>
-  
-  <script>
-    document.addEventListener('DOMContentLoaded', async function() {
-      // Initialize Pipedrive SDK
-      const sdk = await new AppExtensionsSDK().initialize();
-      
-      // Get signed token and user info from Pipedrive SDK
-      let userId = 'test';
-      let apiDomain = '';
-      
-      try {
-        // Try to get the signed token
-        const token = await sdk.execute('GET_SIGNED_TOKEN');
-        console.log('Token received:', JSON.stringify(token));
-        
-        // Try multiple ways to extract user identification
-        if (token) {
-          // Check for api_domain in various places
-          if (token.api_domain) {
-            apiDomain = token.api_domain;
-            userId = apiDomain;
-            console.log('Found api_domain in token:', userId);
-          } else if (token.data && token.data.api_domain) {
-            apiDomain = token.data.api_domain;
-            userId = apiDomain;
-            console.log('Found api_domain in token.data:', userId);
-          }
-        }
-        
-        // Try to get context for additional info
+
+    <script>
+      document.addEventListener("DOMContentLoaded", async function () {
+        // Initialize Pipedrive SDK
+        const sdk = await new AppExtensionsSDK().initialize();
+
+        // Get signed token and user info from Pipedrive SDK
+        let userId = "test";
+        let apiDomain = "";
+
         try {
-          const context = await sdk.execute('GET_CONTEXT');
-          console.log('Context received:', JSON.stringify(context));
-          
-          // Check if context has user info
-          if (context) {
-            if (context.company_domain) {
-              // Use company domain as a fallback
-              const companyUserId = context.company_domain + '.pipedrive.com';
-              if (userId === 'test') {
-                userId = companyUserId;
-                console.log('Using company_domain from context:', userId);
-              }
-            }
-            
-            if (context.user && context.user.company_domain) {
-              const userCompanyId = context.user.company_domain + '.pipedrive.com';
-              if (userId === 'test') {
-                userId = userCompanyId;
-                console.log('Using user.company_domain from context:', userId);
-              }
+          // Try to get the signed token
+          const token = await sdk.execute("GET_SIGNED_TOKEN");
+          console.log("Token received:", JSON.stringify(token));
+
+          // Try multiple ways to extract user identification
+          if (token) {
+            // Check for api_domain in various places
+            if (token.api_domain) {
+              apiDomain = token.api_domain;
+              userId = apiDomain;
+              console.log("Found api_domain in token:", userId);
+            } else if (token.data && token.data.api_domain) {
+              apiDomain = token.data.api_domain;
+              userId = apiDomain;
+              console.log("Found api_domain in token.data:", userId);
             }
           }
-        } catch (contextError) {
-          console.log('Could not get context:', contextError);
-        }
-        
-      } catch (error) {
-        console.error('Error getting SDK data:', error);
-      }
-      
-      // Fallback to URL params if needed
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlUserId = urlParams.get('userId');
-      if (urlUserId && urlUserId !== 'test') {
-        userId = urlUserId;
-        console.log('Using URL param userId:', userId);
-      }
-      
-      // Extract company domain from the parent URL if we still don't have a good userId
-      if (userId === 'test') {
-        try {
-          // Check if we're in an iframe and can access parent URL
-          if (window.parent !== window) {
-            const parentUrl = document.referrer;
-            console.log('Parent URL:', parentUrl);
-            const match = parentUrl.match(/https:\/\/([^\.]+)\.pipedrive\.com/);
-            if (match) {
-              userId = match[0].replace('https://', '');
-              console.log('Extracted userId from parent URL:', userId);
-            }
-          }
-        } catch (e) {
-          console.log('Could not access parent URL');
-        }
-      }
-      
-      // Normalize userId - remove https:// prefix for consistency
-      if (userId && userId.startsWith('https://')) {
-        userId = userId.replace('https://', '');
-        console.log('Normalized userId (removed https://):', userId);
-      }
-      
-      console.log('Final userId for API call:', userId);
-      
-      const statusText = document.getElementById('statusText');
-      const companyNameDiv = document.getElementById('companyName');
-      const connectBtn = document.getElementById('connectBtn');
-      const connectedActions = document.getElementById('connectedActions');
-      const reconnectBtn = document.getElementById('reconnectBtn');
-      const disconnectBtn = document.getElementById('disconnectBtn');
-      
-      console.log('Button elements found:', {
-        connectBtn: !!connectBtn,
-        reconnectBtn: !!reconnectBtn,
-        disconnectBtn: !!disconnectBtn,
-        connectedActions: !!connectedActions
-      });
-      
-      // Polling state management - MUST be defined before handleConnect
-      var pollingInterval = null;
-      var pollAttempts = 0;
-      var MAX_POLL_ATTEMPTS = 15; // 30 seconds at 2-second intervals
-      var lastKnownStatus = null; // Track last status to detect changes
-      
-      // Start polling for status updates
-      function startPolling() {
-        console.log('Starting status polling...');
-        pollAttempts = 0;
-        
-        // Clear any existing polling
-        stopPolling();
-        
-        // Start new polling interval
-        pollingInterval = setInterval(function() {
-          pollAttempts++;
-          console.log('Polling attempt', pollAttempts, 'of', MAX_POLL_ATTEMPTS);
-          
-          checkStatus();
-          
-          // Stop polling after max attempts
-          if (pollAttempts >= MAX_POLL_ATTEMPTS) {
-            console.log('Max polling attempts reached, stopping polling');
-            stopPolling();
-          }
-        }, 2000); // Poll every 2 seconds
-        
-        // Also do an immediate check
-        checkStatus();
-      }
-      
-      // Stop polling
-      function stopPolling() {
-        if (pollingInterval) {
-          console.log('Stopping polling');
-          clearInterval(pollingInterval);
-          pollingInterval = null;
-          pollAttempts = 0;
-        }
-      }
-      
-      // Listen for messages from OAuth callback window
-      window.addEventListener('message', function(event) {
-        if (event.data && event.data.source === 'qb-callback') {
-          if (event.data.success === true) {
-            console.log('Received OAuth callback success message');
-            // Send toast notification
-            sdk.execute('TOAST', { message: 'QuickBooks Connected Successfully!' });
-            
-            // Stop polling and do immediate refresh
-            stopPolling();
-            setTimeout(function() {
-              console.log('Refreshing status after OAuth connection...');
-              checkStatus();
-            }, 500);
-            
-            // Close modal after a delay
-            setTimeout(function() {
-              sdk.execute('CLOSE_MODAL');
-            }, 2000);
-          }
-        }
-      });
-      
-      // Handle connect button
-      function handleConnect() {
-        const authUrl = '/auth/qb?user_id=' + userId + '&extension=true';
-        var popup = window.open(authUrl, '_blank', 'width=600,height=700');
-        
-        // Simple approach: watch for popup to close, then reload the page
-        // This is more reliable than polling or postMessage in sandboxed iframes
-        console.log('Opened OAuth popup, watching for it to close...');
-        
-        var checkPopupClosed = setInterval(function() {
+
+          // Try to get context for additional info
           try {
-            if (!popup || popup.closed) {
-              console.log('Popup closed, reloading page to refresh status...');
-              clearInterval(checkPopupClosed);
-              // Give the server a moment to process, then reload
-              setTimeout(function() {
-                window.location.reload();
-              }, 1000);
-            }
-          } catch (e) {
-            // Cross-origin errors can happen, just keep checking
-          }
-        }, 500);
-      }
-      
-      // Attach button handlers
-      if (reconnectBtn) {
-        console.log('Attaching reconnect button handler');
-        reconnectBtn.addEventListener('click', function() {
-          console.log('Reconnect button clicked');
-          handleConnect();
-        });
-      } else {
-        console.error('Reconnect button not found!');
-      }
-      
-      if (disconnectBtn) {
-        console.log('Attaching disconnect button handler');
-        
-        // Track confirmation state
-        let confirmationPending = false;
-        let confirmationTimeout = null;
-        
-        // Function to reset button state
-        function resetDisconnectButton() {
-          confirmationPending = false;
-          disconnectBtn.textContent = 'Disconnect';
-          disconnectBtn.classList.remove('btn-confirm');
-          disconnectBtn.style.background = ''; // Reset inline style
-          if (confirmationTimeout) {
-            clearTimeout(confirmationTimeout);
-            confirmationTimeout = null;
-          }
-        }
-        
-        disconnectBtn.addEventListener('click', async function(event) {
-          event.preventDefault();
-          console.log('Disconnect button clicked - event listener triggered');
-          console.log('Current userId:', userId);
-          console.log('Confirmation pending:', confirmationPending);
-          
-          // First click - show confirmation
-          if (!confirmationPending) {
-            console.log('First click - showing confirmation');
-            confirmationPending = true;
-            disconnectBtn.textContent = '⚠️ Click again to confirm';
-            disconnectBtn.classList.add('btn-confirm');
-            
-            // Reset after 3 seconds if not confirmed
-            confirmationTimeout = setTimeout(() => {
-              console.log('Confirmation timed out, resetting button');
-              resetDisconnectButton();
-            }, 3000);
-            
-            return;
-          }
-          
-          // Second click - actually disconnect
-          console.log('Second click - performing disconnect');
-          resetDisconnectButton();
-          
-          try {
-            statusText.textContent = 'Disconnecting...';
-            disconnectBtn.disabled = true;
-            reconnectBtn.disabled = true;
-            
-            // Try to get a signed token from SDK for authentication (optional)
-            // Note: GET_SIGNED_TOKEN may not be available in all Pipedrive extension contexts
-            let authToken = null;
-            try {
-              console.log('Attempting to get authentication token (optional)...');
-              // Try different SDK commands that might work
-              try {
-                // This command may not exist in all contexts
-                const token = await sdk.execute('GET_SIGNED_TOKEN');
-                authToken = JSON.stringify(token);
-                console.log('Got signed token successfully');
-              } catch (tokenError) {
-                // Try getting context as fallback
-                const context = await sdk.execute('GET_CONTEXT');
-                if (context) {
-                  authToken = JSON.stringify({ context: context });
-                  console.log('Using context as authentication');
+            const context = await sdk.execute("GET_CONTEXT");
+            console.log("Context received:", JSON.stringify(context));
+
+            // Check if context has user info
+            if (context) {
+              if (context.company_domain) {
+                // Use company domain as a fallback
+                const companyUserId = context.company_domain + ".pipedrive.com";
+                if (userId === "test") {
+                  userId = companyUserId;
+                  console.log("Using company_domain from context:", userId);
                 }
               }
-            } catch (e) {
-              console.log('No authentication token available, proceeding without (server allows this for disconnect)');
+
+              if (context.user && context.user.company_domain) {
+                const userCompanyId =
+                  context.user.company_domain + ".pipedrive.com";
+                if (userId === "test") {
+                  userId = userCompanyId;
+                  console.log(
+                    "Using user.company_domain from context:",
+                    userId,
+                  );
+                }
+              }
             }
-            
-            console.log('Sending disconnect request to server...');
-            const response = await fetch('/api/disconnect-qb', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Pipedrive-Token': authToken || ''
-              },
-              body: JSON.stringify({ userId: userId })
-            });
-            
-            console.log('Response status:', response.status);
-            const data = await response.json();
-            console.log('Response data:', data);
-            
-            if (data.success) {
-              console.log('Disconnect successful');
-              sdk.execute('TOAST', { message: 'QuickBooks disconnected successfully' });
-              
-              // Simple approach: just reload the page after a brief delay
-              // This is more reliable than polling for status changes
-              console.log('Reloading page to refresh status...');
-              setTimeout(function() {
-                window.location.reload();
+          } catch (contextError) {
+            console.log("Could not get context:", contextError);
+          }
+        } catch (error) {
+          console.error("Error getting SDK data:", error);
+        }
+
+        // Fallback to URL params if needed
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlUserId = urlParams.get("userId");
+        if (urlUserId && urlUserId !== "test") {
+          userId = urlUserId;
+          console.log("Using URL param userId:", userId);
+        }
+
+        // Extract company domain from the parent URL if we still don't have a good userId
+        if (userId === "test") {
+          try {
+            // Check if we're in an iframe and can access parent URL
+            if (window.parent !== window) {
+              const parentUrl = document.referrer;
+              console.log("Parent URL:", parentUrl);
+              const match = parentUrl.match(
+                /https:\/\/([^\.]+)\.pipedrive\.com/,
+              );
+              if (match) {
+                userId = match[0].replace("https://", "");
+                console.log("Extracted userId from parent URL:", userId);
+              }
+            }
+          } catch (e) {
+            console.log("Could not access parent URL");
+          }
+        }
+
+        // Normalize userId - remove https:// prefix for consistency
+        if (userId && userId.startsWith("https://")) {
+          userId = userId.replace("https://", "");
+          console.log("Normalized userId (removed https://):", userId);
+        }
+
+        console.log("Final userId for API call:", userId);
+
+        const statusText = document.getElementById("statusText");
+        const companyNameDiv = document.getElementById("companyName");
+        const connectBtn = document.getElementById("connectBtn");
+        const connectedActions = document.getElementById("connectedActions");
+        const reconnectBtn = document.getElementById("reconnectBtn");
+        const disconnectBtn = document.getElementById("disconnectBtn");
+
+        console.log("Button elements found:", {
+          connectBtn: !!connectBtn,
+          reconnectBtn: !!reconnectBtn,
+          disconnectBtn: !!disconnectBtn,
+          connectedActions: !!connectedActions,
+        });
+
+        // Polling state management - MUST be defined before handleConnect
+        var pollingInterval = null;
+        var pollAttempts = 0;
+        var MAX_POLL_ATTEMPTS = 15; // 30 seconds at 2-second intervals
+        var lastKnownStatus = null; // Track last status to detect changes
+
+        // Start polling for status updates
+        function startPolling() {
+          console.log("Starting status polling...");
+          pollAttempts = 0;
+
+          // Clear any existing polling
+          stopPolling();
+
+          // Start new polling interval
+          pollingInterval = setInterval(function () {
+            pollAttempts++;
+            console.log(
+              "Polling attempt",
+              pollAttempts,
+              "of",
+              MAX_POLL_ATTEMPTS,
+            );
+
+            checkStatus();
+
+            // Stop polling after max attempts
+            if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+              console.log("Max polling attempts reached, stopping polling");
+              stopPolling();
+            }
+          }, 2000); // Poll every 2 seconds
+
+          // Also do an immediate check
+          checkStatus();
+        }
+
+        // Stop polling
+        function stopPolling() {
+          if (pollingInterval) {
+            console.log("Stopping polling");
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+            pollAttempts = 0;
+          }
+        }
+
+        // Listen for messages from OAuth callback window
+        window.addEventListener("message", function (event) {
+          if (event.data && event.data.source === "qb-callback") {
+            if (event.data.success === true) {
+              console.log("Received OAuth callback success message");
+              // Send toast notification
+              sdk.execute("TOAST", {
+                message: "QuickBooks Connected Successfully!",
+              });
+
+              // Stop polling and do immediate refresh
+              stopPolling();
+              setTimeout(function () {
+                console.log("Refreshing status after OAuth connection...");
+                checkStatus();
               }, 500);
-            } else {
-              console.error('Disconnect failed:', data.error);
-              sdk.execute('TOAST', { message: 'Failed to disconnect: ' + (data.error || 'Unknown error') });
-              statusText.textContent = 'QB Active';
+
+              // Close modal after a delay
+              setTimeout(function () {
+                sdk.execute("CLOSE_MODAL");
+              }, 2000);
             }
-          } catch (error) {
-            console.error('Error in disconnect handler:', error);
-            console.error('Error stack:', error.stack);
-            
-            // Try to show toast even if there's an error
+          }
+        });
+
+        // Handle connect button
+        function handleConnect() {
+          const authUrl = "/auth/qb?user_id=" + userId + "&extension=true";
+          var popup = window.open(authUrl, "_blank", "width=600,height=700");
+
+          // Simple approach: watch for popup to close, then reload the page
+          // This is more reliable than polling or postMessage in sandboxed iframes
+          console.log("Opened OAuth popup, watching for it to close...");
+
+          var checkPopupClosed = setInterval(function () {
             try {
-              sdk.execute('TOAST', { message: 'Error disconnecting QuickBooks' });
-            } catch (toastError) {
-              console.error('Could not show toast:', toastError);
-            }
-            
-            statusText.textContent = 'QB Active';
-          } finally {
-            // Re-enable buttons
-            disconnectBtn.disabled = false;
-            reconnectBtn.disabled = false;
-            resetDisconnectButton();
-          }
-        });
-        
-        // Reset confirmation if user clicks elsewhere
-        document.addEventListener('click', function(event) {
-          if (confirmationPending && event.target !== disconnectBtn) {
-            console.log('Click outside disconnect button, resetting confirmation');
-            resetDisconnectButton();
-          }
-        });
-      } else {
-        console.error('Disconnect button not found!');
-      }
-      
-      // Check connection status
-      function checkStatus() {
-        console.log('Checking status for userId:', userId);
-        fetch('/api/user-status?userId=' + userId)
-          .then(function(response) { return response.json(); })
-          .then(function(data) {
-            console.log('User status response:', JSON.stringify(data, null, 2));
-            if (data.debug) {
-              console.log('Debug info:', data.debug);
-            }
-            
-            // Track if status changed
-            var statusChanged = (lastKnownStatus !== data.connected);
-            if (statusChanged) {
-              console.log('Status changed from', lastKnownStatus, 'to', data.connected);
-            }
-            lastKnownStatus = data.connected;
-            
-            if (data.connected === true) {
-              // Stop polling if we're connected
-              if (pollingInterval) {
-                console.log('Connected status detected, stopping polling');
-                stopPolling();
+              if (!popup || popup.closed) {
+                console.log(
+                  "Popup closed, reloading page to refresh status...",
+                );
+                clearInterval(checkPopupClosed);
+                // Give the server a moment to process, then reload
+                setTimeout(function () {
+                  window.location.reload();
+                }, 1000);
               }
-              console.log('User is connected, showing connected UI');
-              // Show connected state
-              statusText.textContent = 'QB Active';
-              statusText.className = 'status-active';
-              
-              // Show company name if available
-              if (data.companyName) {
-                companyNameDiv.textContent = data.companyName;
-                companyNameDiv.style.display = 'block';
-                console.log('Displaying company name:', data.companyName);
-              } else {
-                companyNameDiv.style.display = 'none';
-              }
-              
-              // Hide connect button, show disconnect/reconnect buttons
-              connectBtn.style.display = 'none';
-              connectedActions.style.display = 'flex';
-              console.log('Buttons visible - Reconnect/Disconnect should be clickable');
-            } else {
-              console.log('User is not connected, showing connect UI');
-              
-              // Stop polling if we detect disconnected status
-              if (pollingInterval) {
-                console.log('Disconnected status detected, stopping polling');
-                stopPolling();
-              }
-              
-              // Check if it's due to expired tokens
-              if (data.tokenExpired === true) {
-                console.log('Token expired, showing reconnect UI');
-                // Show expired state
-                statusText.textContent = 'QB Session Expired';
-                statusText.className = 'status-inactive';
-                companyNameDiv.style.display = 'none';
-                
-                // Show reconnect button with appropriate text
-                connectBtn.style.display = 'inline-block';
-                connectBtn.textContent = 'Reconnect to QuickBooks';
-                connectBtn.onclick = handleConnect;
-                connectedActions.style.display = 'none';
-              } else {
-                // Show disconnected state
-                statusText.textContent = 'QB Inactive';
-                statusText.className = 'status-inactive';
-                companyNameDiv.style.display = 'none';
-                
-                // Show connect button, hide disconnect/reconnect buttons
-                connectBtn.style.display = 'inline-block';
-                connectBtn.textContent = 'Connect to QuickBooks';
-                connectBtn.onclick = handleConnect;
-                connectedActions.style.display = 'none';
-              }
+            } catch (e) {
+              // Cross-origin errors can happen, just keep checking
             }
-          })
-          .catch(function(error) {
-            console.error('Error checking status:', error);
-            statusText.textContent = 'Status Unknown';
-            statusText.className = 'status-inactive';
-            companyNameDiv.style.display = 'none';
-            
-            // Show connect button on error
-            connectBtn.style.display = 'inline-block';
-            connectBtn.textContent = 'Connect to QuickBooks';
-            connectBtn.onclick = handleConnect;
-            connectedActions.style.display = 'none';
+          }, 500);
+        }
+
+        // Attach button handlers
+        if (reconnectBtn) {
+          console.log("Attaching reconnect button handler");
+          reconnectBtn.addEventListener("click", function () {
+            console.log("Reconnect button clicked");
+            handleConnect();
           });
-      }
-      
-      // Initial status check
-      checkStatus();
-    });
-  </script>
-</body>
+        } else {
+          console.error("Reconnect button not found!");
+        }
+
+        if (disconnectBtn) {
+          console.log("Attaching disconnect button handler");
+
+          // Track confirmation state
+          let confirmationPending = false;
+          let confirmationTimeout = null;
+
+          // Function to reset button state
+          function resetDisconnectButton() {
+            confirmationPending = false;
+            disconnectBtn.textContent = "Disconnect";
+            disconnectBtn.classList.remove("btn-confirm");
+            disconnectBtn.style.background = ""; // Reset inline style
+            if (confirmationTimeout) {
+              clearTimeout(confirmationTimeout);
+              confirmationTimeout = null;
+            }
+          }
+
+          disconnectBtn.addEventListener("click", async function (event) {
+            event.preventDefault();
+            console.log("Disconnect button clicked - event listener triggered");
+            console.log("Current userId:", userId);
+            console.log("Confirmation pending:", confirmationPending);
+
+            // First click - show confirmation
+            if (!confirmationPending) {
+              console.log("First click - showing confirmation");
+              confirmationPending = true;
+              disconnectBtn.textContent = "⚠️ Click again to confirm";
+              disconnectBtn.classList.add("btn-confirm");
+
+              // Reset after 3 seconds if not confirmed
+              confirmationTimeout = setTimeout(() => {
+                console.log("Confirmation timed out, resetting button");
+                resetDisconnectButton();
+              }, 3000);
+
+              return;
+            }
+
+            // Second click - actually disconnect
+            console.log("Second click - performing disconnect");
+            resetDisconnectButton();
+
+            try {
+              statusText.textContent = "Disconnecting...";
+              disconnectBtn.disabled = true;
+              reconnectBtn.disabled = true;
+
+              // Try to get a signed token from SDK for authentication (optional)
+              // Note: GET_SIGNED_TOKEN may not be available in all Pipedrive extension contexts
+              let authToken = null;
+              try {
+                console.log(
+                  "Attempting to get authentication token (optional)...",
+                );
+                // Try different SDK commands that might work
+                try {
+                  // This command may not exist in all contexts
+                  const token = await sdk.execute("GET_SIGNED_TOKEN");
+                  authToken = JSON.stringify(token);
+                  console.log("Got signed token successfully");
+                } catch (tokenError) {
+                  // Try getting context as fallback
+                  const context = await sdk.execute("GET_CONTEXT");
+                  if (context) {
+                    authToken = JSON.stringify({ context: context });
+                    console.log("Using context as authentication");
+                  }
+                }
+              } catch (e) {
+                console.log(
+                  "No authentication token available, proceeding without (server allows this for disconnect)",
+                );
+              }
+
+              console.log("Sending disconnect request to server...");
+              const response = await fetch("/api/disconnect-qb", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Pipedrive-Token": authToken || "",
+                },
+                body: JSON.stringify({ userId: userId }),
+              });
+
+              console.log("Response status:", response.status);
+              const data = await response.json();
+              console.log("Response data:", data);
+
+              if (data.success) {
+                console.log("Disconnect successful");
+                sdk.execute("TOAST", {
+                  message: "QuickBooks disconnected successfully",
+                });
+
+                // Simple approach: just reload the page after a brief delay
+                // This is more reliable than polling for status changes
+                console.log("Reloading page to refresh status...");
+                setTimeout(function () {
+                  window.location.reload();
+                }, 500);
+              } else {
+                console.error("Disconnect failed:", data.error);
+                sdk.execute("TOAST", {
+                  message:
+                    "Failed to disconnect: " + (data.error || "Unknown error"),
+                });
+                statusText.textContent = "Active";
+              }
+            } catch (error) {
+              console.error("Error in disconnect handler:", error);
+              console.error("Error stack:", error.stack);
+
+              // Try to show toast even if there's an error
+              try {
+                sdk.execute("TOAST", {
+                  message: "Error disconnecting QuickBooks",
+                });
+              } catch (toastError) {
+                console.error("Could not show toast:", toastError);
+              }
+
+              statusText.textContent = "Active";
+            } finally {
+              // Re-enable buttons
+              disconnectBtn.disabled = false;
+              reconnectBtn.disabled = false;
+              resetDisconnectButton();
+            }
+          });
+
+          // Reset confirmation if user clicks elsewhere
+          document.addEventListener("click", function (event) {
+            if (confirmationPending && event.target !== disconnectBtn) {
+              console.log(
+                "Click outside disconnect button, resetting confirmation",
+              );
+              resetDisconnectButton();
+            }
+          });
+        } else {
+          console.error("Disconnect button not found!");
+        }
+
+        // Check connection status
+        function checkStatus() {
+          console.log("Checking status for userId:", userId);
+          fetch("/api/user-status?userId=" + userId)
+            .then(function (response) {
+              return response.json();
+            })
+            .then(function (data) {
+              console.log(
+                "User status response:",
+                JSON.stringify(data, null, 2),
+              );
+              if (data.debug) {
+                console.log("Debug info:", data.debug);
+              }
+
+              // Track if status changed
+              var statusChanged = lastKnownStatus !== data.connected;
+              if (statusChanged) {
+                console.log(
+                  "Status changed from",
+                  lastKnownStatus,
+                  "to",
+                  data.connected,
+                );
+              }
+              lastKnownStatus = data.connected;
+
+              if (data.connected === true) {
+                // Stop polling if we're connected
+                if (pollingInterval) {
+                  console.log("Connected status detected, stopping polling");
+                  stopPolling();
+                }
+                console.log("User is connected, showing connected UI");
+                // Show connected state
+                statusText.textContent = "Active";
+                statusText.className = "status-active";
+
+                // Show company name if available
+                if (data.companyName) {
+                  companyNameDiv.textContent = data.companyName;
+                  companyNameDiv.style.display = "block";
+                  console.log("Displaying company name:", data.companyName);
+                } else {
+                  companyNameDiv.style.display = "none";
+                }
+
+                // Hide connect button, show disconnect/reconnect buttons
+                connectBtn.style.display = "none";
+                connectedActions.style.display = "flex";
+                console.log(
+                  "Buttons visible - Reconnect/Disconnect should be clickable",
+                );
+              } else {
+                console.log("User is not connected, showing connect UI");
+
+                // Stop polling if we detect disconnected status
+                if (pollingInterval) {
+                  console.log("Disconnected status detected, stopping polling");
+                  stopPolling();
+                }
+
+                // Check if it's due to expired tokens
+                if (data.tokenExpired === true) {
+                  console.log("Token expired, showing reconnect UI");
+                  // Show expired state
+                  statusText.textContent = "QB Session Expired";
+                  statusText.className = "status-inactive";
+                  companyNameDiv.style.display = "none";
+
+                  // Show reconnect button with appropriate text
+                  connectBtn.style.display = "inline-block";
+                  connectBtn.textContent = "Reconnect to QuickBooks";
+                  connectBtn.onclick = handleConnect;
+                  connectedActions.style.display = "none";
+                } else {
+                  // Show disconnected state
+                  statusText.textContent = "Inactive";
+                  statusText.className = "status-inactive";
+                  companyNameDiv.style.display = "none";
+
+                  // Show connect button, hide disconnect/reconnect buttons
+                  connectBtn.style.display = "inline-block";
+                  connectBtn.textContent = "Connect to QuickBooks";
+                  connectBtn.onclick = handleConnect;
+                  connectedActions.style.display = "none";
+                }
+              }
+            })
+            .catch(function (error) {
+              console.error("Error checking status:", error);
+              statusText.textContent = "Status Unknown";
+              statusText.className = "status-inactive";
+              companyNameDiv.style.display = "none";
+
+              // Show connect button on error
+              connectBtn.style.display = "inline-block";
+              connectBtn.textContent = "Connect to QuickBooks";
+              connectBtn.onclick = handleConnect;
+              connectedActions.style.display = "none";
+            });
+        }
+
+        // Initial status check
+        checkStatus();
+      });
+    </script>
+  </body>
 </html>
