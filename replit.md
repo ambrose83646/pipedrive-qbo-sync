@@ -90,13 +90,14 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
-- **November 25, 2025**: Fixed contact linking and added Pipedrive token refresh
-  - Fixed `/api/attach-contact` endpoint with robust user lookup logic that prefers users with both Pipedrive and QB tokens
-  - Fixed URL construction to handle api_domain with/without https:// prefix
+- **November 25, 2025**: Fixed contact linking with tenant isolation and database storage
+  - Overhauled user lookup to prioritize freshest Pipedrive tokens by `created_at` timestamp
+  - Added tenant-safe QB token merging: only merges if api_domain AND qb_realm_id match (prevents cross-tenant credential leakage)
+  - Implemented database-based deal-to-QB customer mapping via `setDealMapping`/`getDealMapping` functions
+  - Fixed Pipedrive OAuth to use Bearer token in Authorization header (not query string api_token param)
+  - Fixed `/api/deal-contact` endpoint to return stored mapping even when QB tokens unavailable
   - Implemented automatic Pipedrive token refresh (similar to QuickBooks refresh logic)
-  - Added `refreshToken` function to `src/auth/pipedrive.js` for OAuth token refresh
   - Fixed frontend SDK commands: replaced invalid 'TOAST' with `AppExtensionsSDK.Command.SHOW_SNACKBAR`
-  - Fixed frontend to call backend API instead of non-existent SDK `UPDATE_ENTITY` command
   - Note: Pipedrive refresh tokens expire after 60 days of non-use; users must re-authenticate if tokens are fully expired
 
 - **November 25, 2025**: Added invoice creation functionality with product search
