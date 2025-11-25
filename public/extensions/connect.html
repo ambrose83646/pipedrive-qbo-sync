@@ -242,7 +242,7 @@
       var pollingInterval = null;
       var pollAttempts = 0;
       var MAX_POLL_ATTEMPTS = 15; // 30 seconds at 2-second intervals
-      var currentRequestId = 0; // Used to prevent stale responses from updating UI
+      var lastKnownStatus = null; // Track last status to detect changes
       
       // Start polling for status updates
       function startPolling() {
@@ -462,24 +462,21 @@
       
       // Check connection status
       function checkStatus() {
-        // Increment request ID to track this request
-        currentRequestId++;
-        var thisRequestId = currentRequestId;
-        
-        console.log('Checking status for userId:', userId, '(request #' + thisRequestId + ')');
+        console.log('Checking status for userId:', userId);
         fetch('/api/user-status?userId=' + userId)
-          .then(response => response.json())
-          .then(data => {
-            // Ignore stale responses
-            if (thisRequestId !== currentRequestId) {
-              console.log('Ignoring stale response from request #' + thisRequestId + ' (current is #' + currentRequestId + ')');
-              return;
-            }
-            
+          .then(function(response) { return response.json(); })
+          .then(function(data) {
             console.log('User status response:', JSON.stringify(data, null, 2));
             if (data.debug) {
               console.log('Debug info:', data.debug);
             }
+            
+            // Track if status changed
+            var statusChanged = (lastKnownStatus !== data.connected);
+            if (statusChanged) {
+              console.log('Status changed from', lastKnownStatus, 'to', data.connected);
+            }
+            lastKnownStatus = data.connected;
             
             if (data.connected === true) {
               // Stop polling if we're connected
@@ -541,9 +538,8 @@
               }
             }
           })
-          .catch(error => {
+          .catch(function(error) {
             console.error('Error checking status:', error);
-            console.error('Error stack:', error.stack);
             statusText.textContent = 'Status Unknown';
             statusText.className = 'status-inactive';
             companyNameDiv.style.display = 'none';
