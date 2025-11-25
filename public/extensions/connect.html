@@ -415,15 +415,10 @@
               console.log('Disconnect successful');
               sdk.execute('TOAST', { message: 'QuickBooks disconnected successfully' });
               
-              // Stop any existing polling to prevent race conditions
-              stopPolling();
-              
-              // Wait for any in-flight requests to complete, then refresh status
-              console.log('Waiting 500ms then refreshing status...');
-              setTimeout(function() {
-                console.log('Calling checkStatus after disconnect');
-                checkStatus();
-              }, 500);
+              // Use polling to detect when disconnect is reflected in status
+              // This is the same approach that works for connect
+              console.log('Starting polling to detect disconnect status change');
+              startPolling();
             } else {
               console.error('Disconnect failed:', data.error);
               sdk.execute('TOAST', { message: 'Failed to disconnect: ' + (data.error || 'Unknown error') });
@@ -505,9 +500,9 @@
             } else {
               console.log('User is not connected, showing connect UI');
               
-              // Stop polling if we're disconnected and not in the middle of connecting
-              if (pollingInterval && pollAttempts > 2) {
-                console.log('Disconnected status confirmed, stopping polling');
+              // Stop polling if we detect disconnected status
+              if (pollingInterval) {
+                console.log('Disconnected status detected, stopping polling');
                 stopPolling();
               }
               
