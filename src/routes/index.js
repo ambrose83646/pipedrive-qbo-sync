@@ -1711,4 +1711,256 @@ router.post("/deauth", express.json(), async (req, res) => {
   }
 });
 
+// Search QuickBooks items/products
+router.get("/api/items/search", async (req, res) => {
+  try {
+    const searchTerm = req.query.term || '';
+    const providedUserId = req.query.userId || 'test';
+    
+    console.log('Searching items:', searchTerm, 'User ID:', providedUserId);
+
+    // Find user with QB tokens
+    let userData = null;
+    let actualUserId = providedUserId;
+    
+    userData = await getUser(providedUserId);
+    
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      const { listUsers } = require("../../config/database");
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.qb_access_token && testUserData.qb_realm_id) {
+          const normalizedProvidedId = providedUserId.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          const normalizedKey = key.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          
+          if (normalizedKey === normalizedProvidedId ||
+              testUserData.api_domain?.includes(normalizedProvidedId) ||
+              normalizedProvidedId.includes(normalizedKey)) {
+            userData = testUserData;
+            actualUserId = key;
+            break;
+          }
+          
+          if (!userData && testUserData.qb_realm_id) {
+            userData = testUserData;
+            actualUserId = key;
+          }
+        }
+      }
+    }
+    
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      return res.status(400).json({
+        success: false,
+        error: "QuickBooks not connected for this user"
+      });
+    }
+
+    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const realmId = userData.qb_realm_id;
+    
+    // Build query to search items by Name - get both products and services
+    let query;
+    if (searchTerm) {
+      query = `SELECT * FROM Item WHERE Name LIKE '%${searchTerm}%' AND Active = true MAXRESULTS 20`;
+    } else {
+      query = `SELECT * FROM Item WHERE Active = true MAXRESULTS 20`;
+    }
+    const encodedQuery = encodeURIComponent(query);
+    
+    const queryResponse = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
+      return await qbClient.makeApiCall({
+        url: `${baseUrl}/v3/company/${realmId}/query?query=${encodedQuery}`,
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+    });
+    
+    if (!queryResponse || !queryResponse.body) {
+      return res.status(500).json({
+        success: false,
+        error: "Invalid response from QuickBooks"
+      });
+    }
+    
+    const queryResult = JSON.parse(queryResponse.body);
+    const items = queryResult.QueryResponse?.Item || [];
+    
+    // Transform to simplified format
+    const simplifiedItems = items.map(item => ({
+      id: item.Id,
+      name: item.Name,
+      description: item.Description || '',
+      unitPrice: item.UnitPrice || 0,
+      type: item.Type, // 'Inventory', 'Service', 'NonInventory'
+      incomeAccountRef: item.IncomeAccountRef,
+      qtyOnHand: item.QtyOnHand || 0
+    }));
+    
+    res.json(simplifiedItems);
+  } catch (error) {
+    console.error("Search items error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Create QuickBooks invoice
+router.post("/api/invoices", express.json(), async (req, res) => {
+  try {
+    const { customerId, lineItems, dueDate, memo } = req.body;
+    const providedUserId = req.query.userId || req.body.userId || 'test';
+    
+    console.log('Creating invoice for customer:', customerId, 'User ID:', providedUserId);
+
+    if (!customerId) {
+      return res.status(400).json({
+        success: false,
+        error: "Customer ID is required"
+      });
+    }
+
+    if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "At least one line item is required"
+      });
+    }
+
+    // Find user with QB tokens
+    let userData = null;
+    let actualUserId = providedUserId;
+    
+    userData = await getUser(providedUserId);
+    
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      const { listUsers } = require("../../config/database");
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.qb_access_token && testUserData.qb_realm_id) {
+          const normalizedProvidedId = providedUserId.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          const normalizedKey = key.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          
+          if (normalizedKey === normalizedProvidedId ||
+              testUserData.api_domain?.includes(normalizedProvidedId) ||
+              normalizedProvidedId.includes(normalizedKey)) {
+            userData = testUserData;
+            actualUserId = key;
+            break;
+          }
+          
+          if (!userData && testUserData.qb_realm_id) {
+            userData = testUserData;
+            actualUserId = key;
+          }
+        }
+      }
+    }
+    
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      return res.status(400).json({
+        success: false,
+        error: "QuickBooks not connected for this user"
+      });
+    }
+
+    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const realmId = userData.qb_realm_id;
+    
+    // Build invoice object
+    const invoiceData = {
+      CustomerRef: {
+        value: customerId
+      },
+      Line: lineItems.map((item, index) => {
+        const line = {
+          DetailType: "SalesItemLineDetail",
+          Amount: (item.quantity || 1) * (item.unitPrice || 0),
+          Description: item.description || item.name || '',
+          SalesItemLineDetail: {
+            Qty: item.quantity || 1,
+            UnitPrice: item.unitPrice || 0
+          }
+        };
+        
+        // Add item reference if provided
+        if (item.itemId) {
+          line.SalesItemLineDetail.ItemRef = {
+            value: item.itemId
+          };
+        }
+        
+        return line;
+      })
+    };
+    
+    // Add due date if provided
+    if (dueDate) {
+      invoiceData.DueDate = dueDate;
+    }
+    
+    // Add memo/private note if provided
+    if (memo) {
+      invoiceData.PrivateNote = memo;
+    }
+    
+    console.log('Creating invoice with data:', JSON.stringify(invoiceData, null, 2));
+    
+    const createResponse = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
+      return await qbClient.makeApiCall({
+        url: `${baseUrl}/v3/company/${realmId}/invoice`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(invoiceData)
+      });
+    });
+    
+    if (!createResponse || !createResponse.body) {
+      return res.status(500).json({
+        success: false,
+        error: "Invalid response from QuickBooks"
+      });
+    }
+    
+    const result = JSON.parse(createResponse.body);
+    
+    if (result.Invoice) {
+      console.log('Invoice created successfully:', result.Invoice.Id);
+      res.json({
+        success: true,
+        invoice: {
+          id: result.Invoice.Id,
+          docNumber: result.Invoice.DocNumber,
+          totalAmount: result.Invoice.TotalAmt,
+          dueDate: result.Invoice.DueDate,
+          balance: result.Invoice.Balance
+        }
+      });
+    } else {
+      console.error('Invoice creation failed:', result);
+      res.status(500).json({
+        success: false,
+        error: result.Fault?.Error?.[0]?.Message || "Failed to create invoice"
+      });
+    }
+  } catch (error) {
+    console.error("Create invoice error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

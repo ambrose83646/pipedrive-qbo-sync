@@ -509,6 +509,263 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    
+    /* Invoice Modal Styles */
+    .invoice-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1001;
+    }
+    
+    .invoice-modal.active {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    
+    .invoice-content {
+      background: white;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 600px;
+      margin: 20px 0;
+    }
+    
+    .invoice-header {
+      padding: 20px;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .invoice-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+    
+    .invoice-body {
+      padding: 20px;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #595959;
+      margin-bottom: 6px;
+    }
+    
+    .form-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    
+    .form-input:focus {
+      outline: none;
+      border-color: #1890ff;
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+    }
+    
+    .line-items-section {
+      margin-top: 20px;
+    }
+    
+    .line-items-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    
+    .line-items-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+    
+    .btn-add-item {
+      padding: 6px 12px;
+      background: #1890ff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    
+    .btn-add-item:hover {
+      background: #40a9ff;
+    }
+    
+    .line-item {
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      padding: 12px;
+      margin-bottom: 8px;
+    }
+    
+    .line-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .line-item-number {
+      font-size: 12px;
+      font-weight: 500;
+      color: #8c8c8c;
+    }
+    
+    .btn-remove-item {
+      padding: 4px 8px;
+      background: transparent;
+      color: #ff4d4f;
+      border: 1px solid #ff4d4f;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    
+    .btn-remove-item:hover {
+      background: #fff1f0;
+    }
+    
+    .line-item-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    
+    .line-item-row:last-child {
+      margin-bottom: 0;
+    }
+    
+    .product-search-container {
+      position: relative;
+      flex: 1;
+    }
+    
+    .product-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #d9d9d9;
+      border-top: none;
+      border-radius: 0 0 4px 4px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      max-height: 200px;
+      overflow-y: auto;
+      display: none;
+    }
+    
+    .product-dropdown.active {
+      display: block;
+    }
+    
+    .product-item {
+      padding: 10px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .product-item:hover {
+      background: #f5f5f5;
+    }
+    
+    .product-item:last-child {
+      border-bottom: none;
+    }
+    
+    .product-name {
+      font-weight: 500;
+      color: #1a1a1a;
+    }
+    
+    .product-price {
+      font-size: 12px;
+      color: #52c41a;
+    }
+    
+    .input-small {
+      width: 80px;
+    }
+    
+    .invoice-total {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e0e0e0;
+      text-align: right;
+    }
+    
+    .total-label {
+      font-size: 14px;
+      color: #595959;
+    }
+    
+    .total-amount {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-left: 8px;
+    }
+    
+    .invoice-footer {
+      padding: 16px 20px;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    
+    .btn-create {
+      padding: 10px 24px;
+      background: #52c41a;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    
+    .btn-create:hover {
+      background: #73d13d;
+    }
+    
+    .btn-create:disabled {
+      background: #d9d9d9;
+      cursor: not-allowed;
+    }
+    
+    .no-items-message {
+      padding: 20px;
+      text-align: center;
+      color: #8c8c8c;
+      background: #fafafa;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -571,6 +828,51 @@
       </div>
       <div class="search-footer">
         <button class="btn-cancel" onclick="closeSearchModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Invoice Creation Modal -->
+  <div class="invoice-modal" id="invoiceModal">
+    <div class="invoice-content">
+      <div class="invoice-header">
+        <h3 class="invoice-title">Create Invoice</h3>
+        <button class="btn-cancel" onclick="closeInvoiceModal()" style="padding: 4px 8px;">×</button>
+      </div>
+      <div class="invoice-body">
+        <div class="form-group">
+          <label class="form-label">Customer</label>
+          <input type="text" class="form-input" id="invoiceCustomer" readonly placeholder="Loading...">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Due Date</label>
+          <input type="date" class="form-input" id="invoiceDueDate">
+        </div>
+        
+        <div class="line-items-section">
+          <div class="line-items-header">
+            <span class="line-items-title">Line Items</span>
+            <button class="btn-add-item" onclick="addLineItem()">+ Add Item</button>
+          </div>
+          <div id="lineItemsContainer">
+            <div class="no-items-message">Click "Add Item" to add products or services</div>
+          </div>
+        </div>
+        
+        <div class="invoice-total">
+          <span class="total-label">Total:</span>
+          <span class="total-amount" id="invoiceTotal">$0.00</span>
+        </div>
+        
+        <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label">Memo (optional)</label>
+          <textarea class="form-input" id="invoiceMemo" rows="2" placeholder="Add a private note..."></textarea>
+        </div>
+      </div>
+      <div class="invoice-footer">
+        <button class="btn-cancel" onclick="closeInvoiceModal()">Cancel</button>
+        <button class="btn-create" id="createInvoiceBtn" onclick="submitInvoice()">Create Invoice</button>
       </div>
     </div>
   </div>
@@ -814,9 +1116,10 @@
           </div>
         </div>
         
-        <!-- View Invoices Button -->
-        <div class="btn-container">
-          <button class="btn-primary" onclick="viewAllInvoices()">View all invoices</button>
+        <!-- Action Buttons -->
+        <div class="btn-container" style="display: flex; gap: 8px;">
+          <button class="btn-primary" onclick="createInvoice()" style="background: #52c41a; flex: 1;">Create Invoice</button>
+          <button class="btn-primary" onclick="viewAllInvoices()" style="flex: 1;">View all invoices</button>
         </div>
       `;
       
@@ -1080,6 +1383,293 @@
           ${message}
         </div>
       `;
+    }
+    
+    // ============ INVOICE CREATION FUNCTIONS ============
+    
+    let lineItems = [];
+    let lineItemCounter = 0;
+    let productSearchTimeouts = {};
+    
+    function openInvoiceModal() {
+      if (!linkedContact) {
+        sdk.execute('TOAST', { message: 'Please link a QuickBooks contact first' });
+        return;
+      }
+      
+      document.getElementById('invoiceModal').classList.add('active');
+      document.getElementById('invoiceCustomer').value = linkedContact.DisplayName || linkedContact.CompanyName || 'Unknown';
+      
+      // Set default due date to 30 days from now
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 30);
+      document.getElementById('invoiceDueDate').value = dueDate.toISOString().split('T')[0];
+      
+      // Reset line items
+      lineItems = [];
+      lineItemCounter = 0;
+      renderLineItems();
+      updateInvoiceTotal();
+    }
+    
+    function closeInvoiceModal() {
+      document.getElementById('invoiceModal').classList.remove('active');
+      document.getElementById('invoiceMemo').value = '';
+      lineItems = [];
+      lineItemCounter = 0;
+    }
+    
+    function addLineItem() {
+      lineItemCounter++;
+      const newItem = {
+        id: lineItemCounter,
+        itemId: null,
+        name: '',
+        description: '',
+        quantity: 1,
+        unitPrice: 0
+      };
+      lineItems.push(newItem);
+      renderLineItems();
+    }
+    
+    function removeLineItem(itemId) {
+      lineItems = lineItems.filter(item => item.id !== itemId);
+      renderLineItems();
+      updateInvoiceTotal();
+    }
+    
+    function renderLineItems() {
+      const container = document.getElementById('lineItemsContainer');
+      
+      if (lineItems.length === 0) {
+        container.innerHTML = '<div class="no-items-message">Click "Add Item" to add products or services</div>';
+        return;
+      }
+      
+      let html = '';
+      lineItems.forEach((item, index) => {
+        html += `
+          <div class="line-item" data-item-id="${item.id}">
+            <div class="line-item-header">
+              <span class="line-item-number">Item ${index + 1}</span>
+              <button class="btn-remove-item" onclick="removeLineItem(${item.id})">Remove</button>
+            </div>
+            <div class="line-item-row">
+              <div class="product-search-container">
+                <input type="text" class="form-input" 
+                       id="productSearch_${item.id}" 
+                       placeholder="Search products..." 
+                       value="${item.name}"
+                       oninput="searchProducts(${item.id}, this.value)"
+                       onfocus="showProductDropdown(${item.id})"
+                       autocomplete="off">
+                <div class="product-dropdown" id="productDropdown_${item.id}"></div>
+              </div>
+            </div>
+            <div class="line-item-row">
+              <input type="text" class="form-input" style="flex: 1;" 
+                     placeholder="Description" 
+                     value="${item.description}"
+                     onchange="updateLineItem(${item.id}, 'description', this.value)">
+            </div>
+            <div class="line-item-row">
+              <div style="flex: 1;">
+                <label class="form-label" style="margin-bottom: 2px;">Qty</label>
+                <input type="number" class="form-input" 
+                       value="${item.quantity}" 
+                       min="1"
+                       onchange="updateLineItem(${item.id}, 'quantity', parseFloat(this.value) || 1)">
+              </div>
+              <div style="flex: 1;">
+                <label class="form-label" style="margin-bottom: 2px;">Unit Price</label>
+                <input type="number" class="form-input" 
+                       value="${item.unitPrice}" 
+                       step="0.01" 
+                       min="0"
+                       onchange="updateLineItem(${item.id}, 'unitPrice', parseFloat(this.value) || 0)">
+              </div>
+              <div style="flex: 1;">
+                <label class="form-label" style="margin-bottom: 2px;">Amount</label>
+                <input type="text" class="form-input" 
+                       value="$${(item.quantity * item.unitPrice).toFixed(2)}" 
+                       readonly 
+                       style="background: #f5f5f5;">
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      
+      container.innerHTML = html;
+    }
+    
+    function updateLineItem(itemId, field, value) {
+      const item = lineItems.find(i => i.id === itemId);
+      if (item) {
+        item[field] = value;
+        if (field === 'quantity' || field === 'unitPrice') {
+          renderLineItems();
+          updateInvoiceTotal();
+        }
+      }
+    }
+    
+    function updateInvoiceTotal() {
+      const total = lineItems.reduce((sum, item) => {
+        return sum + (item.quantity * item.unitPrice);
+      }, 0);
+      document.getElementById('invoiceTotal').textContent = `$${total.toFixed(2)}`;
+    }
+    
+    function searchProducts(itemId, searchTerm) {
+      // Clear previous timeout for this item
+      if (productSearchTimeouts[itemId]) {
+        clearTimeout(productSearchTimeouts[itemId]);
+      }
+      
+      const dropdown = document.getElementById(`productDropdown_${itemId}`);
+      
+      if (searchTerm.length < 2) {
+        dropdown.classList.remove('active');
+        dropdown.innerHTML = '';
+        return;
+      }
+      
+      dropdown.classList.add('active');
+      dropdown.innerHTML = '<div class="product-item"><span style="color: #8c8c8c;">Searching...</span></div>';
+      
+      // Debounce the search
+      productSearchTimeouts[itemId] = setTimeout(async () => {
+        try {
+          const response = await fetch(`/api/items/search?term=${encodeURIComponent(searchTerm)}&userId=${userId}`);
+          
+          if (!response.ok) {
+            dropdown.innerHTML = '<div class="product-item"><span style="color: #ff4d4f;">Error searching products</span></div>';
+            return;
+          }
+          
+          const products = await response.json();
+          
+          if (!products || products.length === 0) {
+            dropdown.innerHTML = '<div class="product-item"><span style="color: #8c8c8c;">No products found</span></div>';
+            return;
+          }
+          
+          let html = '';
+          products.forEach(product => {
+            const price = product.unitPrice || 0;
+            html += `
+              <div class="product-item" onclick="selectProduct(${itemId}, '${product.id}', '${(product.name || '').replace(/'/g, "\\'")}', '${(product.description || '').replace(/'/g, "\\'")}', ${price})">
+                <div class="product-name">${product.name}</div>
+                <div class="product-price">$${price.toFixed(2)} ${product.type ? `- ${product.type}` : ''}</div>
+              </div>
+            `;
+          });
+          
+          dropdown.innerHTML = html;
+          
+        } catch (error) {
+          console.error('Product search error:', error);
+          dropdown.innerHTML = '<div class="product-item"><span style="color: #ff4d4f;">Error searching products</span></div>';
+        }
+      }, 300);
+    }
+    
+    function showProductDropdown(itemId) {
+      const input = document.getElementById(`productSearch_${itemId}`);
+      if (input.value.length >= 2) {
+        document.getElementById(`productDropdown_${itemId}`).classList.add('active');
+      }
+    }
+    
+    function selectProduct(itemId, productId, name, description, unitPrice) {
+      const item = lineItems.find(i => i.id === itemId);
+      if (item) {
+        item.itemId = productId;
+        item.name = name;
+        item.description = description;
+        item.unitPrice = unitPrice;
+      }
+      
+      // Close dropdown
+      document.getElementById(`productDropdown_${itemId}`).classList.remove('active');
+      
+      // Re-render to update all fields
+      renderLineItems();
+      updateInvoiceTotal();
+    }
+    
+    // Close product dropdowns when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.product-search-container')) {
+        document.querySelectorAll('.product-dropdown').forEach(d => d.classList.remove('active'));
+      }
+    });
+    
+    async function submitInvoice() {
+      if (lineItems.length === 0) {
+        sdk.execute('TOAST', { message: 'Please add at least one line item' });
+        return;
+      }
+      
+      // Validate line items have prices
+      const invalidItems = lineItems.filter(item => !item.unitPrice || item.unitPrice <= 0);
+      if (invalidItems.length > 0) {
+        sdk.execute('TOAST', { message: 'All line items must have a price greater than 0' });
+        return;
+      }
+      
+      const createBtn = document.getElementById('createInvoiceBtn');
+      createBtn.disabled = true;
+      createBtn.textContent = 'Creating...';
+      
+      try {
+        const dueDate = document.getElementById('invoiceDueDate').value;
+        const memo = document.getElementById('invoiceMemo').value;
+        
+        const response = await fetch(`/api/invoices?userId=${userId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            customerId: linkedContact.Id,
+            lineItems: lineItems.map(item => ({
+              itemId: item.itemId,
+              name: item.name,
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice
+            })),
+            dueDate: dueDate || undefined,
+            memo: memo || undefined
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          sdk.execute('TOAST', { message: `Invoice #${result.invoice.docNumber || result.invoice.id} created successfully!` });
+          closeInvoiceModal();
+          
+          // Reload invoice data
+          await loadInvoiceData();
+        } else {
+          sdk.execute('TOAST', { message: `Failed to create invoice: ${result.error}` });
+        }
+        
+      } catch (error) {
+        console.error('Create invoice error:', error);
+        sdk.execute('TOAST', { message: 'Error creating invoice' });
+      } finally {
+        createBtn.disabled = false;
+        createBtn.textContent = 'Create Invoice';
+      }
+    }
+    
+    function createInvoice() {
+      openInvoiceModal();
     }
   </script>
 </body>

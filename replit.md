@@ -90,6 +90,15 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **November 25, 2025**: Added invoice creation functionality with product search
+  - Implemented `/api/items/search` endpoint for searching QuickBooks inventory (products and services)
+  - Implemented `/api/invoices` POST endpoint for creating invoices in QuickBooks
+  - Built invoice creation modal UI with dynamic line item management
+  - Added product search with debounce and dropdown selection (300ms debounce, min 2 chars)
+  - Real-time invoice total calculation as line items are added/modified
+  - Added "Create Invoice" button to linked state UI alongside "View all invoices"
+  - All new endpoints use `makeQBApiCall` helper for automatic token refresh handling
+
 - **November 18, 2025**: Implemented new invoicing panel extension with modern UI design
   - Created professional two-column layout matching QuickBooks design standards
   - Added linked/unlinked states with appropriate visual feedback
