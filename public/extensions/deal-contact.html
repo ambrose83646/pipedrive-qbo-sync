@@ -800,8 +800,9 @@
       </div>
       <div class="header-actions">
         <button class="icon-btn" onclick="refreshData()" title="Refresh">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M13.65 2.35A8 8 0 1 0 14 8h-2a6 6 0 1 1-.22-1.62L9 7h5V2l-1.35 1.35z"/>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 8A6 6 0 1 1 8 2" stroke-linecap="round"/>
+            <path d="M8 2V5L11 3.5 8 2z" fill="currentColor" stroke="none"/>
           </svg>
         </button>
         <button class="icon-btn" onclick="showMenu()" title="Menu">
@@ -1376,10 +1377,6 @@
     }
     
     async function unlinkContact() {
-      if (!confirm('Are you sure you want to unlink this QuickBooks contact from this deal?')) {
-        return;
-      }
-      
       try {
         sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Unlinking contact...' });
         
