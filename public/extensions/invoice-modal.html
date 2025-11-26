@@ -365,7 +365,8 @@
       try {
         const urlParams = new URLSearchParams(window.location.search);
         
-        sdk = await new AppExtensionsSDK({ identifier: 'f8e1ae44-fa57-4516-809b-9f81bcdba7d1' }).initialize();
+        // Let SDK auto-detect identifier from URL params (Pipedrive adds 'id' param when opening modal)
+        sdk = await new AppExtensionsSDK().initialize();
         
         // Data is passed from OPEN_MODAL as a JSON string in the 'data' parameter
         const dataParam = urlParams.get('data');
