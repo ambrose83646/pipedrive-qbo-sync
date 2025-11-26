@@ -679,11 +679,6 @@
             message: `Invoice #${result.invoice.docNumber || result.invoice.id} created successfully!` 
           });
           
-          sdk.execute(AppExtensionsSDK.Command.SEND_MESSAGE, {
-            type: 'invoice_created',
-            invoiceId: result.invoice.id
-          });
-          
           closeModal();
         } else {
           sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { 

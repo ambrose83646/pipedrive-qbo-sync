@@ -950,20 +950,24 @@
         
         console.log('Initialized with dealId:', dealId, 'userId:', userId);
         
-        // Register message listener for invoice creation events from the modal
-        try {
-          sdk.execute(AppExtensionsSDK.Command.RECEIVE_MESSAGE, (message) => {
-            console.log('Received message:', message);
-            if (message && message.type === 'invoice_created') {
-              loadInvoiceData();
-            }
-          });
-        } catch (e) {
-          console.log('Could not register message listener:', e);
-        }
-        
         // Load deal data and check for linked contact
         await loadDealData();
+        
+        // Listen for visibility changes to refresh data when returning from modal
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible' && linkedContact?.Id) {
+            console.log('Panel regained focus, refreshing invoice data...');
+            loadInvoiceData();
+          }
+        });
+        
+        // Also refresh on window focus (backup for visibility)
+        window.addEventListener('focus', () => {
+          if (linkedContact?.Id) {
+            console.log('Window focus, refreshing invoice data...');
+            loadInvoiceData();
+          }
+        });
         
       } catch (error) {
         console.error('Initialization error:', error);

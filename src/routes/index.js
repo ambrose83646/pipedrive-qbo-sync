@@ -1393,10 +1393,14 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error fetching invoices:', error);
+    console.error('Error fetching invoices:', error.message);
+    console.error('Error stack:', error.stack);
+    if (error.response) {
+      console.error('Error response body:', error.response.body || error.response.data);
+    }
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch invoices',
+      error: error.message || 'Failed to fetch invoices',
       overview: {
         outstanding: 0,
         overdue: 0,
