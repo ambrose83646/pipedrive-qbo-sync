@@ -950,6 +950,18 @@
         
         console.log('Initialized with dealId:', dealId, 'userId:', userId);
         
+        // Register message listener for invoice creation events from the modal
+        try {
+          sdk.execute(AppExtensionsSDK.Command.RECEIVE_MESSAGE, (message) => {
+            console.log('Received message:', message);
+            if (message && message.type === 'invoice_created') {
+              loadInvoiceData();
+            }
+          });
+        } catch (e) {
+          console.log('Could not register message listener:', e);
+        }
+        
         // Load deal data and check for linked contact
         await loadDealData();
         
@@ -1722,7 +1734,21 @@
     }
     
     function createInvoice() {
-      openInvoiceModal();
+      if (!linkedContact) {
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Please link a QuickBooks contact first' });
+        return;
+      }
+      
+      sdk.execute(AppExtensionsSDK.Command.OPEN_MODAL, {
+        type: 'custom_modal',
+        action_id: 'invoice-modal',
+        data: {
+          userId: userId,
+          dealId: dealId,
+          customerId: linkedContact.Id,
+          customerName: linkedContact.DisplayName || linkedContact.CompanyName || 'Unknown'
+        }
+      });
     }
   </script>
 </body>
