@@ -7,6 +7,24 @@ const { syncContact } = require("../controllers/sync");
 const OAuthClient = require("intuit-oauth");
 const axios = require("axios");
 
+// Helper function to extract JSON data from QuickBooks API response
+// The intuit-oauth library may return data in either 'json' (pre-parsed) or 'body' (string)
+function getQBResponseData(response) {
+  if (response.json) {
+    return response.json;
+  }
+  if (response.body) {
+    return typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+  }
+  if (response.response?.json) {
+    return response.response.json;
+  }
+  if (response.response?.body) {
+    return typeof response.response.body === 'string' ? JSON.parse(response.response.body) : response.response.body;
+  }
+  throw new Error('No valid response data found');
+}
+
 // Helper function to make QuickBooks API call with automatic token refresh
 async function makeQBApiCall(userId, userData, apiCallFunction) {
   // Create initial client with current tokens
@@ -1252,7 +1270,7 @@ router.get("/api/customer/:customerId", async (req, res) => {
       });
     });
     
-    const customer = JSON.parse(customerResponse.body).Customer;
+    const customer = getQBResponseData(customerResponse).Customer;
     
     res.json({
       success: true,
@@ -1355,7 +1373,7 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
       });
     });
     
-    const responseData = JSON.parse(invoiceResponse.body);
+    const responseData = getQBResponseData(invoiceResponse);
     const invoices = responseData.QueryResponse?.Invoice || [];
     
     // Calculate overview totals
@@ -1538,18 +1556,12 @@ router.get("/api/customers/search", async (req, res) => {
       });
     }
     
-    // Try different ways to get the response data (intuit-oauth library can return different formats)
+    // Use helper to get response data (intuit-oauth library can return different formats)
     let queryResult;
-    if (queryResponse.body) {
-      queryResult = typeof queryResponse.body === 'string' ? JSON.parse(queryResponse.body) : queryResponse.body;
-    } else if (queryResponse.json) {
-      queryResult = typeof queryResponse.json === 'string' ? JSON.parse(queryResponse.json) : queryResponse.json;
-    } else if (typeof queryResponse.getJson === 'function') {
-      queryResult = queryResponse.getJson();
-    } else if (queryResponse.response && queryResponse.response.body) {
-      queryResult = typeof queryResponse.response.body === 'string' ? JSON.parse(queryResponse.response.body) : queryResponse.response.body;
-    } else {
-      console.error("[Search] Could not extract data from QB response:", JSON.stringify(queryResponse, null, 2));
+    try {
+      queryResult = getQBResponseData(queryResponse);
+    } catch (parseError) {
+      console.error("[Search] Could not extract data from QB response:", parseError.message);
       return res.status(500).json({
         success: false,
         error: "Could not parse QuickBooks response"
@@ -1622,7 +1634,7 @@ router.post("/api/create-customer", express.json(), async (req, res) => {
       body: JSON.stringify(customerData)
     });
     
-    const createdCustomer = JSON.parse(createResponse.body).Customer;
+    const createdCustomer = getQBResponseData(createResponse).Customer;
     
     res.json({
       success: true,
@@ -1894,7 +1906,7 @@ router.get("/api/deal-contact", async (req, res) => {
         }
       });
       
-      const customer = JSON.parse(customerResponse.body).Customer;
+      const customer = getQBResponseData(customerResponse).Customer;
       
       res.json({
         success: true,
@@ -2096,14 +2108,14 @@ router.get("/api/items/search", async (req, res) => {
       });
     });
     
-    if (!queryResponse || !queryResponse.body) {
+    if (!queryResponse) {
       return res.status(500).json({
         success: false,
         error: "Invalid response from QuickBooks"
       });
     }
     
-    const queryResult = JSON.parse(queryResponse.body);
+    const queryResult = getQBResponseData(queryResponse);
     const items = queryResult.QueryResponse?.Item || [];
     
     // Transform to simplified format
@@ -2242,14 +2254,14 @@ router.post("/api/invoices", express.json(), async (req, res) => {
       });
     });
     
-    if (!createResponse || !createResponse.body) {
+    if (!createResponse) {
       return res.status(500).json({
         success: false,
         error: "Invalid response from QuickBooks"
       });
     }
     
-    const result = JSON.parse(createResponse.body);
+    const result = getQBResponseData(createResponse);
     
     if (result.Invoice) {
       console.log('Invoice created successfully:', result.Invoice.Id);
