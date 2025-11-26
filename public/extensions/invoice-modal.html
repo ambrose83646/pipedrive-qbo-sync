@@ -443,7 +443,10 @@
         const urlParams = new URLSearchParams(window.location.search);
         
         // Let SDK auto-detect identifier from URL params (Pipedrive adds 'id' param when opening modal)
-        sdk = await new AppExtensionsSDK().initialize();
+        // Set modal size to be larger on desktop (max is browser viewport)
+        sdk = await new AppExtensionsSDK().initialize({
+          size: { width: 900, height: 700 }
+        });
         
         // Data is passed from OPEN_MODAL as a JSON string in the 'data' parameter
         const dataParam = urlParams.get('data');
