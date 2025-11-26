@@ -367,10 +367,27 @@
         
         sdk = await new AppExtensionsSDK({ identifier: 'f8e1ae44-fa57-4516-809b-9f81bcdba7d1' }).initialize();
         
-        userId = urlParams.get('userId') || 'test';
-        dealId = urlParams.get('dealId');
-        customerId = urlParams.get('customerId');
-        customerName = urlParams.get('customerName') || 'Unknown Customer';
+        // Data is passed from OPEN_MODAL as a JSON string in the 'data' parameter
+        const dataParam = urlParams.get('data');
+        if (dataParam) {
+          try {
+            const data = JSON.parse(decodeURIComponent(dataParam));
+            userId = data.userId || 'test';
+            dealId = data.dealId;
+            customerId = data.customerId;
+            customerName = data.customerName || 'Unknown Customer';
+          } catch (parseError) {
+            console.error('Error parsing data parameter:', parseError);
+          }
+        }
+        
+        // Fallback to individual query params if data param not present
+        if (!userId) userId = urlParams.get('userId') || 'test';
+        if (!dealId) dealId = urlParams.get('dealId');
+        if (!customerId) customerId = urlParams.get('customerId');
+        if (!customerName) customerName = urlParams.get('customerName') || 'Unknown Customer';
+        
+        console.log('Modal initialized with:', { userId, dealId, customerId, customerName });
         
         if (!customerId) {
           showError('No customer selected. Please link a QuickBooks contact first.');
