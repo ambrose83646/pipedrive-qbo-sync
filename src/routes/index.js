@@ -2388,12 +2388,11 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
       }
     }
     
-    // If we have an address but missing postal code, use Nominatim to enrich it
-    if (address && !address.postalCode && address.line1) {
+    // If we have an address but missing key fields (city, state, postal code), use Nominatim to enrich it
+    if (address && address.line1 && (!address.postalCode || !address.city || !address.state)) {
       try {
-        // Build a search query from available address parts
-        const searchParts = [address.line1, address.city, address.state, address.country].filter(Boolean);
-        const searchQuery = searchParts.join(', ');
+        // Use the line1 as the search query (it likely contains the full formatted address)
+        const searchQuery = address.line1;
         
         console.log(`[Deal Address] Enriching address via Nominatim: "${searchQuery}"`);
         
@@ -2413,21 +2412,37 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
           const result = nominatimResponse.data[0];
           const addressDetails = result.address || {};
           
-          console.log('[Deal Address] Nominatim response:', addressDetails);
+          console.log('[Deal Address] Nominatim response:', JSON.stringify(addressDetails));
+          
+          // Build the street address from house_number and road
+          const streetAddress = [addressDetails.house_number, addressDetails.road].filter(Boolean).join(' ');
+          
+          // Update line1 to be just the street address if we got better data
+          if (streetAddress) {
+            address.line1 = streetAddress;
+            console.log(`[Deal Address] Updated line1 to: ${streetAddress}`);
+          }
           
           // Enrich missing fields from Nominatim
           if (!address.postalCode && addressDetails.postcode) {
             address.postalCode = addressDetails.postcode;
             console.log(`[Deal Address] Added postal code: ${addressDetails.postcode}`);
           }
-          if (!address.city && (addressDetails.city || addressDetails.town || addressDetails.village)) {
-            address.city = addressDetails.city || addressDetails.town || addressDetails.village;
+          if (!address.city) {
+            address.city = addressDetails.city || addressDetails.town || addressDetails.village || addressDetails.municipality;
+            if (address.city) {
+              console.log(`[Deal Address] Added city: ${address.city}`);
+            }
           }
           if (!address.state && addressDetails.state) {
             address.state = addressDetails.state;
+            console.log(`[Deal Address] Added state: ${addressDetails.state}`);
           }
-          if (!address.country && addressDetails.country) {
+          if (!address.country) {
             address.country = addressDetails.country;
+            if (address.country) {
+              console.log(`[Deal Address] Added country: ${address.country}`);
+            }
           }
         } else {
           console.log('[Deal Address] No Nominatim results found');
