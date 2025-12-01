@@ -2221,6 +2221,43 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
       }
     }
     
+    // Helper to parse Pipedrive address object into our format
+    function parseAddressObject(value) {
+      if (!value) return null;
+      if (typeof value === 'string') {
+        return { line1: value };
+      }
+      if (typeof value === 'object') {
+        // Handle array of addresses (take first one)
+        if (Array.isArray(value)) {
+          value = value[0];
+          if (!value) return null;
+        }
+        // Pipedrive address format with street_number, route, locality, etc.
+        if (value.formatted_address || value.street_number || value.route || value.locality) {
+          return {
+            line1: [value.street_number, value.route].filter(Boolean).join(' ') || value.formatted_address,
+            city: value.locality || value.sublocality,
+            state: value.admin_area_level_1,
+            postalCode: value.postal_code,
+            country: value.country
+          };
+        }
+        // Generic address object format
+        if (value.line1 || value.street || value.city) {
+          return {
+            line1: value.line1 || value.street || value.formatted_address,
+            line2: value.line2,
+            city: value.city || value.locality,
+            state: value.state || value.admin_area_level_1,
+            postalCode: value.postalCode || value.postal_code,
+            country: value.country
+          };
+        }
+      }
+      return null;
+    }
+    
     // First get the deal to find associated person
     const dealResponse = await makePipedriveApiCall(`/v1/deals/${dealId}`);
     
@@ -2240,41 +2277,66 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
     // Try to get person's address first
     if (personId) {
       try {
+        // Step 1: Get person fields metadata to find "Shipping Address" custom field key
+        const personFieldsResponse = await makePipedriveApiCall('/v1/personFields');
+        let shippingAddressKey = null;
+        let addressFieldKeys = [];
+        
+        if (personFieldsResponse.data?.success && personFieldsResponse.data?.data) {
+          for (const field of personFieldsResponse.data.data) {
+            // Look for field named "Shipping Address" (case-insensitive)
+            if (field.name && field.name.toLowerCase().includes('shipping') && field.name.toLowerCase().includes('address')) {
+              shippingAddressKey = field.key;
+              console.log(`[Deal Address] Found shipping address field: "${field.name}" with key: ${field.key}`);
+              break;
+            }
+            // Also track all address-type fields as fallback
+            if (field.field_type === 'address') {
+              addressFieldKeys.push({ key: field.key, name: field.name });
+            }
+          }
+        }
+        
+        // Step 2: Get the person data
         const personResponse = await makePipedriveApiCall(`/v1/persons/${personId}`);
         
         if (personResponse.data?.success && personResponse.data?.data) {
           const person = personResponse.data.data;
           
-          // Look for address fields in person data
-          // Pipedrive stores addresses in various formats depending on custom fields
-          for (const key of Object.keys(person)) {
-            const value = person[key];
-            if (value && typeof value === 'object' && (value.street_number || value.route || value.locality || value.formatted_address)) {
-              address = {
-                line1: [value.street_number, value.route].filter(Boolean).join(' ') || value.formatted_address,
-                city: value.locality || value.sublocality,
-                state: value.admin_area_level_1,
-                postalCode: value.postal_code,
-                country: value.country
-              };
-              break;
+          // Priority 1: Check the shipping address custom field directly
+          if (shippingAddressKey && person[shippingAddressKey]) {
+            console.log(`[Deal Address] Found shipping address value:`, person[shippingAddressKey]);
+            address = parseAddressObject(person[shippingAddressKey]);
+          }
+          
+          // Priority 2: Check other address-type custom fields
+          if (!address && addressFieldKeys.length > 0) {
+            for (const fieldInfo of addressFieldKeys) {
+              if (person[fieldInfo.key]) {
+                console.log(`[Deal Address] Using address field "${fieldInfo.name}":`, person[fieldInfo.key]);
+                address = parseAddressObject(person[fieldInfo.key]);
+                if (address) break;
+              }
             }
           }
           
-          // Check for common address field patterns
-          if (!address && person.address) {
-            if (typeof person.address === 'string') {
-              address = { line1: person.address };
-            } else if (typeof person.address === 'object') {
-              address = {
-                line1: person.address.line1 || person.address.street || person.address.formatted_address,
-                line2: person.address.line2,
-                city: person.address.city || person.address.locality,
-                state: person.address.state || person.address.admin_area_level_1,
-                postalCode: person.address.postalCode || person.address.postal_code,
-                country: person.address.country
-              };
+          // Priority 3: Scan all fields for address-like objects (fallback)
+          if (!address) {
+            for (const key of Object.keys(person)) {
+              const value = person[key];
+              if (value && typeof value === 'object' && (value.street_number || value.route || value.locality || value.formatted_address)) {
+                address = parseAddressObject(value);
+                if (address) {
+                  console.log(`[Deal Address] Found address in field "${key}"`);
+                  break;
+                }
+              }
             }
+          }
+          
+          // Priority 4: Check standard address field
+          if (!address && person.address) {
+            address = parseAddressObject(person.address);
           }
         }
       } catch (err) {
@@ -2285,43 +2347,38 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
     // Fallback to organization address
     if (!address && orgId) {
       try {
+        // Get organization fields metadata to find address custom fields
+        const orgFieldsResponse = await makePipedriveApiCall('/v1/organizationFields');
+        let orgAddressFieldKeys = [];
+        
+        if (orgFieldsResponse.data?.success && orgFieldsResponse.data?.data) {
+          for (const field of orgFieldsResponse.data.data) {
+            if (field.field_type === 'address') {
+              orgAddressFieldKeys.push({ key: field.key, name: field.name });
+            }
+          }
+        }
+        
         const orgResponse = await makePipedriveApiCall(`/v1/organizations/${orgId}`);
         
         if (orgResponse.data?.success && orgResponse.data?.data) {
           const org = orgResponse.data.data;
           
-          // Look for address in org data
-          if (org.address) {
-            if (typeof org.address === 'string') {
-              address = { line1: org.address };
-            } else if (typeof org.address === 'object') {
-              address = {
-                line1: org.address.line1 || org.address.street || org.address.formatted_address,
-                line2: org.address.line2,
-                city: org.address.city || org.address.locality,
-                state: org.address.state || org.address.admin_area_level_1,
-                postalCode: org.address.postalCode || org.address.postal_code,
-                country: org.address.country
-              };
+          // Check address-type custom fields
+          for (const fieldInfo of orgAddressFieldKeys) {
+            if (org[fieldInfo.key]) {
+              console.log(`[Deal Address] Using org address field "${fieldInfo.name}"`);
+              address = parseAddressObject(org[fieldInfo.key]);
+              if (address) break;
             }
           }
           
-          // Check other address fields
-          for (const key of Object.keys(org)) {
-            const value = org[key];
-            if (!address && value && typeof value === 'object' && (value.street_number || value.route || value.locality || value.formatted_address)) {
-              address = {
-                line1: [value.street_number, value.route].filter(Boolean).join(' ') || value.formatted_address,
-                city: value.locality || value.sublocality,
-                state: value.admin_area_level_1,
-                postalCode: value.postal_code,
-                country: value.country
-              };
-              break;
-            }
+          // Check standard address field
+          if (!address && org.address) {
+            address = parseAddressObject(org.address);
           }
           
-          // Also check if there's a single address string in org
+          // Check formatted address string
           if (!address && org.address_formatted_address) {
             address = { line1: org.address_formatted_address };
           }
