@@ -342,6 +342,105 @@
       color: #ff4d4f;
     }
     
+    .form-select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d9d9d9;
+      border-radius: 6px;
+      font-size: 14px;
+      box-sizing: border-box;
+      background: white;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    
+    .form-select:focus {
+      outline: none;
+      border-color: #1890ff;
+      box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1);
+    }
+    
+    .form-select.error {
+      border-color: #ff4d4f;
+    }
+    
+    .required-indicator {
+      color: #ff4d4f;
+      margin-left: 4px;
+    }
+    
+    .shipping-section {
+      margin-top: 24px;
+      padding: 20px;
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+    }
+    
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+    
+    .btn-import {
+      padding: 6px 12px;
+      background: #f0f5ff;
+      color: #1890ff;
+      border: 1px solid #adc6ff;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn-import:hover {
+      background: #e6f0ff;
+      border-color: #1890ff;
+    }
+    
+    .btn-import:disabled {
+      background: #f5f5f5;
+      color: #bfbfbf;
+      border-color: #d9d9d9;
+      cursor: not-allowed;
+    }
+    
+    .shipping-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    
+    .shipping-toggle input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    
+    .shipping-toggle label {
+      font-size: 14px;
+      color: #595959;
+      cursor: pointer;
+    }
+    
+    .shipping-fields {
+      display: none;
+    }
+    
+    .shipping-fields.active {
+      display: block;
+    }
+    
     /* Responsive Styles */
     @media (max-width: 768px) {
       .modal-container {
@@ -513,6 +612,62 @@
           <div class="form-group">
             <label class="form-label">Due Date</label>
             <input type="date" class="form-input" id="invoiceDueDate" value="${dueDateStr}">
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Payment Terms<span class="required-indicator">*</span></label>
+            <select class="form-select" id="paymentTerms" required>
+              <option value="">-- Select Payment Terms --</option>
+              <option value="Prepay">Prepay</option>
+              <option value="Terms">Terms</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="shipping-section">
+          <div class="section-header">
+            <span class="section-title">Shipping Address</span>
+            <button type="button" class="btn-import" id="importAddressBtn" onclick="importPipedriveAddress()">Import from Pipedrive</button>
+          </div>
+          <div class="shipping-toggle">
+            <input type="checkbox" id="useShippingAddress" onchange="toggleShippingFields()">
+            <label for="useShippingAddress">Use a different shipping address</label>
+          </div>
+          <div class="shipping-fields" id="shippingFields">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Address Line 1</label>
+                <input type="text" class="form-input" id="shipLine1" placeholder="Street address">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Address Line 2</label>
+                <input type="text" class="form-input" id="shipLine2" placeholder="Apt, suite, building (optional)">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">City</label>
+                <input type="text" class="form-input" id="shipCity" placeholder="City">
+              </div>
+              <div class="form-group">
+                <label class="form-label">State / Province</label>
+                <input type="text" class="form-input" id="shipState" placeholder="State">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Postal Code</label>
+                <input type="text" class="form-input" id="shipPostalCode" placeholder="ZIP / Postal code">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Country</label>
+                <input type="text" class="form-input" id="shipCountry" placeholder="Country">
+              </div>
+            </div>
           </div>
         </div>
         
@@ -731,7 +886,61 @@
       }
     });
     
+    function toggleShippingFields() {
+      const checkbox = document.getElementById('useShippingAddress');
+      const fields = document.getElementById('shippingFields');
+      if (checkbox.checked) {
+        fields.classList.add('active');
+      } else {
+        fields.classList.remove('active');
+      }
+    }
+    
+    async function importPipedriveAddress() {
+      const btn = document.getElementById('importAddressBtn');
+      btn.disabled = true;
+      btn.textContent = 'Importing...';
+      
+      try {
+        const response = await fetch(`/api/pipedrive/deal-address?userId=${userId}&dealId=${dealId}`);
+        const result = await response.json();
+        
+        if (result.success && result.address) {
+          const addr = result.address;
+          
+          document.getElementById('useShippingAddress').checked = true;
+          document.getElementById('shippingFields').classList.add('active');
+          
+          document.getElementById('shipLine1').value = addr.line1 || addr.street_number || '';
+          document.getElementById('shipLine2').value = addr.line2 || '';
+          document.getElementById('shipCity').value = addr.city || addr.locality || '';
+          document.getElementById('shipState').value = addr.state || addr.admin_area_level_1 || '';
+          document.getElementById('shipPostalCode').value = addr.postalCode || addr.postal_code || '';
+          document.getElementById('shipCountry').value = addr.country || '';
+          
+          sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Address imported from Pipedrive' });
+        } else {
+          sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: result.error || 'No address found in Pipedrive' });
+        }
+      } catch (error) {
+        console.error('Import address error:', error);
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Failed to import address' });
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Import from Pipedrive';
+      }
+    }
+    
     async function submitInvoice() {
+      const paymentTerms = document.getElementById('paymentTerms');
+      if (!paymentTerms.value) {
+        paymentTerms.classList.add('error');
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Please select Payment Terms' });
+        paymentTerms.focus();
+        return;
+      }
+      paymentTerms.classList.remove('error');
+      
       if (lineItems.length === 0) {
         sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Please add at least one line item' });
         return;
@@ -750,6 +959,19 @@
       try {
         const dueDate = document.getElementById('invoiceDueDate').value;
         const memo = document.getElementById('invoiceMemo').value;
+        const paymentTermsValue = document.getElementById('paymentTerms').value;
+        
+        let shippingAddress = null;
+        if (document.getElementById('useShippingAddress').checked) {
+          shippingAddress = {
+            Line1: document.getElementById('shipLine1').value || undefined,
+            Line2: document.getElementById('shipLine2').value || undefined,
+            City: document.getElementById('shipCity').value || undefined,
+            CountrySubDivisionCode: document.getElementById('shipState').value || undefined,
+            PostalCode: document.getElementById('shipPostalCode').value || undefined,
+            Country: document.getElementById('shipCountry').value || undefined
+          };
+        }
         
         const response = await fetch(`/api/invoices?userId=${userId}`, {
           method: 'POST',
@@ -766,7 +988,9 @@
               unitPrice: item.unitPrice
             })),
             dueDate: dueDate || undefined,
-            memo: memo || undefined
+            memo: memo || undefined,
+            paymentTerms: paymentTermsValue,
+            shippingAddress: shippingAddress
           })
         });
         

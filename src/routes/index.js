@@ -2139,10 +2139,194 @@ router.get("/api/items/search", async (req, res) => {
   }
 });
 
+// Get Pipedrive deal's contact address
+router.get("/api/pipedrive/deal-address", async (req, res) => {
+  try {
+    const { dealId, userId } = req.query;
+    
+    if (!dealId) {
+      return res.status(400).json({
+        success: false,
+        error: "dealId is required"
+      });
+    }
+    
+    // Find user with Pipedrive tokens
+    let userData = null;
+    let actualUserId = userId || 'test';
+    
+    userData = await getUser(actualUserId);
+    
+    if (!userData || !userData.access_token) {
+      const { listUsers } = require("../../config/database");
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.access_token && testUserData.api_domain) {
+          userData = testUserData;
+          actualUserId = key;
+          break;
+        }
+      }
+    }
+    
+    if (!userData || !userData.access_token) {
+      return res.status(400).json({
+        success: false,
+        error: "Pipedrive not connected"
+      });
+    }
+    
+    const apiDomain = userData.api_domain || 'https://api.pipedrive.com';
+    
+    // First get the deal to find associated person
+    const dealResponse = await axios.get(`${apiDomain}/v1/deals/${dealId}`, {
+      headers: {
+        'Authorization': `Bearer ${userData.access_token}`
+      }
+    });
+    
+    if (!dealResponse.data?.success || !dealResponse.data?.data) {
+      return res.json({
+        success: false,
+        error: "Deal not found"
+      });
+    }
+    
+    const deal = dealResponse.data.data;
+    const personId = deal.person_id?.value || deal.person_id;
+    const orgId = deal.org_id?.value || deal.org_id;
+    
+    let address = null;
+    
+    // Try to get person's address first
+    if (personId) {
+      try {
+        const personResponse = await axios.get(`${apiDomain}/v1/persons/${personId}`, {
+          headers: {
+            'Authorization': `Bearer ${userData.access_token}`
+          }
+        });
+        
+        if (personResponse.data?.success && personResponse.data?.data) {
+          const person = personResponse.data.data;
+          
+          // Look for address fields in person data
+          // Pipedrive stores addresses in various formats depending on custom fields
+          for (const key of Object.keys(person)) {
+            const value = person[key];
+            if (value && typeof value === 'object' && (value.street_number || value.route || value.locality || value.formatted_address)) {
+              address = {
+                line1: [value.street_number, value.route].filter(Boolean).join(' ') || value.formatted_address,
+                city: value.locality || value.sublocality,
+                state: value.admin_area_level_1,
+                postalCode: value.postal_code,
+                country: value.country
+              };
+              break;
+            }
+          }
+          
+          // Check for common address field patterns
+          if (!address && person.address) {
+            if (typeof person.address === 'string') {
+              address = { line1: person.address };
+            } else if (typeof person.address === 'object') {
+              address = {
+                line1: person.address.line1 || person.address.street || person.address.formatted_address,
+                line2: person.address.line2,
+                city: person.address.city || person.address.locality,
+                state: person.address.state || person.address.admin_area_level_1,
+                postalCode: person.address.postalCode || person.address.postal_code,
+                country: person.address.country
+              };
+            }
+          }
+        }
+      } catch (err) {
+        console.log('Could not fetch person data:', err.message);
+      }
+    }
+    
+    // Fallback to organization address
+    if (!address && orgId) {
+      try {
+        const orgResponse = await axios.get(`${apiDomain}/v1/organizations/${orgId}`, {
+          headers: {
+            'Authorization': `Bearer ${userData.access_token}`
+          }
+        });
+        
+        if (orgResponse.data?.success && orgResponse.data?.data) {
+          const org = orgResponse.data.data;
+          
+          // Look for address in org data
+          if (org.address) {
+            if (typeof org.address === 'string') {
+              address = { line1: org.address };
+            } else if (typeof org.address === 'object') {
+              address = {
+                line1: org.address.line1 || org.address.street || org.address.formatted_address,
+                line2: org.address.line2,
+                city: org.address.city || org.address.locality,
+                state: org.address.state || org.address.admin_area_level_1,
+                postalCode: org.address.postalCode || org.address.postal_code,
+                country: org.address.country
+              };
+            }
+          }
+          
+          // Check other address fields
+          for (const key of Object.keys(org)) {
+            const value = org[key];
+            if (!address && value && typeof value === 'object' && (value.street_number || value.route || value.locality || value.formatted_address)) {
+              address = {
+                line1: [value.street_number, value.route].filter(Boolean).join(' ') || value.formatted_address,
+                city: value.locality || value.sublocality,
+                state: value.admin_area_level_1,
+                postalCode: value.postal_code,
+                country: value.country
+              };
+              break;
+            }
+          }
+          
+          // Also check if there's a single address string in org
+          if (!address && org.address_formatted_address) {
+            address = { line1: org.address_formatted_address };
+          }
+        }
+      } catch (err) {
+        console.log('Could not fetch organization data:', err.message);
+      }
+    }
+    
+    if (address) {
+      res.json({
+        success: true,
+        address: address
+      });
+    } else {
+      res.json({
+        success: false,
+        error: "No address found for this deal's contact or organization"
+      });
+    }
+    
+  } catch (error) {
+    console.error("Get deal address error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Create QuickBooks invoice
 router.post("/api/invoices", express.json(), async (req, res) => {
   try {
-    const { customerId, lineItems, dueDate, memo } = req.body;
+    const { customerId, lineItems, dueDate, memo, paymentTerms, shippingAddress } = req.body;
     const providedUserId = req.query.userId || req.body.userId || 'test';
     
     console.log('Creating invoice for customer:', customerId, 'User ID:', providedUserId);
@@ -2238,6 +2422,26 @@ router.post("/api/invoices", express.json(), async (req, res) => {
     // Add memo/private note if provided
     if (memo) {
       invoiceData.PrivateNote = memo;
+    }
+    
+    // Add payment terms as a custom field or in private note
+    // QuickBooks uses SalesTermRef for payment terms, but custom values need to be predefined
+    // For now, we'll append the payment terms to the CustomerMemo (visible on invoice)
+    if (paymentTerms) {
+      invoiceData.CustomerMemo = {
+        value: `Payment Terms: ${paymentTerms}`
+      };
+    }
+    
+    // Add shipping address if provided
+    if (shippingAddress && (shippingAddress.Line1 || shippingAddress.City)) {
+      invoiceData.ShipAddr = {};
+      if (shippingAddress.Line1) invoiceData.ShipAddr.Line1 = shippingAddress.Line1;
+      if (shippingAddress.Line2) invoiceData.ShipAddr.Line2 = shippingAddress.Line2;
+      if (shippingAddress.City) invoiceData.ShipAddr.City = shippingAddress.City;
+      if (shippingAddress.CountrySubDivisionCode) invoiceData.ShipAddr.CountrySubDivisionCode = shippingAddress.CountrySubDivisionCode;
+      if (shippingAddress.PostalCode) invoiceData.ShipAddr.PostalCode = shippingAddress.PostalCode;
+      if (shippingAddress.Country) invoiceData.ShipAddr.Country = shippingAddress.Country;
     }
     
     console.log('Creating invoice with data:', JSON.stringify(invoiceData, null, 2));
