@@ -2180,12 +2180,49 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
     
     const apiDomain = userData.api_domain || 'https://api.pipedrive.com';
     
-    // First get the deal to find associated person
-    const dealResponse = await axios.get(`${apiDomain}/v1/deals/${dealId}`, {
-      headers: {
-        'Authorization': `Bearer ${userData.access_token}`
+    // Helper function to make Pipedrive API calls with token refresh
+    async function makePipedriveApiCall(endpoint, retryCount = 0) {
+      try {
+        const response = await axios.get(`${apiDomain}${endpoint}`, {
+          headers: {
+            'Authorization': `Bearer ${userData.access_token}`
+          }
+        });
+        return response;
+      } catch (error) {
+        if (error.response?.status === 401 && userData.refresh_token && retryCount === 0) {
+          console.log('[Deal Address] Token expired, attempting refresh...');
+          try {
+            const pipedriveAuth = require('../auth/pipedrive');
+            const newTokens = await pipedriveAuth.refreshToken(userData.refresh_token);
+            
+            // Update userData with new tokens
+            userData.access_token = newTokens.access_token;
+            userData.refresh_token = newTokens.refresh_token;
+            
+            // Persist updated tokens to database
+            await setUser(actualUserId, {
+              ...userData,
+              access_token: newTokens.access_token,
+              refresh_token: newTokens.refresh_token,
+              pipedrive_updated_at: new Date().toISOString()
+            });
+            
+            console.log('[Deal Address] Token refreshed successfully');
+            
+            // Retry with new token
+            return await makePipedriveApiCall(endpoint, retryCount + 1);
+          } catch (refreshError) {
+            console.error('[Deal Address] Token refresh failed:', refreshError.message);
+            throw new Error('Pipedrive authentication expired. Please reconnect.');
+          }
+        }
+        throw error;
       }
-    });
+    }
+    
+    // First get the deal to find associated person
+    const dealResponse = await makePipedriveApiCall(`/v1/deals/${dealId}`);
     
     if (!dealResponse.data?.success || !dealResponse.data?.data) {
       return res.json({
@@ -2203,11 +2240,7 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
     // Try to get person's address first
     if (personId) {
       try {
-        const personResponse = await axios.get(`${apiDomain}/v1/persons/${personId}`, {
-          headers: {
-            'Authorization': `Bearer ${userData.access_token}`
-          }
-        });
+        const personResponse = await makePipedriveApiCall(`/v1/persons/${personId}`);
         
         if (personResponse.data?.success && personResponse.data?.data) {
           const person = personResponse.data.data;
@@ -2252,11 +2285,7 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
     // Fallback to organization address
     if (!address && orgId) {
       try {
-        const orgResponse = await axios.get(`${apiDomain}/v1/organizations/${orgId}`, {
-          headers: {
-            'Authorization': `Bearer ${userData.access_token}`
-          }
-        });
+        const orgResponse = await makePipedriveApiCall(`/v1/organizations/${orgId}`);
         
         if (orgResponse.data?.success && orgResponse.data?.data) {
           const org = orgResponse.data.data;
