@@ -2388,6 +2388,55 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
       }
     }
     
+    // If we have an address but missing postal code, use Nominatim to enrich it
+    if (address && !address.postalCode && address.line1) {
+      try {
+        // Build a search query from available address parts
+        const searchParts = [address.line1, address.city, address.state, address.country].filter(Boolean);
+        const searchQuery = searchParts.join(', ');
+        
+        console.log(`[Deal Address] Enriching address via Nominatim: "${searchQuery}"`);
+        
+        const nominatimResponse = await axios.get('https://nominatim.openstreetmap.org/search', {
+          params: {
+            q: searchQuery,
+            format: 'json',
+            addressdetails: 1,
+            limit: 1
+          },
+          headers: {
+            'User-Agent': 'PipedriveQBOIntegration/1.0 (contact@example.com)'
+          }
+        });
+        
+        if (nominatimResponse.data && nominatimResponse.data.length > 0) {
+          const result = nominatimResponse.data[0];
+          const addressDetails = result.address || {};
+          
+          console.log('[Deal Address] Nominatim response:', addressDetails);
+          
+          // Enrich missing fields from Nominatim
+          if (!address.postalCode && addressDetails.postcode) {
+            address.postalCode = addressDetails.postcode;
+            console.log(`[Deal Address] Added postal code: ${addressDetails.postcode}`);
+          }
+          if (!address.city && (addressDetails.city || addressDetails.town || addressDetails.village)) {
+            address.city = addressDetails.city || addressDetails.town || addressDetails.village;
+          }
+          if (!address.state && addressDetails.state) {
+            address.state = addressDetails.state;
+          }
+          if (!address.country && addressDetails.country) {
+            address.country = addressDetails.country;
+          }
+        } else {
+          console.log('[Deal Address] No Nominatim results found');
+        }
+      } catch (geoError) {
+        console.log('[Deal Address] Nominatim geocoding failed:', geoError.message);
+      }
+    }
+    
     if (address) {
       res.json({
         success: true,
