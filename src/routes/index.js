@@ -2814,4 +2814,91 @@ router.post("/api/invoices", express.json(), async (req, res) => {
   }
 });
 
+// Download invoice as PDF
+router.get("/api/invoices/:invoiceId/pdf", async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+    const providedUserId = req.query.userId || 'test';
+    
+    console.log('Downloading PDF for invoice:', invoiceId, 'User ID:', providedUserId);
+
+    // Find user with QB tokens
+    let userData = null;
+    let actualUserId = providedUserId;
+    
+    userData = await getUser(providedUserId);
+    
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      const { listUsers } = require("../config/database");
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.qb_access_token && testUserData.qb_realm_id) {
+          const normalizedProvidedId = providedUserId.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          const normalizedKey = key.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          
+          if (normalizedKey === normalizedProvidedId ||
+              testUserData.api_domain?.includes(normalizedProvidedId) ||
+              normalizedProvidedId.includes(normalizedKey)) {
+            userData = testUserData;
+            actualUserId = key;
+            break;
+          }
+          
+          if (!userData && testUserData.qb_realm_id) {
+            userData = testUserData;
+            actualUserId = key;
+          }
+        }
+      }
+    }
+    
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      return res.status(400).json({
+        success: false,
+        error: "QuickBooks not connected for this user"
+      });
+    }
+
+    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const realmId = userData.qb_realm_id;
+    
+    // Fetch PDF from QuickBooks
+    const pdfResponse = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
+      return await qbClient.makeApiCall({
+        url: `${baseUrl}/v3/company/${realmId}/invoice/${invoiceId}/pdf`,
+        method: 'GET',
+        headers: {
+          'Accept': 'application/pdf'
+        }
+      });
+    });
+    
+    if (!pdfResponse) {
+      return res.status(500).json({
+        success: false,
+        error: "Failed to fetch PDF from QuickBooks"
+      });
+    }
+    
+    // The response body contains the PDF data
+    const pdfData = pdfResponse.body || pdfResponse;
+    
+    // Set headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoiceId}.pdf"`);
+    
+    // Send the PDF data
+    res.send(Buffer.from(pdfData));
+    
+  } catch (error) {
+    console.error("Download PDF error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

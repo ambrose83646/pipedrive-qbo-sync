@@ -191,6 +191,25 @@
       color: #1890ff;
     }
     
+    .action-btn-download {
+      margin-left: 4px;
+      background: #f0f5ff;
+      border-color: #adc6ff;
+      color: #1890ff;
+    }
+    
+    .action-btn-download:hover {
+      background: #e6f0ff;
+      border-color: #1890ff;
+    }
+    
+    .action-btn-download:disabled {
+      background: #f5f5f5;
+      color: #bfbfbf;
+      border-color: #d9d9d9;
+      cursor: wait;
+    }
+    
     .empty-state {
       text-align: center;
       padding: 60px 20px;
@@ -599,7 +618,8 @@
             <td class="amount-cell">${formatCurrency(invoice.TotalAmt)}</td>
             <td class="balance-cell">${formatCurrency(invoice.Balance)}</td>
             <td style="text-align: center;">
-              <button class="action-btn" onclick="showInvoiceDetail('${invoice.Id}')">View</button>
+              <button class="action-btn" onclick="showInvoiceDetail('${invoice.Id}')" title="View Details">View</button>
+              <button class="action-btn action-btn-download" onclick="downloadInvoicePdf('${invoice.Id}', '${invoiceNum}')" title="Download PDF">PDF</button>
             </td>
           </tr>
         `;
@@ -811,6 +831,39 @@
     function closeDetail() {
       document.getElementById('detailOverlay').classList.remove('active');
       document.getElementById('detailPanel').classList.remove('active');
+    }
+    
+    async function downloadInvoicePdf(invoiceId, invoiceNum) {
+      const btn = event.target;
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '...';
+      
+      try {
+        const response = await fetch(`/api/invoices/${invoiceId}/pdf?userId=${encodeURIComponent(userId)}`);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Failed to download PDF');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `invoice-${invoiceNum}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+      } catch (error) {
+        console.error('Error downloading PDF:', error);
+        alert('Failed to download PDF: ' + error.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
     }
     
     function showError(message) {
