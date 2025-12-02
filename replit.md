@@ -106,6 +106,13 @@ Preferred communication style: Simple, everyday language.
   - Invoice overview data filters by selected date range
   - Fixed cross-browser event handling by passing element references instead of relying on global event
 
+- **December 2, 2025**: Added automatic email option when creating invoices
+  - Checkbox "Email invoice to customer" in invoice modal (checked by default when email on file)
+  - Displays customer email address and disables checkbox when no email on file
+  - Backend calls QuickBooks `/invoice/{id}/send` endpoint after successful creation
+  - Success message indicates whether email was sent successfully
+  - Email failures don't prevent invoice creation (graceful degradation)
+
 - **December 2, 2025**: Added discount field to invoice modal
   - Users can now apply discounts as either percentage (%) or fixed dollar amount ($)
   - Toggle button switches between discount types with live calculation updates

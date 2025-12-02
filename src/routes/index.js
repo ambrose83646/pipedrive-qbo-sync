@@ -2565,11 +2565,12 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
 // Create QuickBooks invoice
 router.post("/api/invoices", express.json(), async (req, res) => {
   try {
-    const { customerId, customerEmail, lineItems, dueDate, memo, paymentTerms, shippingAddress, discount } = req.body;
+    const { customerId, customerEmail, lineItems, dueDate, memo, paymentTerms, shippingAddress, discount, sendEmail } = req.body;
     const providedUserId = req.query.userId || req.body.userId || 'test';
     
     console.log('Creating invoice for customer:', customerId, 'Email:', customerEmail, 'User ID:', providedUserId);
     console.log('Discount:', discount ? `${discount.type} - ${discount.value}` : 'none');
+    console.log('Send email after creation:', sendEmail ? 'yes' : 'no');
 
     if (!customerId) {
       return res.status(400).json({
@@ -2752,8 +2753,43 @@ router.post("/api/invoices", express.json(), async (req, res) => {
     
     if (result.Invoice) {
       console.log('Invoice created successfully:', result.Invoice.Id);
+      
+      let emailSent = false;
+      
+      // Send invoice email if requested
+      if (sendEmail && customerEmail) {
+        try {
+          console.log('Sending invoice email to:', customerEmail);
+          
+          const sendEmailResponse = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
+            return await qbClient.makeApiCall({
+              url: `${baseUrl}/v3/company/${realmId}/invoice/${result.Invoice.Id}/send?sendTo=${encodeURIComponent(customerEmail)}`,
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/octet-stream',
+                'Accept': 'application/json'
+              }
+            });
+          });
+          
+          if (sendEmailResponse) {
+            const sendResult = getQBResponseData(sendEmailResponse);
+            if (sendResult.Invoice) {
+              console.log('Invoice email sent successfully');
+              emailSent = true;
+            } else {
+              console.warn('Email send may have failed:', sendResult);
+            }
+          }
+        } catch (emailError) {
+          console.error('Error sending invoice email:', emailError);
+          // Don't fail the whole request just because email failed
+        }
+      }
+      
       res.json({
         success: true,
+        emailSent: emailSent,
         invoice: {
           id: result.Invoice.Id,
           docNumber: result.Invoice.DocNumber,

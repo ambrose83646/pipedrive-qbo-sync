@@ -705,9 +705,26 @@
           console.log('Fetched customer email:', customerEmail);
         } else {
           console.warn('Could not fetch customer email:', result.error);
+          customerEmail = null;
         }
       } catch (error) {
         console.error('Error fetching customer email:', error);
+        customerEmail = null;
+      }
+    }
+    
+    function updateEmailCheckboxUI() {
+      const emailRecipient = document.getElementById('emailRecipient');
+      const sendEmailCheckbox = document.getElementById('sendEmailCheckbox');
+      
+      if (emailRecipient && customerEmail) {
+        emailRecipient.textContent = ` (${customerEmail})`;
+      } else if (emailRecipient) {
+        emailRecipient.textContent = ' - No email on file';
+        if (sendEmailCheckbox) {
+          sendEmailCheckbox.checked = false;
+          sendEmailCheckbox.disabled = true;
+        }
       }
     }
     
@@ -845,11 +862,24 @@
           <textarea class="form-input" id="invoiceMemo" rows="2" placeholder="Add a private note to this invoice..."></textarea>
         </div>
         
+        <div class="email-option" style="margin-top: 16px; padding: 16px; background: #f0f5ff; border: 1px solid #adc6ff; border-radius: 8px;">
+          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+            <input type="checkbox" id="sendEmailCheckbox" style="width: 18px; height: 18px; cursor: pointer;" checked>
+            <span style="font-size: 14px; color: #1a1a1a;">
+              <strong>Email invoice to customer</strong>
+              <span id="emailRecipient" style="color: #595959; font-weight: normal;"></span>
+            </span>
+          </label>
+        </div>
+        
         <div class="modal-footer">
           <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
           <button class="btn btn-create" id="createInvoiceBtn" onclick="submitInvoice()">Create Invoice</button>
         </div>
       `;
+      
+      // Update email checkbox UI after form is rendered
+      updateEmailCheckboxUI();
     }
     
     function addLineItem() {
@@ -1218,7 +1248,8 @@
           };
         }
         
-        const email = document.getElementById('invoiceEmail').value;
+        const sendEmailCheckbox = document.getElementById('sendEmailCheckbox');
+        const shouldSendEmail = sendEmailCheckbox && sendEmailCheckbox.checked && !sendEmailCheckbox.disabled && customerEmail;
         
         // Build discount object if discount is applied
         let discount = null;
@@ -1236,7 +1267,8 @@
           },
           body: JSON.stringify({
             customerId: customerId,
-            customerEmail: email || undefined,
+            customerEmail: customerEmail || undefined,
+            sendEmail: shouldSendEmail,
             lineItems: lineItems.map(item => ({
               itemId: item.itemId,
               name: item.name,
@@ -1255,9 +1287,13 @@
         const result = await response.json();
         
         if (result.success) {
-          sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { 
-            message: `Invoice #${result.invoice.docNumber || result.invoice.id} created successfully!` 
-          });
+          let message = `Invoice #${result.invoice.docNumber || result.invoice.id} created successfully!`;
+          if (result.emailSent) {
+            message += ` Email sent to ${customerEmail}`;
+          } else if (shouldSendEmail && !result.emailSent) {
+            message += ` (Email could not be sent)`;
+          }
+          sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message });
           
           closeModal();
         } else {
