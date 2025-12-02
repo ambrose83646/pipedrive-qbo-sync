@@ -2396,6 +2396,7 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
         
         console.log(`[Deal Address] Enriching address via Nominatim: "${searchQuery}"`);
         
+        const appUrl = process.env.APP_URL || 'https://pipedrive-qbo-sync.replit.app';
         const nominatimResponse = await axios.get('https://nominatim.openstreetmap.org/search', {
           params: {
             q: searchQuery,
@@ -2404,8 +2405,11 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
             limit: 1
           },
           headers: {
-            'User-Agent': 'PipedriveQBOIntegration/1.0 (contact@example.com)'
-          }
+            'User-Agent': `PipedriveQuickBooksIntegration/1.0 (${appUrl})`,
+            'Accept': 'application/json',
+            'Referer': appUrl
+          },
+          timeout: 10000
         });
         
         if (nominatimResponse.data && nominatimResponse.data.length > 0) {
