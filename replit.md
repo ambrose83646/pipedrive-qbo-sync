@@ -20,12 +20,17 @@ Secure OAuth 2.0 is implemented for both Pipedrive and QuickBooks. It leverages 
 
 ## Data Storage
 PostgreSQL is used for persistent storage with proper relational tables:
-- **users**: OAuth tokens, realm IDs, ShipStation credentials, and configuration data
+- **users**: OAuth tokens (encrypted with AES-256-GCM), realm IDs, ShipStation credentials (encrypted), and configuration data
 - **deal_mappings**: Links between Pipedrive deals and QuickBooks customers
 - **pending_invoices**: Invoices awaiting payment for ShipStation automation
 - **invoice_mappings**: Links between QuickBooks invoices and ShipStation orders
 
 The database schema is defined in `config/schema.sql` and the data access layer in `config/postgres.js`.
+
+### Security
+- All OAuth tokens (Pipedrive and QuickBooks) are encrypted at rest using AES-256-GCM
+- ShipStation API credentials are also encrypted
+- Encryption uses the `SESSION_SECRET` environment variable as the key source
 
 ## Frontend Architecture
 Browser-based Pipedrive App Extensions, built with `@pipedrive/app-extensions-sdk`, provide UI components integrated directly into the Pipedrive interface. These extensions facilitate connection management and deal-contact operations.

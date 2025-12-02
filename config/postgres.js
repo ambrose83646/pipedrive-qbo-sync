@@ -1,6 +1,7 @@
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
+const { encrypt, decrypt } = require('../src/utils/encryption');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -51,6 +52,11 @@ async function setUser(userId, data) {
     [normalized]
   );
   
+  const pipedriveAccessToken = encrypt(data.pipedrive_access_token || data.access_token);
+  const pipedriveRefreshToken = encrypt(data.pipedrive_refresh_token || data.refresh_token);
+  const qbAccessToken = encrypt(data.qb_access_token);
+  const qbRefreshToken = encrypt(data.qb_refresh_token);
+  
   if (existing.rows.length > 0) {
     await pool.query(`
       UPDATE users SET
@@ -75,12 +81,12 @@ async function setUser(userId, data) {
       WHERE pipedrive_user_id = $1
     `, [
       normalized,
-      data.pipedrive_access_token || data.access_token,
-      data.pipedrive_refresh_token || data.refresh_token,
+      pipedriveAccessToken,
+      pipedriveRefreshToken,
       data.pipedrive_expires_at || data.expires_at ? new Date(data.pipedrive_expires_at || data.expires_at) : null,
       data.pipedrive_api_domain || data.api_domain,
-      data.qb_access_token,
-      data.qb_refresh_token,
+      qbAccessToken,
+      qbRefreshToken,
       data.qb_realm_id,
       data.qb_expires_at ? new Date(data.qb_expires_at) : null,
       data.qb_last_refresh ? new Date(data.qb_last_refresh) : null,
@@ -119,12 +125,12 @@ async function setUser(userId, data) {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
     `, [
       normalized,
-      data.pipedrive_access_token || data.access_token,
-      data.pipedrive_refresh_token || data.refresh_token,
+      pipedriveAccessToken,
+      pipedriveRefreshToken,
       data.pipedrive_expires_at || data.expires_at ? new Date(data.pipedrive_expires_at || data.expires_at) : null,
       data.pipedrive_api_domain || data.api_domain,
-      data.qb_access_token,
-      data.qb_refresh_token,
+      qbAccessToken,
+      qbRefreshToken,
       data.qb_realm_id,
       data.qb_expires_at ? new Date(data.qb_expires_at) : null,
       data.qb_last_refresh ? new Date(data.qb_last_refresh) : null,
@@ -160,17 +166,23 @@ async function listUsers(prefix = '') {
 
 function rowToUserData(row) {
   if (!row) return null;
+  
+  const pipedriveAccessToken = decrypt(row.pipedrive_access_token);
+  const pipedriveRefreshToken = decrypt(row.pipedrive_refresh_token);
+  const qbAccessToken = decrypt(row.qb_access_token);
+  const qbRefreshToken = decrypt(row.qb_refresh_token);
+  
   return {
-    pipedrive_access_token: row.pipedrive_access_token,
-    access_token: row.pipedrive_access_token,
-    pipedrive_refresh_token: row.pipedrive_refresh_token,
-    refresh_token: row.pipedrive_refresh_token,
+    pipedrive_access_token: pipedriveAccessToken,
+    access_token: pipedriveAccessToken,
+    pipedrive_refresh_token: pipedriveRefreshToken,
+    refresh_token: pipedriveRefreshToken,
     pipedrive_expires_at: row.pipedrive_expires_at?.toISOString(),
     expires_at: row.pipedrive_expires_at?.toISOString(),
     pipedrive_api_domain: row.pipedrive_api_domain,
     api_domain: row.pipedrive_api_domain,
-    qb_access_token: row.qb_access_token,
-    qb_refresh_token: row.qb_refresh_token,
+    qb_access_token: qbAccessToken,
+    qb_refresh_token: qbRefreshToken,
     qb_realm_id: row.qb_realm_id,
     qb_expires_at: row.qb_expires_at?.toISOString(),
     qb_last_refresh: row.qb_last_refresh?.toISOString(),
