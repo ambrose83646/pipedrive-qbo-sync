@@ -76,16 +76,57 @@ async function makeShipStationApiCall(userData, method, endpoint, data = null) {
   return response.data;
 }
 
-async function createShipStationOrder(userData, invoice) {
-  const orderNumber = invoice.DocNumber || `QB-${invoice.Id}`;
+// Build unique ShipStation order number with tenant prefix
+// Format: QB-{tenantSuffix}-{invoiceNumber} e.g., QB-3761-1078
+function buildShipStationOrderNumber(userId, invoiceNumber) {
+  if (!userId) {
+    throw new Error('userId is required to build ShipStation order number');
+  }
+  if (!invoiceNumber) {
+    throw new Error('invoiceNumber is required to build ShipStation order number');
+  }
+  const userIdStr = String(userId);
+  const tenantSuffix = userIdStr.slice(-4);
+  return `QB-${tenantSuffix}-${invoiceNumber}`;
+}
+
+async function createShipStationOrder(userData, invoice, userId) {
+  const invoiceId = invoice.Id;
+  const invoiceNumber = invoice.DocNumber || invoice.Id;
   
+  // Step 1: Check if we already have a mapping for this invoice
+  try {
+    const existingMapping = await getInvoiceMapping(invoiceId);
+    if (existingMapping && existingMapping.shipstationOrderId) {
+      console.log(`[PaymentPoller] Invoice ${invoiceNumber} already mapped to order ${existingMapping.shipstationOrderNumber} (ID: ${existingMapping.shipstationOrderId})`);
+      return {
+        orderId: existingMapping.shipstationOrderId,
+        orderNumber: existingMapping.shipstationOrderNumber,
+        alreadyExists: true,
+        fromMapping: true
+      };
+    }
+  } catch (mappingError) {
+    console.warn(`[PaymentPoller] Could not check invoice mapping:`, mappingError.message);
+  }
+  
+  // Step 2: Generate unique order number with tenant prefix
+  const orderNumber = buildShipStationOrderNumber(userId, invoiceNumber);
+  console.log(`[PaymentPoller] Generated order number: ${orderNumber} for invoice ${invoiceNumber}`);
+  
+  // Step 3: Check if order already exists in ShipStation
   try {
     const existingOrders = await makeShipStationApiCall(userData, 'GET', `/orders?orderNumber=${encodeURIComponent(orderNumber)}`);
     if (existingOrders.orders && existingOrders.orders.length > 0) {
-      console.log(`[PaymentPoller] Order ${orderNumber} already exists (ID: ${existingOrders.orders[0].orderId}), skipping creation`);
+      const existingOrder = existingOrders.orders[0];
+      console.log(`[PaymentPoller] Order ${orderNumber} already exists (ID: ${existingOrder.orderId}), saving mapping`);
+      
+      // Save the mapping for future lookups
+      await setInvoiceMapping(invoiceId, invoiceNumber, existingOrder.orderId, existingOrder.orderNumber, 'existing_poller');
+      
       return {
-        orderId: existingOrders.orders[0].orderId,
-        orderNumber: existingOrders.orders[0].orderNumber,
+        orderId: existingOrder.orderId,
+        orderNumber: existingOrder.orderNumber,
         alreadyExists: true
       };
     }
@@ -93,6 +134,7 @@ async function createShipStationOrder(userData, invoice) {
     console.warn(`[PaymentPoller] Could not check for existing order ${orderNumber}:`, dupeCheckError.message);
   }
   
+  // Step 4: Build ship-to address
   const shipTo = {
     name: invoice.CustomerRef?.name || invoice.ShipAddr?.Line1 || 'Customer',
     street1: invoice.ShipAddr?.Line1 || invoice.BillAddr?.Line1 || '',
@@ -105,6 +147,7 @@ async function createShipStationOrder(userData, invoice) {
     email: invoice.BillEmail?.Address || ''
   };
   
+  // Step 5: Map line items
   const items = [];
   if (invoice.Line) {
     invoice.Line.forEach(line => {
@@ -119,8 +162,9 @@ async function createShipStationOrder(userData, invoice) {
     });
   }
   
+  // Step 6: Create the order
   const shipstationOrder = {
-    orderNumber: invoice.DocNumber || `QB-${invoice.Id}`,
+    orderNumber: orderNumber,
     orderDate: invoice.TxnDate || new Date().toISOString().split('T')[0],
     orderStatus: 'awaiting_shipment',
     billTo: shipTo,
@@ -128,9 +172,9 @@ async function createShipStationOrder(userData, invoice) {
     items: items,
     amountPaid: parseFloat(invoice.TotalAmt),
     customerEmail: invoice.BillEmail?.Address || '',
-    internalNotes: `QuickBooks Invoice #${invoice.DocNumber || invoice.Id}`,
+    internalNotes: `QuickBooks Invoice #${invoiceNumber}`,
     advancedOptions: {
-      customField1: `QB_Invoice_${invoice.Id}`,
+      customField1: `QB_Invoice_${invoiceId}`,
       customField2: invoice.CustomerRef?.value || ''
     }
   };
@@ -140,6 +184,14 @@ async function createShipStationOrder(userData, invoice) {
   const createdOrder = await makeShipStationApiCall(userData, 'POST', '/orders/createorder', shipstationOrder);
   
   console.log(`[PaymentPoller] ShipStation order created - ID: ${createdOrder.orderId}, Number: ${createdOrder.orderNumber}`);
+  
+  // Step 7: Save the mapping
+  try {
+    await setInvoiceMapping(invoiceId, invoiceNumber, createdOrder.orderId, createdOrder.orderNumber, 'poller');
+    console.log(`[PaymentPoller] Saved invoice mapping: ${invoiceNumber} -> ${createdOrder.orderNumber}`);
+  } catch (mappingSaveError) {
+    console.error(`[PaymentPoller] Failed to save invoice mapping:`, mappingSaveError.message);
+  }
   
   return createdOrder;
 }
@@ -247,18 +299,10 @@ async function checkPendingInvoices() {
             
             try {
               const mergedInvoice = { ...invoiceData, ...currentInvoice };
-              const ssOrder = await createShipStationOrder(userData, mergedInvoice);
+              const ssOrder = await createShipStationOrder(userData, mergedInvoice, userId);
               
               if (ssOrder && ssOrder.orderId) {
                 console.log(`[PaymentPoller] ShipStation order ${ssOrder.orderId} created for invoice ${invoiceNumber}`);
-                
-                await setInvoiceMapping(
-                  invoiceId,
-                  invoiceNumber,
-                  ssOrder.orderId.toString(),
-                  ssOrder.orderNumber,
-                  'payment_polling'
-                );
                 
                 await deletePendingInvoice(invoiceId);
                 console.log(`[PaymentPoller] Removed pending entry for invoice ${invoiceNumber}`);

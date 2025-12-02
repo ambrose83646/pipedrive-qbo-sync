@@ -3035,21 +3035,11 @@ router.post("/api/invoices", express.json(), async (req, res) => {
             // Net 30/60 or paid invoice - create ShipStation order immediately
             console.log(`[ShipStation] Creating order for invoice ${result.Invoice.DocNumber}`);
             
-            const ssOrder = await createShipStationOrderFromInvoice(userData, result.Invoice);
+            const ssOrder = await createShipStationOrderFromInvoice(userData, result.Invoice, actualUserId);
             
             if (ssOrder && ssOrder.orderId) {
               shipstationOrderCreated = true;
               console.log(`[ShipStation] Order ${ssOrder.orderId} created for invoice ${result.Invoice.DocNumber}`);
-              
-              // Store the mapping
-              const mappingKey = `ss_invoice:${result.Invoice.Id}`;
-              await setUser(mappingKey, {
-                invoiceId: result.Invoice.Id,
-                invoiceNumber: result.Invoice.DocNumber,
-                shipstationOrderId: ssOrder.orderId,
-                shipstationOrderNumber: ssOrder.orderNumber,
-                createdAt: new Date().toISOString()
-              });
             }
           }
         } catch (ssError) {
@@ -3438,33 +3428,73 @@ function getShipmentStatusLabel(shipment) {
   return 'Label Created';
 }
 
+// Build unique ShipStation order number with tenant prefix
+// Format: QB-{tenantSuffix}-{invoiceNumber} e.g., QB-3761-1078
+function buildShipStationOrderNumber(userId, invoiceNumber) {
+  if (!userId) {
+    throw new Error('userId is required to build ShipStation order number');
+  }
+  if (!invoiceNumber) {
+    throw new Error('invoiceNumber is required to build ShipStation order number');
+  }
+  // Extract last 4 digits of user ID as tenant suffix
+  const userIdStr = String(userId);
+  const tenantSuffix = userIdStr.slice(-4);
+  return `QB-${tenantSuffix}-${invoiceNumber}`;
+}
+
 // Helper function to create ShipStation order from QuickBooks invoice
-async function createShipStationOrderFromInvoice(userData, invoice, skipDupeCheck = false) {
+async function createShipStationOrderFromInvoice(userData, invoice, userId) {
+  const { getInvoiceMapping, setInvoiceMapping } = require("../../config/postgres");
+  
   if (!userData.shipstation_api_key || !userData.shipstation_api_secret) {
     throw new Error('ShipStation not connected');
   }
   
-  const orderNumber = invoice.DocNumber || `QB-${invoice.Id}`;
+  const invoiceId = invoice.Id;
+  const invoiceNumber = invoice.DocNumber || invoice.Id;
   
-  // Idempotency check: see if order already exists with this number
-  if (!skipDupeCheck) {
-    try {
-      const existingOrders = await makeShipStationApiCall(userData, 'GET', `/orders?orderNumber=${encodeURIComponent(orderNumber)}`);
-      if (existingOrders.orders && existingOrders.orders.length > 0) {
-        console.log(`[ShipStation] Order ${orderNumber} already exists (ID: ${existingOrders.orders[0].orderId}), skipping creation`);
-        return {
-          orderId: existingOrders.orders[0].orderId,
-          orderNumber: existingOrders.orders[0].orderNumber,
-          alreadyExists: true
-        };
-      }
-    } catch (dupeCheckError) {
-      console.warn(`[ShipStation] Could not check for existing order ${orderNumber}:`, dupeCheckError.message);
-      // Continue with creation - ShipStation will reject if duplicate
+  // Step 1: Check if we already have a mapping for this invoice
+  try {
+    const existingMapping = await getInvoiceMapping(invoiceId);
+    if (existingMapping && existingMapping.shipstationOrderId) {
+      console.log(`[ShipStation] Invoice ${invoiceNumber} already mapped to order ${existingMapping.shipstationOrderNumber} (ID: ${existingMapping.shipstationOrderId})`);
+      return {
+        orderId: existingMapping.shipstationOrderId,
+        orderNumber: existingMapping.shipstationOrderNumber,
+        alreadyExists: true,
+        fromMapping: true
+      };
     }
+  } catch (mappingError) {
+    console.warn(`[ShipStation] Could not check invoice mapping:`, mappingError.message);
   }
   
-  // Build ship-to address from invoice
+  // Step 2: Generate unique order number with tenant prefix
+  const orderNumber = buildShipStationOrderNumber(userId, invoiceNumber);
+  console.log(`[ShipStation] Generated order number: ${orderNumber} for invoice ${invoiceNumber}`);
+  
+  // Step 3: Check if order already exists in ShipStation with this number
+  try {
+    const existingOrders = await makeShipStationApiCall(userData, 'GET', `/orders?orderNumber=${encodeURIComponent(orderNumber)}`);
+    if (existingOrders.orders && existingOrders.orders.length > 0) {
+      const existingOrder = existingOrders.orders[0];
+      console.log(`[ShipStation] Order ${orderNumber} already exists (ID: ${existingOrder.orderId}), saving mapping`);
+      
+      // Save the mapping for future lookups
+      await setInvoiceMapping(invoiceId, invoiceNumber, existingOrder.orderId, existingOrder.orderNumber, 'existing');
+      
+      return {
+        orderId: existingOrder.orderId,
+        orderNumber: existingOrder.orderNumber,
+        alreadyExists: true
+      };
+    }
+  } catch (dupeCheckError) {
+    console.warn(`[ShipStation] Could not check for existing order ${orderNumber}:`, dupeCheckError.message);
+  }
+  
+  // Step 4: Build ship-to address from invoice
   const shipTo = {
     name: invoice.CustomerRef?.name || invoice.ShipAddr?.Line1 || 'Customer',
     street1: invoice.ShipAddr?.Line1 || invoice.BillAddr?.Line1 || '',
@@ -3477,7 +3507,7 @@ async function createShipStationOrderFromInvoice(userData, invoice, skipDupeChec
     email: invoice.BillEmail?.Address || ''
   };
   
-  // Map invoice line items to ShipStation items
+  // Step 5: Map invoice line items to ShipStation items
   const items = [];
   if (invoice.Line) {
     invoice.Line.forEach(line => {
@@ -3492,8 +3522,9 @@ async function createShipStationOrderFromInvoice(userData, invoice, skipDupeChec
     });
   }
   
+  // Step 6: Create the order
   const shipstationOrder = {
-    orderNumber: invoice.DocNumber || `QB-${invoice.Id}`,
+    orderNumber: orderNumber,
     orderDate: invoice.TxnDate || new Date().toISOString().split('T')[0],
     orderStatus: 'awaiting_shipment',
     billTo: shipTo,
@@ -3501,9 +3532,9 @@ async function createShipStationOrderFromInvoice(userData, invoice, skipDupeChec
     items: items,
     amountPaid: parseFloat(invoice.TotalAmt) - parseFloat(invoice.Balance || 0),
     customerEmail: invoice.BillEmail?.Address || '',
-    internalNotes: `QuickBooks Invoice #${invoice.DocNumber || invoice.Id}`,
+    internalNotes: `QuickBooks Invoice #${invoiceNumber}`,
     advancedOptions: {
-      customField1: `QB_Invoice_${invoice.Id}`,
+      customField1: `QB_Invoice_${invoiceId}`,
       customField2: invoice.CustomerRef?.value || ''
     }
   };
@@ -3514,6 +3545,14 @@ async function createShipStationOrderFromInvoice(userData, invoice, skipDupeChec
   const createdOrder = await makeShipStationApiCall(userData, 'POST', '/orders/createorder', shipstationOrder);
   
   console.log(`[ShipStation] Order created successfully - ID: ${createdOrder.orderId}, Number: ${createdOrder.orderNumber}`);
+  
+  // Step 7: Save the mapping for future lookups
+  try {
+    await setInvoiceMapping(invoiceId, invoiceNumber, createdOrder.orderId, createdOrder.orderNumber, 'created');
+    console.log(`[ShipStation] Saved invoice mapping: ${invoiceNumber} -> ${createdOrder.orderNumber}`);
+  } catch (mappingSaveError) {
+    console.error(`[ShipStation] Failed to save invoice mapping:`, mappingSaveError.message);
+  }
   
   return createdOrder;
 }
@@ -3561,71 +3600,17 @@ router.post("/api/shipstation/orders", express.json(), async (req, res) => {
       });
     }
     
-    // Build ShipStation order from QuickBooks invoice
-    const shipTo = {
-      name: invoice.CustomerRef?.name || invoice.ShipAddr?.Line1 || 'Customer',
-      street1: invoice.ShipAddr?.Line1 || invoice.BillAddr?.Line1 || '',
-      street2: invoice.ShipAddr?.Line2 || invoice.BillAddr?.Line2 || '',
-      city: invoice.ShipAddr?.City || invoice.BillAddr?.City || '',
-      state: invoice.ShipAddr?.CountrySubDivisionCode || invoice.BillAddr?.CountrySubDivisionCode || '',
-      postalCode: invoice.ShipAddr?.PostalCode || invoice.BillAddr?.PostalCode || '',
-      country: invoice.ShipAddr?.Country || invoice.BillAddr?.Country || 'US',
-      phone: invoice.ShipAddr?.Phone || '',
-      email: invoice.BillEmail?.Address || ''
-    };
-    
-    // Map invoice line items to ShipStation items
-    const items = [];
-    if (invoice.Line) {
-      invoice.Line.forEach(line => {
-        if (line.DetailType === 'SalesItemLineDetail' && line.SalesItemLineDetail) {
-          items.push({
-            name: line.SalesItemLineDetail.ItemRef?.name || line.Description || 'Item',
-            quantity: line.SalesItemLineDetail.Qty || 1,
-            unitPrice: line.SalesItemLineDetail.UnitPrice || line.Amount || 0,
-            sku: line.SalesItemLineDetail.ItemRef?.value || ''
-          });
-        }
-      });
-    }
-    
-    const shipstationOrder = {
-      orderNumber: invoice.DocNumber || `QB-${invoice.Id}`,
-      orderDate: invoice.TxnDate || new Date().toISOString().split('T')[0],
-      orderStatus: 'awaiting_shipment',
-      billTo: shipTo,
-      shipTo: shipTo,
-      items: items,
-      amountPaid: parseFloat(invoice.TotalAmt) - parseFloat(invoice.Balance || 0),
-      customerEmail: invoice.BillEmail?.Address || '',
-      internalNotes: `QuickBooks Invoice #${invoice.DocNumber || invoice.Id}`,
-      advancedOptions: {
-        customField1: `QB_Invoice_${invoice.Id}`,
-        customField2: invoice.CustomerRef?.value || ''
-      }
-    };
-    
-    // Create order in ShipStation
-    const createdOrder = await makeShipStationApiCall(userData, 'POST', '/orders/createorder', shipstationOrder);
+    // Use the helper function which handles unique order numbers and mappings
+    const createdOrder = await createShipStationOrderFromInvoice(userData, invoice, actualUserId);
     
     console.log(`[ShipStation] Order created: ${createdOrder.orderId} for invoice ${invoice.DocNumber}`);
-    
-    // Store the mapping in database
-    const { setDealMapping, getDealMapping } = require("../../config/postgres");
-    const mappingKey = `ss_invoice:${invoice.Id}`;
-    await setUser(mappingKey, {
-      invoiceId: invoice.Id,
-      invoiceNumber: invoice.DocNumber,
-      shipstationOrderId: createdOrder.orderId,
-      shipstationOrderNumber: createdOrder.orderNumber,
-      createdAt: new Date().toISOString()
-    });
     
     res.json({
       success: true,
       orderId: createdOrder.orderId,
       orderNumber: createdOrder.orderNumber,
-      message: 'ShipStation order created successfully'
+      alreadyExists: createdOrder.alreadyExists || false,
+      message: createdOrder.alreadyExists ? 'ShipStation order already exists' : 'ShipStation order created successfully'
     });
     
   } catch (error) {
