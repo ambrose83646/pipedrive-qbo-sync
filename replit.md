@@ -3,8 +3,8 @@
 This Node.js application integrates Pipedrive CRM with QuickBooks Online (QBO) to synchronize contact data. It enables users to manage CRM contacts and accounting customers from a unified interface, utilizing OAuth 2.0 for secure authentication with both services. The application stores user credentials in Replit's key-value database and provides Pipedrive browser extensions for direct QuickBooks connection and contact synchronization. It adheres to QuickBooks compliance by requiring explicit user action to connect.
 
 Key functionalities include:
-- **Post-Installation Setup**: A three-step process for administrators to authorize users, configure invoice preferences (field mappings), and optionally integrate ShipStation.
-- **ShipStation Integration**: Automates order fulfillment based on invoice payment terms, with encrypted credentials and background polling for payment status.
+- **Post-Installation Setup**: A two-step process for administrators to authorize users and configure invoice preferences (field mappings).
+- **ShipStation Integration**: Configured separately in the Settings page. Automates order fulfillment based on invoice payment terms, with encrypted credentials and background polling for payment status.
 
 # User Preferences
 
@@ -64,7 +64,7 @@ A controller-based synchronization logic (`src/controllers/sync.js`) manages dat
 - **Authentication**: HTTP Basic Auth (API Key + Secret, stored encrypted)
 - **API Access**: REST API (https://ssapi.shipstation.com)
 - **Key Features Used**: Orders, Shipments, Stores
-- **Configuration**: Per-user API credentials entered during setup
+- **Configuration**: Per-user API credentials entered in Settings page
 - **Automation**: Background polling service checks for paid invoices every 5 minutes
 
 ## Database

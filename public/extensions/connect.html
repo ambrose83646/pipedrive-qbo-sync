@@ -119,13 +119,130 @@
         color: #666;
         margin-top: 5px;
       }
+
+      .section-divider {
+        border-top: 1px solid #e0e0e0;
+        margin: 30px 0;
+      }
+
+      .settings-section {
+        margin-bottom: 30px;
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+
+      .section-icon {
+        width: 32px;
+        height: 32px;
+        background: #2ca01c;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 18px;
+      }
+
+      .section-icon.shipstation {
+        background: #84c225;
+      }
+
+      h3 {
+        color: #333;
+        margin: 0;
+        font-size: 18px;
+      }
+
+      .input-group {
+        margin-bottom: 15px;
+      }
+
+      .input-group label {
+        display: block;
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 5px;
+      }
+
+      .input-group input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #d9d9d9;
+        border-radius: 4px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+      }
+
+      .input-group input:focus {
+        outline: none;
+        border-color: #40a9ff;
+        box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+      }
+
+      .input-group input:disabled {
+        background: #f5f5f5;
+        color: #999;
+      }
+
+      .btn-test {
+        background: #f5f5f5;
+        color: #333;
+        border: 1px solid #d9d9d9;
+      }
+
+      .btn-test:hover {
+        background: #e8e8e8;
+      }
+
+      .btn-save {
+        background: #84c225;
+      }
+
+      .btn-save:hover {
+        background: #6ba01c;
+      }
+
+      .connection-result {
+        margin-top: 10px;
+        font-size: 13px;
+        min-height: 20px;
+      }
+
+      .connection-result.success {
+        color: #28a745;
+      }
+
+      .connection-result.error {
+        color: #dc3545;
+      }
+
+      .shipstation-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+      }
+
+      .info-text {
+        font-size: 12px;
+        color: #888;
+        margin-top: 8px;
+      }
     </style>
   </head>
   <body>
-    <h2>Connect QuickBooks</h2>
-    <p>Link your Pipedrive to QuickBooks to sync contacts and invoices.</p>
+    <div class="settings-section">
+      <div class="section-header">
+        <div class="section-icon">QB</div>
+        <h3>QuickBooks</h3>
+      </div>
+      <p style="color: #666; margin-bottom: 15px;">Link your Pipedrive to QuickBooks to sync contacts and invoices.</p>
 
-    <div class="status-container">
+      <div class="status-container">
       <div class="status-label">QuickBooks Connection Status:</div>
       <div id="statusText" class="status-inactive">Checking...</div>
       <div id="companyName" class="company-name" style="display: none"></div>
@@ -135,6 +252,45 @@
       <div id="connectedActions" class="button-group" style="display: none">
         <button id="reconnectBtn" class="btn-reconnect">Reconnect</button>
         <button id="disconnectBtn" class="btn-disconnect">Disconnect</button>
+      </div>
+    </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="settings-section">
+      <div class="section-header">
+        <div class="section-icon shipstation">SS</div>
+        <h3>ShipStation</h3>
+      </div>
+      <p style="color: #666; margin-bottom: 15px;">Connect ShipStation to automatically create shipping orders from invoices.</p>
+
+      <div id="shipstationStatus" class="status-container">
+        <div class="status-label">ShipStation Connection Status:</div>
+        <div id="ssStatusText" class="status-inactive">Checking...</div>
+      </div>
+
+      <div id="shipstationForm" style="display: none;">
+        <div class="input-group">
+          <label for="ssApiKey">API Key</label>
+          <input type="text" id="ssApiKey" placeholder="Enter your ShipStation API Key">
+        </div>
+        <div class="input-group">
+          <label for="ssApiSecret">API Secret</label>
+          <input type="password" id="ssApiSecret" placeholder="Enter your ShipStation API Secret">
+        </div>
+        <p class="info-text">Find your API keys in ShipStation: Settings > Account > API Settings</p>
+        <div class="shipstation-actions">
+          <button id="ssTestBtn" class="btn-test">Test Connection</button>
+          <button id="ssSaveBtn" class="btn-save" style="display: none;">Save Credentials</button>
+        </div>
+        <div id="ssConnectionResult" class="connection-result"></div>
+      </div>
+
+      <div id="shipstationConnected" style="display: none;">
+        <div class="button-group" style="justify-content: flex-start;">
+          <button id="ssDisconnectBtn" class="btn-disconnect">Disconnect</button>
+        </div>
       </div>
     </div>
 
@@ -613,6 +769,206 @@
 
         // Initial status check
         checkStatus();
+
+        // ============== ShipStation Section ==============
+        const ssStatusText = document.getElementById('ssStatusText');
+        const shipstationForm = document.getElementById('shipstationForm');
+        const shipstationConnected = document.getElementById('shipstationConnected');
+        const ssApiKeyInput = document.getElementById('ssApiKey');
+        const ssApiSecretInput = document.getElementById('ssApiSecret');
+        const ssTestBtn = document.getElementById('ssTestBtn');
+        const ssSaveBtn = document.getElementById('ssSaveBtn');
+        const ssDisconnectBtn = document.getElementById('ssDisconnectBtn');
+        const ssConnectionResult = document.getElementById('ssConnectionResult');
+
+        // Track if credentials have been tested successfully
+        let ssCredentialsTested = false;
+
+        // Check ShipStation status
+        async function checkShipStationStatus() {
+          try {
+            const response = await fetch('/api/shipstation/status?userId=' + userId);
+            const data = await response.json();
+
+            if (data.connected) {
+              ssStatusText.textContent = 'Active';
+              ssStatusText.className = 'status-active';
+              shipstationForm.style.display = 'none';
+              shipstationConnected.style.display = 'block';
+            } else {
+              ssStatusText.textContent = 'Not Connected';
+              ssStatusText.className = 'status-inactive';
+              shipstationForm.style.display = 'block';
+              shipstationConnected.style.display = 'none';
+            }
+          } catch (error) {
+            console.error('Error checking ShipStation status:', error);
+            ssStatusText.textContent = 'Not Connected';
+            ssStatusText.className = 'status-inactive';
+            shipstationForm.style.display = 'block';
+            shipstationConnected.style.display = 'none';
+          }
+        }
+
+        // Test ShipStation connection
+        ssTestBtn.addEventListener('click', async function() {
+          const apiKey = ssApiKeyInput.value.trim();
+          const apiSecret = ssApiSecretInput.value.trim();
+
+          if (!apiKey || !apiSecret) {
+            ssConnectionResult.textContent = 'Please enter both API Key and Secret';
+            ssConnectionResult.className = 'connection-result error';
+            return;
+          }
+
+          ssTestBtn.disabled = true;
+          ssTestBtn.textContent = 'Testing...';
+          ssConnectionResult.textContent = '';
+
+          try {
+            const response = await fetch('/api/shipstation/test', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ apiKey, apiSecret })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+              ssConnectionResult.textContent = 'Connection successful! Click Save to store your credentials.';
+              ssConnectionResult.className = 'connection-result success';
+              ssSaveBtn.style.display = 'inline-block';
+              ssCredentialsTested = true;
+            } else {
+              ssConnectionResult.textContent = data.error || 'Connection failed. Please check your credentials.';
+              ssConnectionResult.className = 'connection-result error';
+              ssSaveBtn.style.display = 'none';
+              ssCredentialsTested = false;
+            }
+          } catch (error) {
+            ssConnectionResult.textContent = 'Connection failed: ' + error.message;
+            ssConnectionResult.className = 'connection-result error';
+            ssSaveBtn.style.display = 'none';
+            ssCredentialsTested = false;
+          }
+
+          ssTestBtn.disabled = false;
+          ssTestBtn.textContent = 'Test Connection';
+        });
+
+        // Save ShipStation credentials
+        ssSaveBtn.addEventListener('click', async function() {
+          if (!ssCredentialsTested) {
+            ssConnectionResult.textContent = 'Please test the connection first';
+            ssConnectionResult.className = 'connection-result error';
+            return;
+          }
+
+          const apiKey = ssApiKeyInput.value.trim();
+          const apiSecret = ssApiSecretInput.value.trim();
+
+          ssSaveBtn.disabled = true;
+          ssSaveBtn.textContent = 'Saving...';
+
+          try {
+            // Get auth token for security
+            let authToken = null;
+            try {
+              const token = await sdk.execute('GET_SIGNED_TOKEN');
+              authToken = JSON.stringify(token);
+            } catch (e) {
+              console.log('Could not get signed token, proceeding without');
+            }
+
+            const response = await fetch('/api/shipstation/save', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'X-Pipedrive-Token': authToken || ''
+              },
+              body: JSON.stringify({ userId, apiKey, apiSecret })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+              sdk.execute('TOAST', { message: 'ShipStation connected successfully!' });
+              // Refresh the status
+              checkShipStationStatus();
+              // Clear the form
+              ssApiKeyInput.value = '';
+              ssApiSecretInput.value = '';
+              ssCredentialsTested = false;
+            } else {
+              ssConnectionResult.textContent = data.error || 'Failed to save credentials';
+              ssConnectionResult.className = 'connection-result error';
+            }
+          } catch (error) {
+            ssConnectionResult.textContent = 'Failed to save: ' + error.message;
+            ssConnectionResult.className = 'connection-result error';
+          }
+
+          ssSaveBtn.disabled = false;
+          ssSaveBtn.textContent = 'Save Credentials';
+        });
+
+        // Disconnect ShipStation
+        let ssDisconnectPending = false;
+        ssDisconnectBtn.addEventListener('click', async function() {
+          if (!ssDisconnectPending) {
+            ssDisconnectPending = true;
+            ssDisconnectBtn.textContent = 'Click again to confirm';
+            ssDisconnectBtn.classList.add('btn-confirm');
+            setTimeout(() => {
+              ssDisconnectPending = false;
+              ssDisconnectBtn.textContent = 'Disconnect';
+              ssDisconnectBtn.classList.remove('btn-confirm');
+            }, 3000);
+            return;
+          }
+
+          ssDisconnectPending = false;
+          ssDisconnectBtn.disabled = true;
+          ssDisconnectBtn.textContent = 'Disconnecting...';
+
+          try {
+            // Get auth token for security
+            let authToken = null;
+            try {
+              const token = await sdk.execute('GET_SIGNED_TOKEN');
+              authToken = JSON.stringify(token);
+            } catch (e) {
+              console.log('Could not get signed token, proceeding without');
+            }
+
+            const response = await fetch('/api/shipstation/disconnect', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'X-Pipedrive-Token': authToken || ''
+              },
+              body: JSON.stringify({ userId })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+              sdk.execute('TOAST', { message: 'ShipStation disconnected' });
+              checkShipStationStatus();
+            } else {
+              console.error('Disconnect failed:', data.error);
+            }
+          } catch (error) {
+            console.error('Disconnect error:', error);
+          }
+
+          ssDisconnectBtn.disabled = false;
+          ssDisconnectBtn.textContent = 'Disconnect';
+          ssDisconnectBtn.classList.remove('btn-confirm');
+        });
+
+        // Initial ShipStation status check
+        checkShipStationStatus();
       });
     </script>
   </body>

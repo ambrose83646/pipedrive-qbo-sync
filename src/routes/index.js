@@ -577,6 +577,146 @@ router.post("/api/shipstation/test", express.json(), async (req, res) => {
   }
 });
 
+// Save ShipStation credentials
+router.post("/api/shipstation/save", express.json(), async (req, res) => {
+  try {
+    const { userId, apiKey, apiSecret } = req.body;
+    const pipedriveToken = req.headers['x-pipedrive-token'];
+    
+    if (!userId || !apiKey || !apiSecret) {
+      return res.status(400).json({ error: "User ID, API Key, and Secret are required" });
+    }
+    
+    // Normalize userId - strip https://, http://, and .pipedrive.com suffix for comparison
+    function normalizeUserId(id) {
+      if (!id) return id;
+      let normalized = id.toString();
+      normalized = normalized.replace(/^https?:\/\//, '');
+      normalized = normalized.replace(/\.pipedrive\.com$/, '');
+      return normalized;
+    }
+    
+    const normalizedInput = normalizeUserId(userId);
+    
+    // Try multiple userId formats to find the user
+    const possibleUserIds = [
+      userId,
+      normalizedInput,
+      normalizedInput + '.pipedrive.com'
+    ];
+    
+    let userData = null;
+    let foundUserId = null;
+    
+    for (const tryUserId of [...new Set(possibleUserIds.filter(id => id))]) {
+      const tryUserData = await getUser(tryUserId);
+      if (tryUserData && tryUserData.qb_access_token) {
+        userData = tryUserData;
+        foundUserId = tryUserId;
+        break;
+      }
+    }
+    
+    if (!userData) {
+      console.log(`[ShipStation] User not found for save: ${userId}`);
+      return res.status(404).json({ error: "User not found. Please connect QuickBooks first." });
+    }
+    
+    // Log authentication attempt (token is optional but logged for debugging)
+    if (pipedriveToken) {
+      console.log(`[ShipStation] Save request authenticated with Pipedrive token for: ${foundUserId}`);
+    }
+    
+    // Encrypt and save credentials
+    const updatedData = {
+      ...userData,
+      shipstation_api_key: encrypt(apiKey),
+      shipstation_api_secret: encrypt(apiSecret),
+      shipstation_auto_create: true,
+      shipstation_connected_at: new Date().toISOString()
+    };
+    
+    await setUser(foundUserId, updatedData);
+    
+    console.log(`[ShipStation] Credentials saved for user: ${foundUserId}`);
+    res.json({ success: true, message: 'ShipStation connected successfully' });
+    
+  } catch (error) {
+    console.error('[ShipStation] Save credentials error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to save credentials' });
+  }
+});
+
+// Disconnect ShipStation
+router.post("/api/shipstation/disconnect", express.json(), async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const pipedriveToken = req.headers['x-pipedrive-token'];
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    // Normalize userId - strip https://, http://, and .pipedrive.com suffix for comparison
+    function normalizeUserId(id) {
+      if (!id) return id;
+      let normalized = id.toString();
+      normalized = normalized.replace(/^https?:\/\//, '');
+      normalized = normalized.replace(/\.pipedrive\.com$/, '');
+      return normalized;
+    }
+    
+    const normalizedInput = normalizeUserId(userId);
+    
+    // Try multiple userId formats to find the user
+    const possibleUserIds = [
+      userId,
+      normalizedInput,
+      normalizedInput + '.pipedrive.com'
+    ];
+    
+    let userData = null;
+    let foundUserId = null;
+    
+    for (const tryUserId of [...new Set(possibleUserIds.filter(id => id))]) {
+      const tryUserData = await getUser(tryUserId);
+      if (tryUserData && tryUserData.shipstation_api_key) {
+        userData = tryUserData;
+        foundUserId = tryUserId;
+        break;
+      }
+    }
+    
+    if (!userData) {
+      console.log(`[ShipStation] User not found for disconnect: ${userId}`);
+      return res.status(404).json({ error: "User not found or ShipStation not connected" });
+    }
+    
+    // Log authentication attempt
+    if (pipedriveToken) {
+      console.log(`[ShipStation] Disconnect request authenticated with Pipedrive token for: ${foundUserId}`);
+    }
+    
+    // Remove ShipStation credentials
+    const updatedData = {
+      ...userData,
+      shipstation_api_key: null,
+      shipstation_api_secret: null,
+      shipstation_auto_create: null,
+      shipstation_connected_at: null
+    };
+    
+    await setUser(foundUserId, updatedData);
+    
+    console.log(`[ShipStation] Disconnected for user: ${foundUserId}`);
+    res.json({ success: true, message: 'ShipStation disconnected' });
+    
+  } catch (error) {
+    console.error('[ShipStation] Disconnect error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to disconnect' });
+  }
+});
+
 // Get setup preferences  
 router.get("/api/setup/preferences", async (req, res) => {
   try {
