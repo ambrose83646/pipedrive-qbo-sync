@@ -48,13 +48,22 @@ async function handleToken(requestUrl) {
   }
 }
 
-async function refreshToken(refreshToken) {
+async function refreshToken(refreshTokenValue) {
+  console.log('[QB Auth] Starting token refresh...');
+  console.log('[QB Auth] Refresh token prefix:', refreshTokenValue?.substring(0, 15) + '...');
+  
   try {
     oauthClient.setToken({
-      refresh_token: refreshToken
+      refresh_token: refreshTokenValue
     });
     
     const authResponse = await oauthClient.refresh();
+    
+    console.log('[QB Auth] Refresh successful!');
+    console.log('[QB Auth] New access token received:', !!authResponse.token.access_token);
+    console.log('[QB Auth] New refresh token received:', !!authResponse.token.refresh_token);
+    console.log('[QB Auth] New refresh token prefix:', authResponse.token.refresh_token?.substring(0, 15) + '...');
+    console.log('[QB Auth] Expires in:', authResponse.token.expires_in, 'seconds');
     
     return {
       access_token: authResponse.token.access_token,
@@ -63,7 +72,30 @@ async function refreshToken(refreshToken) {
       token_type: authResponse.token.token_type
     };
   } catch (error) {
-    console.error('Error refreshing QB token:', error);
+    console.error('[QB Auth] Error refreshing token:', error.message);
+    
+    // Log detailed error info
+    if (error.authResponse) {
+      console.error('[QB Auth] Auth response error:', {
+        status: error.authResponse.response?.status,
+        body: error.authResponse.response?.body
+      });
+    }
+    if (error.originalMessage) {
+      console.error('[QB Auth] Original error message:', error.originalMessage);
+    }
+    if (error.intuit_tid) {
+      console.error('[QB Auth] Intuit TID:', error.intuit_tid);
+    }
+    
+    // Check for specific refresh token errors
+    const errorStr = JSON.stringify(error).toLowerCase();
+    if (errorStr.includes('invalid_grant') || errorStr.includes('expired') || errorStr.includes('revoked')) {
+      const customError = new Error('QuickBooks refresh token has expired or been revoked. Please reconnect to QuickBooks.');
+      customError.code = 'REFRESH_TOKEN_EXPIRED';
+      throw customError;
+    }
+    
     throw error;
   }
 }

@@ -28,7 +28,13 @@ function getQBResponseData(response) {
 // Helper function to check if token needs refresh (expires within 10 minutes)
 function tokenNeedsRefresh(userData) {
   if (!userData.qb_expires_at) {
-    console.log('[TokenCheck] No expiration timestamp, assuming token is valid');
+    // If no expiration timestamp and we have a refresh token, proactively refresh
+    // This handles cases where tokens were stored without expiration tracking
+    if (userData.qb_refresh_token) {
+      console.log('[TokenCheck] No expiration timestamp but refresh token exists, triggering refresh');
+      return true;
+    }
+    console.log('[TokenCheck] No expiration timestamp and no refresh token, cannot refresh');
     return false;
   }
   
