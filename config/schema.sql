@@ -25,7 +25,14 @@ CREATE TABLE IF NOT EXISTS users (
     shipstation_auto_create BOOLEAN DEFAULT FALSE,
     shipstation_connected_at TIMESTAMP,
     
-    -- Setup preferences
+    -- Setup flow tokens
+    setup_token TEXT,
+    setup_token_expires TIMESTAMP,
+    
+    -- Setup preferences (stored as JSONB for flexibility)
+    invoice_preferences JSONB,
+    
+    -- Legacy setup fields (kept for backward compatibility)
     invoice_item_field VARCHAR(100),
     invoice_qty_field VARCHAR(100),
     invoice_price_field VARCHAR(100),
