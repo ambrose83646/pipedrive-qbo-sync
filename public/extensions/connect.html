@@ -459,10 +459,14 @@
           if (event.data && event.data.source === "qb-callback") {
             if (event.data.success === true) {
               console.log("Received OAuth callback success message");
-              // Send toast notification
-              sdk.execute("TOAST", {
-                message: "QuickBooks Connected Successfully!",
-              });
+              // Send toast notification (wrapped in try/catch for settings panel compatibility)
+              try {
+                sdk.execute("SHOW_SNACKBAR", {
+                  message: "QuickBooks Connected Successfully!",
+                });
+              } catch (e) {
+                console.log("Toast notification not available in this context");
+              }
 
               // Stop polling and do immediate refresh
               stopPolling();
@@ -610,9 +614,13 @@
 
               if (data.success) {
                 console.log("Disconnect successful");
-                sdk.execute("TOAST", {
-                  message: "QuickBooks disconnected successfully",
-                });
+                try {
+                  sdk.execute("SHOW_SNACKBAR", {
+                    message: "QuickBooks disconnected successfully",
+                  });
+                } catch (e) {
+                  console.log("Toast notification not available in this context");
+                }
 
                 // Simple approach: just reload the page after a brief delay
                 // This is more reliable than polling for status changes
@@ -622,10 +630,14 @@
                 }, 500);
               } else {
                 console.error("Disconnect failed:", data.error);
-                sdk.execute("TOAST", {
-                  message:
-                    "Failed to disconnect: " + (data.error || "Unknown error"),
-                });
+                try {
+                  sdk.execute("SHOW_SNACKBAR", {
+                    message:
+                      "Failed to disconnect: " + (data.error || "Unknown error"),
+                  });
+                } catch (e) {
+                  console.log("Toast notification not available in this context");
+                }
                 statusText.textContent = "Active";
               }
             } catch (error) {
@@ -634,7 +646,7 @@
 
               // Try to show toast even if there's an error
               try {
-                sdk.execute("TOAST", {
+                sdk.execute("SHOW_SNACKBAR", {
                   message: "Error disconnecting QuickBooks",
                 });
               } catch (toastError) {
@@ -892,19 +904,27 @@
             const data = await response.json();
 
             if (response.ok && data.success) {
-              sdk.execute('TOAST', { message: 'ShipStation connected successfully!' });
+              try {
+                sdk.execute('SHOW_SNACKBAR', { message: 'ShipStation connected successfully!' });
+              } catch (e) {
+                console.log('Toast notification not available in this context');
+              }
               // Refresh the status
               checkShipStationStatus();
               // Clear the form
               ssApiKeyInput.value = '';
               ssApiSecretInput.value = '';
               ssCredentialsTested = false;
+              // Also show success in the result area
+              ssConnectionResult.textContent = 'Connected successfully!';
+              ssConnectionResult.className = 'connection-result success';
             } else {
               ssConnectionResult.textContent = data.error || 'Failed to save credentials';
               ssConnectionResult.className = 'connection-result error';
             }
           } catch (error) {
-            ssConnectionResult.textContent = 'Failed to save: ' + error.message;
+            console.error('ShipStation save error:', error);
+            ssConnectionResult.textContent = 'Failed to save credentials. Please try again.';
             ssConnectionResult.className = 'connection-result error';
           }
 
@@ -953,7 +973,11 @@
             const data = await response.json();
 
             if (response.ok && data.success) {
-              sdk.execute('TOAST', { message: 'ShipStation disconnected' });
+              try {
+                sdk.execute('SHOW_SNACKBAR', { message: 'ShipStation disconnected' });
+              } catch (e) {
+                console.log('Toast notification not available in this context');
+              }
               checkShipStationStatus();
             } else {
               console.error('Disconnect failed:', data.error);
