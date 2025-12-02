@@ -1706,10 +1706,8 @@
       // Open the invoice list modal using Pipedrive SDK
       try {
         sdk.execute(AppExtensionsSDK.Command.OPEN_MODAL, {
-          modal: {
-            type: 'custom',
-            action_id: '1d5c0945-7264-435f-8aa2-986bed03ba6b'
-          },
+          type: AppExtensionsSDK.Modal.CUSTOM_MODAL,
+          action_id: '1d5c0945-7264-435f-8aa2-986bed03ba6b',
           data: {
             customerId: linkedContact.Id,
             userId: userId,
