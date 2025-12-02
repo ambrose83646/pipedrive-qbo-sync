@@ -498,18 +498,57 @@
     
     function formatDate(dateStr) {
       if (!dateStr) return '-';
-      const date = new Date(dateStr);
+      
+      // Robust parsing: QuickBooks sends YYYY-MM-DD which JavaScript treats as UTC
+      // This causes dates to display one day early in US time zones
+      let date;
+      if (dateStr.includes('T')) {
+        // Already has time component (ISO format with timezone)
+        date = new Date(dateStr);
+      } else {
+        // Date-only string like "2025-01-05" - parse as local midnight
+        const [year, month, day] = dateStr.split('-').map(Number);
+        date = new Date(year, month - 1, day);
+      }
+      
+      if (isNaN(date.getTime())) return '-';
+      
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
     
     function getInvoiceStatus(invoice) {
       const balance = parseFloat(invoice.Balance || 0);
-      const dueDate = new Date(invoice.DueDate);
-      const today = new Date();
       
       if (balance <= 0) {
         return { label: 'Paid', class: 'status-paid' };
-      } else if (dueDate < today) {
+      }
+      
+      // Guard against missing DueDate
+      if (!invoice.DueDate) {
+        return { label: 'Open', class: 'status-open' };
+      }
+      
+      // Parse DueDate robustly - QuickBooks may send ISO strings or date-only strings
+      let dueDate;
+      if (invoice.DueDate.includes('T')) {
+        // Already has time component (ISO format)
+        dueDate = new Date(invoice.DueDate);
+      } else {
+        // Date-only string like "2025-01-05"
+        dueDate = new Date(invoice.DueDate + 'T00:00:00');
+      }
+      
+      // Check for invalid date
+      if (isNaN(dueDate.getTime())) {
+        return { label: 'Open', class: 'status-open' };
+      }
+      
+      // Compare dates by stripping time components
+      const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+      const today = new Date();
+      const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      if (dueDateOnly < todayOnly) {
         return { label: 'Overdue', class: 'status-overdue' };
       } else {
         return { label: 'Open', class: 'status-open' };
@@ -601,6 +640,33 @@
         </div>
       `;
       
+      if (invoice.BillEmail?.Address) {
+        detailHtml += `
+          <div class="detail-row">
+            <span class="detail-label">Bill Email</span>
+            <span class="detail-value">${invoice.BillEmail.Address}</span>
+          </div>
+        `;
+      }
+      
+      if (invoice.ShipAddr) {
+        const addr = invoice.ShipAddr;
+        const addrParts = [
+          addr.Line1,
+          addr.Line2,
+          [addr.City, addr.CountrySubDivisionCode, addr.PostalCode].filter(Boolean).join(', ')
+        ].filter(Boolean);
+        
+        if (addrParts.length > 0) {
+          detailHtml += `
+            <div class="detail-row">
+              <span class="detail-label">Ship To</span>
+              <span class="detail-value">${addrParts.join('<br>')}</span>
+            </div>
+          `;
+        }
+      }
+      
       if (invoice.CustomerMemo?.value) {
         detailHtml += `
           <div class="detail-row">
@@ -610,33 +676,130 @@
         `;
       }
       
+      if (invoice.PrivateNote) {
+        detailHtml += `
+          <div class="detail-row">
+            <span class="detail-label">Private Note</span>
+            <span class="detail-value">${invoice.PrivateNote}</span>
+          </div>
+        `;
+      }
+      
       if (invoice.Line && invoice.Line.length > 0) {
-        const lineItems = invoice.Line.filter(line => line.DetailType === 'SalesItemLineDetail');
+        detailHtml += `
+          <div class="line-items-section">
+            <div class="line-items-title">Line Items</div>
+        `;
         
-        if (lineItems.length > 0) {
-          detailHtml += `
-            <div class="line-items-section">
-              <div class="line-items-title">Line Items</div>
-          `;
+        invoice.Line.forEach(line => {
+          let itemName = '';
+          let itemDetail = '';
+          let amount = line.Amount || 0;
+          let showLine = true;
           
-          lineItems.forEach(line => {
-            const itemName = line.SalesItemLineDetail?.ItemRef?.name || line.Description || 'Item';
-            const qty = line.SalesItemLineDetail?.Qty || 1;
-            const unitPrice = line.SalesItemLineDetail?.UnitPrice || line.Amount;
-            
-            detailHtml += `
-              <div class="line-item-row">
-                <div class="line-item-desc">
-                  <div class="line-item-name">${itemName}</div>
-                  <div class="line-item-qty">${qty} x ${formatCurrency(unitPrice)}</div>
+          switch(line.DetailType) {
+            case 'SalesItemLineDetail':
+              itemName = line.SalesItemLineDetail?.ItemRef?.name || line.Description || 'Item';
+              const qty = line.SalesItemLineDetail?.Qty || 1;
+              const unitPrice = line.SalesItemLineDetail?.UnitPrice || line.Amount;
+              itemDetail = `${qty} x ${formatCurrency(unitPrice)}`;
+              // Check for markup/shipping context
+              if (line.SalesItemLineDetail?.MarkupInfo) {
+                const markupPct = line.SalesItemLineDetail.MarkupInfo.Percent;
+                if (markupPct) {
+                  itemDetail += ` (${markupPct}% markup)`;
+                }
+              }
+              // Check if this is a shipping item
+              if (itemName.toLowerCase().includes('shipping') || itemName.toLowerCase().includes('freight')) {
+                itemDetail = 'Shipping charge';
+              }
+              break;
+              
+            case 'DiscountLineDetail':
+              itemName = 'Discount';
+              const pct = line.DiscountLineDetail?.DiscountPercent;
+              itemDetail = pct ? `${pct}% discount` : 'Applied discount';
+              amount = -Math.abs(amount);
+              break;
+              
+            case 'SubTotalLineDetail':
+              itemName = 'Subtotal';
+              break;
+              
+            case 'TaxLineDetail':
+              itemName = 'Tax';
+              itemDetail = line.TaxLineDetail?.TaxRateRef?.name || '';
+              break;
+              
+            case 'GroupLineDetail':
+              itemName = line.GroupLineDetail?.GroupItemRef?.name || 'Group';
+              itemDetail = 'Group';
+              // Render the group header
+              detailHtml += `
+                <div class="line-item-row" style="background: #f9f9f9;">
+                  <div class="line-item-desc">
+                    <div class="line-item-name" style="font-weight: 600;">${itemName}</div>
+                    <div class="line-item-qty">${itemDetail}</div>
+                  </div>
+                  <div class="line-item-amount"></div>
                 </div>
-                <div class="line-item-amount">${formatCurrency(line.Amount)}</div>
-              </div>
-            `;
-          });
+              `;
+              // Render child entries
+              if (line.GroupLineDetail?.Line) {
+                line.GroupLineDetail.Line.forEach(childLine => {
+                  const childName = childLine.SalesItemLineDetail?.ItemRef?.name || childLine.Description || 'Item';
+                  const childQty = childLine.SalesItemLineDetail?.Qty || 1;
+                  const childPrice = childLine.SalesItemLineDetail?.UnitPrice || childLine.Amount || 0;
+                  const childAmount = childLine.Amount || 0;
+                  detailHtml += `
+                    <div class="line-item-row" style="padding-left: 16px;">
+                      <div class="line-item-desc">
+                        <div class="line-item-name">${childName}</div>
+                        <div class="line-item-qty">${childQty} x ${formatCurrency(childPrice)}</div>
+                      </div>
+                      <div class="line-item-amount">${formatCurrency(childAmount)}</div>
+                    </div>
+                  `;
+                });
+              }
+              showLine = false;
+              break;
+              
+            case 'DescriptionOnly':
+              itemName = line.Description || 'Note';
+              amount = 0;
+              break;
+              
+            case 'ItemBasedExpenseLineDetail':
+              itemName = line.ItemBasedExpenseLineDetail?.ItemRef?.name || 'Expense';
+              const expQty = line.ItemBasedExpenseLineDetail?.Qty || 1;
+              const expPrice = line.ItemBasedExpenseLineDetail?.UnitPrice || line.Amount;
+              itemDetail = `${expQty} x ${formatCurrency(expPrice)}`;
+              break;
+              
+            default:
+              if (line.Description) {
+                itemName = line.Description;
+              } else {
+                showLine = false;
+              }
+          }
           
-          detailHtml += '</div>';
-        }
+          if (!showLine) return;
+          
+          detailHtml += `
+            <div class="line-item-row">
+              <div class="line-item-desc">
+                <div class="line-item-name">${itemName}</div>
+                ${itemDetail ? `<div class="line-item-qty">${itemDetail}</div>` : ''}
+              </div>
+              <div class="line-item-amount">${formatCurrency(amount)}</div>
+            </div>
+          `;
+        });
+        
+        detailHtml += '</div>';
       }
       
       document.getElementById('detailBody').innerHTML = detailHtml;
