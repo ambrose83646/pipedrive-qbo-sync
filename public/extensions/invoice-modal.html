@@ -592,9 +592,8 @@
     }
     
     function showInvoiceForm() {
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 30);
-      const dueDateStr = dueDate.toISOString().split('T')[0];
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
       
       document.getElementById('modalContainer').innerHTML = `
         <div class="modal-header">
@@ -611,17 +610,18 @@
           </div>
           <div class="form-group">
             <label class="form-label">Due Date</label>
-            <input type="date" class="form-input" id="invoiceDueDate" value="${dueDateStr}">
+            <input type="date" class="form-input" id="invoiceDueDate" value="${todayStr}">
           </div>
         </div>
         
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Payment Terms<span class="required-indicator">*</span></label>
-            <select class="form-select" id="paymentTerms" required>
+            <select class="form-select" id="paymentTerms" required onchange="updateDueDateFromTerms()">
               <option value="">-- Select Payment Terms --</option>
-              <option value="Prepay">Prepay</option>
-              <option value="Terms">Terms</option>
+              <option value="Due on Receipt">Due on Receipt</option>
+              <option value="Net 30">Net 30</option>
+              <option value="Net 60">Net 60</option>
             </select>
           </div>
         </div>
@@ -894,6 +894,24 @@
       } else {
         fields.classList.remove('active');
       }
+    }
+    
+    function updateDueDateFromTerms() {
+      const terms = document.getElementById('paymentTerms').value;
+      const dueDateInput = document.getElementById('invoiceDueDate');
+      
+      const today = new Date();
+      let dueDate = new Date();
+      
+      if (terms === 'Due on Receipt') {
+        dueDate = today;
+      } else if (terms === 'Net 30') {
+        dueDate.setDate(today.getDate() + 30);
+      } else if (terms === 'Net 60') {
+        dueDate.setDate(today.getDate() + 60);
+      }
+      
+      dueDateInput.value = dueDate.toISOString().split('T')[0];
     }
     
     async function importPipedriveAddress() {
