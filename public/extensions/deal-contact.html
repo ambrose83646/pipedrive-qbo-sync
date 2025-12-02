@@ -1689,19 +1689,37 @@
         return;
       }
       
-      // Open QuickBooks invoice list for this customer in a new tab
-      // The URL format for QuickBooks Online customer invoices page
-      // Note: This opens the customer page where user can see all invoices
-      const qbUrl = `https://app.sandbox.qbo.intuit.com/app/customerdetail?nameId=${linkedContact.Id}`;
+      // Get current date range for the modal
+      const { startDate, endDate } = getDateRange(dateRangeType);
+      const formatApiDate = (date) => date.toISOString().split('T')[0];
       
-      // Use SDK to open external URL or window.open as fallback
+      // Build modal URL with parameters
+      const customerName = linkedContact.DisplayName || linkedContact.CompanyName || 'Customer';
+      const modalUrl = `/extensions/invoice-list-modal.html?` +
+        `customerId=${encodeURIComponent(linkedContact.Id)}&` +
+        `userId=${encodeURIComponent(userId)}&` +
+        `customerName=${encodeURIComponent(customerName)}&` +
+        `dateRangeType=${encodeURIComponent(dateRangeType)}&` +
+        `startDate=${encodeURIComponent(formatApiDate(startDate))}&` +
+        `endDate=${encodeURIComponent(formatApiDate(endDate))}`;
+      
+      // Open the invoice list modal using Pipedrive SDK
       try {
-        window.open(qbUrl, '_blank');
-        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Opening QuickBooks...' });
+        sdk.execute(AppExtensionsSDK.Command.OPEN_MODAL, {
+          type: 'custom',
+          action_id: '1d5c0945-7264-435f-8aa2-986bed03ba6b',
+          data: {
+            customerId: linkedContact.Id,
+            userId: userId,
+            customerName: customerName,
+            dateRangeType: dateRangeType,
+            startDate: formatApiDate(startDate),
+            endDate: formatApiDate(endDate)
+          }
+        });
       } catch (e) {
-        console.error('Error opening QuickBooks:', e);
-        // Fallback - show the URL to the user
-        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Could not open QuickBooks automatically' });
+        console.error('Error opening invoice list modal:', e);
+        sdk.execute(AppExtensionsSDK.Command.SHOW_SNACKBAR, { message: 'Could not open invoice list' });
       }
     }
     

@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoices - QuickBooks</title>
+  <script src="https://cdn.jsdelivr.net/npm/@pipedrive/app-extensions-sdk@latest/dist/index.umd.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #333;
+      background: #f5f5f5;
+    }
+    
+    .modal-container {
+      min-height: 100vh;
+      padding: 24px;
+      background: white;
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #e0e0e0;
+      margin-bottom: 24px;
+    }
+    
+    .modal-header-left {
+      flex: 1;
+    }
+    
+    .modal-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+    
+    .modal-subtitle {
+      font-size: 13px;
+      color: #8c8c8c;
+      margin-top: 4px;
+    }
+    
+    .date-range-badge {
+      display: inline-block;
+      background: #f0f0f0;
+      color: #595959;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+    
+    .btn-close {
+      background: transparent;
+      border: 1px solid #d9d9d9;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      color: #595959;
+    }
+    
+    .btn-close:hover {
+      background: #f5f5f5;
+    }
+    
+    .overview-summary {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 24px;
+      padding: 16px;
+      background: #fafafa;
+      border-radius: 8px;
+    }
+    
+    .overview-item {
+      flex: 1;
+      text-align: center;
+    }
+    
+    .overview-value {
+      font-size: 24px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+    
+    .overview-value.outstanding {
+      color: #fa8c16;
+    }
+    
+    .overview-value.overdue {
+      color: #f5222d;
+    }
+    
+    .overview-value.paid {
+      color: #52c41a;
+    }
+    
+    .overview-label {
+      font-size: 12px;
+      color: #8c8c8c;
+      margin-top: 4px;
+    }
+    
+    .invoice-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    .invoice-table th,
+    .invoice-table td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .invoice-table th {
+      background: #fafafa;
+      font-weight: 600;
+      font-size: 12px;
+      color: #8c8c8c;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .invoice-table tr:hover {
+      background: #f9f9f9;
+    }
+    
+    .invoice-number {
+      font-weight: 500;
+      color: #1890ff;
+    }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    
+    .status-paid {
+      background: #f6ffed;
+      color: #52c41a;
+    }
+    
+    .status-open {
+      background: #fff7e6;
+      color: #fa8c16;
+    }
+    
+    .status-overdue {
+      background: #fff1f0;
+      color: #f5222d;
+    }
+    
+    .amount-cell {
+      font-weight: 500;
+      text-align: right !important;
+    }
+    
+    .balance-cell {
+      text-align: right !important;
+    }
+    
+    .action-btn {
+      background: transparent;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      color: #595959;
+    }
+    
+    .action-btn:hover {
+      background: #f5f5f5;
+      border-color: #1890ff;
+      color: #1890ff;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #8c8c8c;
+    }
+    
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    
+    .empty-state-text {
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+    
+    .empty-state-subtext {
+      font-size: 14px;
+    }
+    
+    .loading-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #8c8c8c;
+    }
+    
+    .loading-spinner {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      border: 3px solid #f0f0f0;
+      border-top-color: #1890ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .invoice-detail-panel {
+      display: none;
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 400px;
+      height: 100vh;
+      background: white;
+      box-shadow: -4px 0 12px rgba(0,0,0,0.15);
+      z-index: 1000;
+      overflow-y: auto;
+    }
+    
+    .invoice-detail-panel.active {
+      display: block;
+    }
+    
+    .detail-header {
+      padding: 20px;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .detail-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    
+    .detail-close {
+      background: transparent;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #8c8c8c;
+    }
+    
+    .detail-body {
+      padding: 20px;
+    }
+    
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .detail-label {
+      color: #8c8c8c;
+      font-size: 13px;
+    }
+    
+    .detail-value {
+      font-weight: 500;
+      color: #1a1a1a;
+    }
+    
+    .line-items-section {
+      margin-top: 24px;
+    }
+    
+    .line-items-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #595959;
+    }
+    
+    .line-item-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .line-item-desc {
+      flex: 1;
+    }
+    
+    .line-item-name {
+      font-weight: 500;
+      color: #1a1a1a;
+    }
+    
+    .line-item-qty {
+      font-size: 12px;
+      color: #8c8c8c;
+      margin-top: 2px;
+    }
+    
+    .line-item-amount {
+      font-weight: 500;
+      text-align: right;
+    }
+    
+    .overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.3);
+      z-index: 999;
+    }
+    
+    .overlay.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="modal-container">
+    <div class="modal-header">
+      <div class="modal-header-left">
+        <h1 class="modal-title">Invoices</h1>
+        <p class="modal-subtitle" id="customerName">Loading...</p>
+        <div class="date-range-badge" id="dateRangeBadge">This Quarter</div>
+      </div>
+      <button class="btn-close" onclick="closeModal()">Close</button>
+    </div>
+    
+    <div class="overview-summary" id="overviewSummary">
+      <div class="overview-item">
+        <div class="overview-value outstanding" id="summaryOutstanding">$0.00</div>
+        <div class="overview-label">Outstanding</div>
+      </div>
+      <div class="overview-item">
+        <div class="overview-value overdue" id="summaryOverdue">$0.00</div>
+        <div class="overview-label">Overdue</div>
+      </div>
+      <div class="overview-item">
+        <div class="overview-value paid" id="summaryPaid">$0.00</div>
+        <div class="overview-label">Paid</div>
+      </div>
+      <div class="overview-item">
+        <div class="overview-value" id="summaryTotal">$0.00</div>
+        <div class="overview-label">Total</div>
+      </div>
+    </div>
+    
+    <div id="invoiceContent">
+      <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Loading invoices...</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="overlay" id="detailOverlay" onclick="closeDetail()"></div>
+  <div class="invoice-detail-panel" id="detailPanel">
+    <div class="detail-header">
+      <span class="detail-title" id="detailTitle">Invoice #</span>
+      <button class="detail-close" onclick="closeDetail()">&times;</button>
+    </div>
+    <div class="detail-body" id="detailBody">
+    </div>
+  </div>
+  
+  <script>
+    let sdk = null;
+    let invoices = [];
+    let customerId = null;
+    let userId = null;
+    let customerName = '';
+    let dateRange = { type: 'this_quarter', startDate: null, endDate: null };
+    
+    async function init() {
+      try {
+        sdk = await new AppExtensionsSDK().initialize();
+        console.log('SDK initialized');
+        
+        // First try URL parameters
+        const params = new URLSearchParams(window.location.search);
+        customerId = params.get('customerId');
+        userId = params.get('userId');
+        customerName = params.get('customerName') || 'Customer';
+        dateRange.type = params.get('dateRangeType') || 'this_quarter';
+        dateRange.startDate = params.get('startDate');
+        dateRange.endDate = params.get('endDate');
+        
+        // If not in URL params, try to get from SDK context
+        if (!customerId || !userId) {
+          try {
+            const context = await sdk.getContext();
+            console.log('SDK context:', context);
+            
+            if (context.data) {
+              customerId = context.data.customerId || customerId;
+              userId = context.data.userId || userId;
+              customerName = context.data.customerName || customerName;
+              dateRange.type = context.data.dateRangeType || dateRange.type;
+              dateRange.startDate = context.data.startDate || dateRange.startDate;
+              dateRange.endDate = context.data.endDate || dateRange.endDate;
+            }
+          } catch (contextError) {
+            console.log('Could not get context data:', contextError);
+          }
+        }
+        
+        document.getElementById('customerName').textContent = customerName;
+        document.getElementById('dateRangeBadge').textContent = getDateRangeLabel(dateRange.type);
+        
+        if (customerId && userId) {
+          await loadInvoices();
+        } else {
+          showError('Missing customer or user information');
+        }
+      } catch (error) {
+        console.error('Initialization error:', error);
+        showError('Failed to initialize: ' + error.message);
+      }
+    }
+    
+    function getDateRangeLabel(type) {
+      switch(type) {
+        case 'this_quarter': return 'This Quarter';
+        case 'last_quarter': return 'Last Quarter';
+        case 'this_year': return 'This Year';
+        case 'custom': return 'Custom Range';
+        default: return 'This Quarter';
+      }
+    }
+    
+    async function loadInvoices() {
+      try {
+        let url = `/api/customer/${customerId}/invoices?userId=${encodeURIComponent(userId)}`;
+        
+        if (dateRange.startDate) {
+          url += `&startDate=${dateRange.startDate}`;
+        }
+        if (dateRange.endDate) {
+          url += `&endDate=${dateRange.endDate}`;
+        }
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.success) {
+          invoices = data.invoices || [];
+          updateOverviewSummary(data.overview);
+          renderInvoiceTable();
+        } else {
+          showError(data.error || 'Failed to load invoices');
+        }
+      } catch (error) {
+        console.error('Error loading invoices:', error);
+        showError('Failed to load invoices: ' + error.message);
+      }
+    }
+    
+    function updateOverviewSummary(overview) {
+      document.getElementById('summaryOutstanding').textContent = formatCurrency(overview.outstanding);
+      document.getElementById('summaryOverdue').textContent = formatCurrency(overview.overdue);
+      document.getElementById('summaryPaid').textContent = formatCurrency(overview.paid);
+      document.getElementById('summaryTotal').textContent = formatCurrency(overview.total);
+    }
+    
+    function formatCurrency(amount) {
+      return '$' + (amount || 0).toFixed(2);
+    }
+    
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    
+    function getInvoiceStatus(invoice) {
+      const balance = parseFloat(invoice.Balance || 0);
+      const dueDate = new Date(invoice.DueDate);
+      const today = new Date();
+      
+      if (balance <= 0) {
+        return { label: 'Paid', class: 'status-paid' };
+      } else if (dueDate < today) {
+        return { label: 'Overdue', class: 'status-overdue' };
+      } else {
+        return { label: 'Open', class: 'status-open' };
+      }
+    }
+    
+    function renderInvoiceTable() {
+      const container = document.getElementById('invoiceContent');
+      
+      if (invoices.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📄</div>
+            <div class="empty-state-text">No invoices found</div>
+            <div class="empty-state-subtext">No invoices match the selected date range</div>
+          </div>
+        `;
+        return;
+      }
+      
+      let tableHtml = `
+        <table class="invoice-table">
+          <thead>
+            <tr>
+              <th>Invoice #</th>
+              <th>Date</th>
+              <th>Due Date</th>
+              <th>Status</th>
+              <th style="text-align: right;">Amount</th>
+              <th style="text-align: right;">Balance</th>
+              <th style="text-align: center;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      
+      invoices.forEach(invoice => {
+        const status = getInvoiceStatus(invoice);
+        const invoiceNum = invoice.DocNumber || invoice.Id;
+        
+        tableHtml += `
+          <tr>
+            <td class="invoice-number">${invoiceNum}</td>
+            <td>${formatDate(invoice.TxnDate)}</td>
+            <td>${formatDate(invoice.DueDate)}</td>
+            <td><span class="status-badge ${status.class}">${status.label}</span></td>
+            <td class="amount-cell">${formatCurrency(invoice.TotalAmt)}</td>
+            <td class="balance-cell">${formatCurrency(invoice.Balance)}</td>
+            <td style="text-align: center;">
+              <button class="action-btn" onclick="showInvoiceDetail('${invoice.Id}')">View</button>
+            </td>
+          </tr>
+        `;
+      });
+      
+      tableHtml += '</tbody></table>';
+      container.innerHTML = tableHtml;
+    }
+    
+    function showInvoiceDetail(invoiceId) {
+      const invoice = invoices.find(inv => inv.Id === invoiceId);
+      if (!invoice) return;
+      
+      const status = getInvoiceStatus(invoice);
+      const invoiceNum = invoice.DocNumber || invoice.Id;
+      
+      document.getElementById('detailTitle').textContent = `Invoice #${invoiceNum}`;
+      
+      let detailHtml = `
+        <div class="detail-row">
+          <span class="detail-label">Status</span>
+          <span class="detail-value"><span class="status-badge ${status.class}">${status.label}</span></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Invoice Date</span>
+          <span class="detail-value">${formatDate(invoice.TxnDate)}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Due Date</span>
+          <span class="detail-value">${formatDate(invoice.DueDate)}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Total Amount</span>
+          <span class="detail-value">${formatCurrency(invoice.TotalAmt)}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Balance Due</span>
+          <span class="detail-value">${formatCurrency(invoice.Balance)}</span>
+        </div>
+      `;
+      
+      if (invoice.CustomerMemo?.value) {
+        detailHtml += `
+          <div class="detail-row">
+            <span class="detail-label">Memo</span>
+            <span class="detail-value">${invoice.CustomerMemo.value}</span>
+          </div>
+        `;
+      }
+      
+      if (invoice.Line && invoice.Line.length > 0) {
+        const lineItems = invoice.Line.filter(line => line.DetailType === 'SalesItemLineDetail');
+        
+        if (lineItems.length > 0) {
+          detailHtml += `
+            <div class="line-items-section">
+              <div class="line-items-title">Line Items</div>
+          `;
+          
+          lineItems.forEach(line => {
+            const itemName = line.SalesItemLineDetail?.ItemRef?.name || line.Description || 'Item';
+            const qty = line.SalesItemLineDetail?.Qty || 1;
+            const unitPrice = line.SalesItemLineDetail?.UnitPrice || line.Amount;
+            
+            detailHtml += `
+              <div class="line-item-row">
+                <div class="line-item-desc">
+                  <div class="line-item-name">${itemName}</div>
+                  <div class="line-item-qty">${qty} x ${formatCurrency(unitPrice)}</div>
+                </div>
+                <div class="line-item-amount">${formatCurrency(line.Amount)}</div>
+              </div>
+            `;
+          });
+          
+          detailHtml += '</div>';
+        }
+      }
+      
+      document.getElementById('detailBody').innerHTML = detailHtml;
+      document.getElementById('detailOverlay').classList.add('active');
+      document.getElementById('detailPanel').classList.add('active');
+    }
+    
+    function closeDetail() {
+      document.getElementById('detailOverlay').classList.remove('active');
+      document.getElementById('detailPanel').classList.remove('active');
+    }
+    
+    function showError(message) {
+      document.getElementById('invoiceContent').innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">⚠️</div>
+          <div class="empty-state-text">Error</div>
+          <div class="empty-state-subtext">${message}</div>
+        </div>
+      `;
+    }
+    
+    function closeModal() {
+      if (sdk) {
+        sdk.execute(AppExtensionsSDK.Command.CLOSE_MODAL);
+      } else {
+        window.close();
+      }
+    }
+    
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
