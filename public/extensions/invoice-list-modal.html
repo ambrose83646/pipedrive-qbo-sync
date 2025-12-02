@@ -210,6 +210,31 @@
       cursor: wait;
     }
     
+    .action-btn-paylink {
+      margin-left: 4px;
+      background: #f6ffed;
+      border-color: #b7eb8f;
+      color: #52c41a;
+    }
+    
+    .action-btn-paylink:hover {
+      background: #d9f7be;
+      border-color: #52c41a;
+    }
+    
+    .action-btn-paylink:disabled {
+      background: #f5f5f5;
+      color: #bfbfbf;
+      border-color: #d9d9d9;
+      cursor: wait;
+    }
+    
+    .action-btn-paylink.copied {
+      background: #52c41a;
+      border-color: #52c41a;
+      color: white;
+    }
+    
     .empty-state {
       text-align: center;
       padding: 60px 20px;
@@ -620,6 +645,7 @@
             <td style="text-align: center;">
               <button class="action-btn" onclick="showInvoiceDetail('${invoice.Id}')" title="View Details">View</button>
               <button class="action-btn action-btn-download" onclick="downloadInvoicePdf('${invoice.Id}', '${invoiceNum}')" title="Download PDF">PDF</button>
+              <button class="action-btn action-btn-paylink" onclick="copyPaymentLink('${invoice.Id}', '${invoiceNum}', this)" title="Copy Payment Link">Pay</button>
             </td>
           </tr>
         `;
@@ -861,6 +887,42 @@
         console.error('Error downloading PDF:', error);
         alert('Failed to download PDF: ' + error.message);
       } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    }
+    
+    async function copyPaymentLink(invoiceId, invoiceNum, btn) {
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '...';
+      
+      try {
+        const response = await fetch(`/api/invoices/${invoiceId}/paylink?userId=${encodeURIComponent(userId)}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get payment link');
+        }
+        
+        if (!data.paymentLink) {
+          throw new Error('No payment link available');
+        }
+        
+        await navigator.clipboard.writeText(data.paymentLink);
+        
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.classList.remove('copied');
+          btn.disabled = false;
+        }, 2000);
+        
+      } catch (error) {
+        console.error('Error copying payment link:', error);
+        alert('Failed to get payment link: ' + error.message);
         btn.disabled = false;
         btn.textContent = originalText;
       }
