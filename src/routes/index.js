@@ -25,6 +25,83 @@ function getQBResponseData(response) {
   throw new Error('No valid response data found');
 }
 
+// Helper function to check if token needs refresh (expires within 10 minutes)
+function tokenNeedsRefresh(userData) {
+  if (!userData.qb_expires_at) {
+    console.log('[TokenCheck] No expiration timestamp, assuming token is valid');
+    return false;
+  }
+  
+  const expiresAt = new Date(userData.qb_expires_at);
+  const now = new Date();
+  const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000);
+  
+  const needsRefresh = expiresAt < tenMinutesFromNow;
+  const minutesUntilExpiry = Math.round((expiresAt - now) / 60000);
+  
+  console.log(`[TokenCheck] Token expires at: ${expiresAt.toISOString()}, now: ${now.toISOString()}`);
+  console.log(`[TokenCheck] Minutes until expiry: ${minutesUntilExpiry}, needs refresh: ${needsRefresh}`);
+  
+  return needsRefresh;
+}
+
+// Helper function to refresh QuickBooks token and save to database
+// Returns updated userData on success, or null if refresh should be skipped/failed softly
+async function refreshAndSaveToken(userId, userData, throwOnError = false) {
+  console.log(`[TokenRefresh] Starting token refresh for user ${userId}`);
+  console.log(`[TokenRefresh] Current refresh token exists: ${!!userData.qb_refresh_token}`);
+  
+  // Soft guard against missing refresh token - skip refresh, don't break existing flow
+  if (!userData.qb_refresh_token) {
+    console.warn(`[TokenRefresh] No refresh token available for user ${userId}, skipping refresh`);
+    return null; // Return null to indicate refresh was skipped
+  }
+  
+  console.log(`[TokenRefresh] Current refresh token (first 10 chars): ${userData.qb_refresh_token.substring(0, 10)}...`);
+  
+  try {
+    const newTokens = await qbAuth.refreshToken(userData.qb_refresh_token);
+    
+    console.log(`[TokenRefresh] Refresh successful!`);
+    console.log(`[TokenRefresh] New access token received: ${!!newTokens.access_token}`);
+    console.log(`[TokenRefresh] New refresh token received: ${!!newTokens.refresh_token}`);
+    console.log(`[TokenRefresh] New refresh token (first 10 chars): ${newTokens.refresh_token?.substring(0, 10)}...`);
+    console.log(`[TokenRefresh] Tokens changed: ${userData.qb_refresh_token !== newTokens.refresh_token ? 'YES' : 'NO'}`);
+    
+    const updatedUserData = {
+      ...userData,
+      qb_access_token: newTokens.access_token,
+      qb_refresh_token: newTokens.refresh_token,
+      qb_expires_in: newTokens.expires_in,
+      qb_expires_at: new Date(Date.now() + (newTokens.expires_in * 1000)).toISOString(),
+      qb_last_refresh: new Date().toISOString()
+    };
+    
+    await setUser(userId, updatedUserData);
+    console.log(`[TokenRefresh] Tokens saved to database for user ${userId}`);
+    
+    return updatedUserData;
+  } catch (error) {
+    console.error(`[TokenRefresh] Failed for user ${userId}:`, error.message);
+    
+    // Log specific error details for debugging
+    if (error.response) {
+      console.error(`[TokenRefresh] Error response:`, {
+        status: error.response.status || error.response.statusCode,
+        body: error.response.body || error.response.data
+      });
+    }
+    
+    // Check for specific error types
+    const errorMessage = error.message?.toLowerCase() || '';
+    if (errorMessage.includes('invalid') || errorMessage.includes('expired') || errorMessage.includes('revoked')) {
+      throw new Error('QuickBooks refresh token is invalid or expired. Please reconnect to QuickBooks.');
+    }
+    
+    throw error;
+  }
+}
+
 // Helper function to make QuickBooks API call with automatic token refresh
 async function makeQBApiCall(userId, userData, apiCallFunction) {
   // Create initial client with current tokens
@@ -49,13 +126,32 @@ async function makeQBApiCall(userId, userData, apiCallFunction) {
     return qbClient;
   };
   
+  let currentUserData = userData;
+  
   try {
     console.log(`[makeQBApiCall] Starting API call for user ${userId}`);
     console.log(`[makeQBApiCall] Has access token: ${!!userData.qb_access_token}, Has realm: ${!!userData.qb_realm_id}`);
     
-    // First attempt with existing token
-    const qbClient = createClient(userData);
-    const response = await apiCallFunction(qbClient, userData);
+    // PROACTIVE REFRESH: Check if token is about to expire and refresh before making the call
+    if (tokenNeedsRefresh(currentUserData)) {
+      console.log(`[makeQBApiCall] Token expiring soon, attempting proactive refresh...`);
+      try {
+        const refreshedData = await refreshAndSaveToken(userId, currentUserData);
+        if (refreshedData) {
+          currentUserData = refreshedData;
+          console.log(`[makeQBApiCall] Proactive refresh successful`);
+        } else {
+          console.log(`[makeQBApiCall] Proactive refresh skipped (no refresh token), continuing with existing token`);
+        }
+      } catch (proactiveRefreshError) {
+        console.error(`[makeQBApiCall] Proactive refresh failed:`, proactiveRefreshError.message);
+        // Continue with existing token - it might still work
+      }
+    }
+    
+    // Make API call with current (possibly refreshed) token
+    const qbClient = createClient(currentUserData);
+    const response = await apiCallFunction(qbClient, currentUserData);
     
     console.log(`[makeQBApiCall] API call successful, response type: ${typeof response}`);
     if (response) {
@@ -76,32 +172,25 @@ async function makeQBApiCall(userId, userData, apiCallFunction) {
     // Check if error is due to unauthorized (expired token)
     const statusCode = error.response?.statusCode || error.response?.status || error.statusCode;
     if (statusCode === 401) {
-      console.log(`[makeQBApiCall] QB token expired for user ${userId}, attempting refresh...`);
+      console.log(`[makeQBApiCall] QB token expired (401) for user ${userId}, attempting reactive refresh...`);
       
       try {
-        // Refresh the token
-        const newTokens = await qbAuth.refreshToken(userData.qb_refresh_token);
+        const updatedUserData = await refreshAndSaveToken(userId, currentUserData);
         
-        // Update user data with new tokens
-        const updatedUserData = {
-          ...userData,
-          qb_access_token: newTokens.access_token,
-          qb_refresh_token: newTokens.refresh_token,
-          qb_expires_in: newTokens.expires_in,
-          qb_expires_at: new Date(Date.now() + (newTokens.expires_in * 1000)).toISOString()
-        };
+        if (!updatedUserData) {
+          // No refresh token available - cannot recover
+          console.error(`[makeQBApiCall] No refresh token available, cannot recover from 401`);
+          throw new Error('QuickBooks session expired. Please reconnect to QuickBooks.');
+        }
         
-        // Save updated tokens to database with the correct user ID
-        await setUser(userId, updatedUserData);
-        
-        console.log(`[makeQBApiCall] QB token refreshed successfully for user ${userId}`);
+        console.log(`[makeQBApiCall] Reactive refresh successful, retrying API call`);
         
         // Create new client with refreshed token and retry
         const refreshedClient = createClient(updatedUserData);
         return await apiCallFunction(refreshedClient, updatedUserData);
       } catch (refreshError) {
-        console.error(`[makeQBApiCall] Failed to refresh QB token for user ${userId}:`, refreshError.message);
-        throw new Error('QuickBooks authentication failed. Please reconnect.');
+        console.error(`[makeQBApiCall] Reactive refresh failed for user ${userId}:`, refreshError.message);
+        throw new Error(refreshError.message || 'QuickBooks authentication failed. Please reconnect.');
       }
     }
     
@@ -993,42 +1082,38 @@ router.get("/api/user-status", async (req, res) => {
     // Check if QuickBooks tokens exist
     let isConnected = !!(userData.qb_access_token && userData.qb_realm_id);
     
-    // If connected, check for token expiration and attempt refresh
-    if (isConnected && userData.qb_expires_at) {
-      const expiresAt = new Date(userData.qb_expires_at);
-      const now = new Date();
-      if (expiresAt < now && userData.qb_refresh_token) {
-        console.log(`[API User Status] QB tokens expired for user ${pipedriveUserId}, attempting refresh...`);
-        
-        // Try to refresh the token
-        try {
-          const newTokens = await qbAuth.refreshToken(userData.qb_refresh_token);
-          
-          // Update user data with new tokens
-          userData = {
-            ...userData,
-            qb_access_token: newTokens.access_token,
-            qb_refresh_token: newTokens.refresh_token,
-            qb_expires_in: newTokens.expires_in,
-            qb_expires_at: new Date(Date.now() + (newTokens.expires_in * 1000)).toISOString()
-          };
-          
-          // Save updated tokens to database with the correct user ID
-          await setUser(foundUserId, userData);
-          
+    // If connected, check for token expiration and attempt proactive refresh
+    // Only attempt refresh if token is expiring soon (has refresh token check built into refreshAndSaveToken)
+    if (isConnected && tokenNeedsRefresh(userData)) {
+      console.log(`[API User Status] QB tokens expiring soon for user ${pipedriveUserId}, attempting proactive refresh...`);
+      
+      try {
+        const refreshedData = await refreshAndSaveToken(foundUserId, userData);
+        if (refreshedData) {
+          userData = refreshedData;
           console.log(`[API User Status] QB token refreshed successfully for user ${pipedriveUserId}`);
-          isConnected = true;
-        } catch (refreshError) {
-          console.error(`[API User Status] Failed to refresh QB token for user ${pipedriveUserId}:`, refreshError);
-          
-          // Check if the error is due to invalid refresh token
-          if (refreshError.message && refreshError.message.includes('Refresh token is invalid')) {
-            // Mark as disconnected and clean up tokens
-            isConnected = false;
-            userData.tokenExpired = true; // Flag to indicate need for reconnection
-          } else {
-            isConnected = false;
-          }
+        } else {
+          // No refresh token available - this is fine, existing token may still work
+          console.log(`[API User Status] No refresh token available, continuing with existing token`);
+        }
+        // Keep isConnected = true in both cases
+      } catch (refreshError) {
+        console.error(`[API User Status] Proactive refresh failed for user ${pipedriveUserId}:`, refreshError.message);
+        
+        // GRACEFUL FALLBACK: Don't mark as disconnected for most proactive refresh failures
+        // The existing token might still work - only mark disconnected if token is truly invalid
+        const errorMessage = refreshError.message?.toLowerCase() || '';
+        
+        // Only mark as disconnected if the error clearly indicates the refresh token is unusable
+        if (errorMessage.includes('invalid') && errorMessage.includes('refresh')) {
+          console.log(`[API User Status] Refresh token appears invalid, marking as disconnected`);
+          isConnected = false;
+          userData.tokenExpired = true;
+        } else {
+          // For other errors (network issues, temporary failures), keep connected
+          // The token might still work or makeQBApiCall will handle refresh on 401
+          console.log(`[API User Status] Proactive refresh failed but keeping connected status (token may still work)`);
+          // isConnected stays true
         }
       }
     }
