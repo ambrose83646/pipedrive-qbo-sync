@@ -77,7 +77,10 @@ async function setUser(userId, data) {
         invoice_qty_field = $16,
         invoice_price_field = $17,
         setup_completed = $18,
-        setup_completed_at = $19
+        setup_completed_at = $19,
+        setup_token = $20,
+        setup_token_expires = $21,
+        invoice_preferences = $22
       WHERE pipedrive_user_id = $1
     `, [
       normalized,
@@ -98,7 +101,10 @@ async function setUser(userId, data) {
       data.invoice_qty_field,
       data.invoice_price_field,
       data.setup_completed || false,
-      data.setup_completed_at ? new Date(data.setup_completed_at) : null
+      data.setup_completed_at ? new Date(data.setup_completed_at) : null,
+      data.setup_token || null,
+      data.setup_token_expires ? new Date(data.setup_token_expires) : null,
+      data.invoice_preferences ? JSON.stringify(data.invoice_preferences) : null
     ]);
   } else {
     await pool.query(`
@@ -121,8 +127,11 @@ async function setUser(userId, data) {
         invoice_qty_field,
         invoice_price_field,
         setup_completed,
-        setup_completed_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        setup_completed_at,
+        setup_token,
+        setup_token_expires,
+        invoice_preferences
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
     `, [
       normalized,
       pipedriveAccessToken,
@@ -142,7 +151,10 @@ async function setUser(userId, data) {
       data.invoice_qty_field,
       data.invoice_price_field,
       data.setup_completed || false,
-      data.setup_completed_at ? new Date(data.setup_completed_at) : null
+      data.setup_completed_at ? new Date(data.setup_completed_at) : null,
+      data.setup_token || null,
+      data.setup_token_expires ? new Date(data.setup_token_expires) : null,
+      data.invoice_preferences ? JSON.stringify(data.invoice_preferences) : null
     ]);
   }
   return true;
@@ -194,7 +206,10 @@ function rowToUserData(row) {
     invoice_qty_field: row.invoice_qty_field,
     invoice_price_field: row.invoice_price_field,
     setup_completed: row.setup_completed,
-    setup_completed_at: row.setup_completed_at?.toISOString()
+    setup_completed_at: row.setup_completed_at?.toISOString(),
+    setup_token: row.setup_token,
+    setup_token_expires: row.setup_token_expires?.toISOString(),
+    invoice_preferences: row.invoice_preferences
   };
 }
 
