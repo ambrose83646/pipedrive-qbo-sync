@@ -408,33 +408,32 @@
         });
         console.log('SDK initialized');
         
-        // First try URL parameters
-        const params = new URLSearchParams(window.location.search);
-        customerId = params.get('customerId');
-        userId = params.get('userId');
-        customerName = params.get('customerName') || 'Customer';
-        dateRange.type = params.get('dateRangeType') || 'this_quarter';
-        dateRange.startDate = params.get('startDate');
-        dateRange.endDate = params.get('endDate');
+        const urlParams = new URLSearchParams(window.location.search);
         
-        // If not in URL params, try to get from SDK context
-        if (!customerId || !userId) {
+        // Data is passed from OPEN_MODAL as a JSON string in the 'data' parameter
+        const dataParam = urlParams.get('data');
+        if (dataParam) {
           try {
-            const context = await sdk.getContext();
-            console.log('SDK context:', context);
-            
-            if (context.data) {
-              customerId = context.data.customerId || customerId;
-              userId = context.data.userId || userId;
-              customerName = context.data.customerName || customerName;
-              dateRange.type = context.data.dateRangeType || dateRange.type;
-              dateRange.startDate = context.data.startDate || dateRange.startDate;
-              dateRange.endDate = context.data.endDate || dateRange.endDate;
-            }
-          } catch (contextError) {
-            console.log('Could not get context data:', contextError);
+            const data = JSON.parse(decodeURIComponent(dataParam));
+            console.log('Parsed modal data:', data);
+            customerId = data.customerId;
+            userId = data.userId;
+            customerName = data.customerName || 'Customer';
+            dateRange.type = data.dateRangeType || 'this_quarter';
+            dateRange.startDate = data.startDate;
+            dateRange.endDate = data.endDate;
+          } catch (parseError) {
+            console.error('Error parsing data parameter:', parseError);
           }
         }
+        
+        // Fallback to individual query params if data param not present
+        if (!customerId) customerId = urlParams.get('customerId');
+        if (!userId) userId = urlParams.get('userId');
+        if (!customerName) customerName = urlParams.get('customerName') || 'Customer';
+        if (!dateRange.type) dateRange.type = urlParams.get('dateRangeType') || 'this_quarter';
+        if (!dateRange.startDate) dateRange.startDate = urlParams.get('startDate');
+        if (!dateRange.endDate) dateRange.endDate = urlParams.get('endDate');
         
         document.getElementById('customerName').textContent = customerName;
         document.getElementById('dateRangeBadge').textContent = getDateRangeLabel(dateRange.type);
