@@ -1,6 +1,6 @@
 # Overview
 
-This Node.js application integrates Pipedrive CRM with QuickBooks Online (QBO) to synchronize contact data. It enables users to manage CRM contacts and accounting customers from a unified interface, utilizing OAuth 2.0 for secure authentication with both services. The application stores user credentials in Replit's key-value database and provides Pipedrive browser extensions for direct QuickBooks connection and contact synchronization. It adheres to QuickBooks compliance by requiring explicit user action to connect.
+This Node.js application integrates Pipedrive CRM with QuickBooks Online (QBO) to synchronize contact data. It enables users to manage CRM contacts and accounting customers from a unified interface, utilizing OAuth 2.0 for secure authentication with both services. The application stores user credentials in PostgreSQL and provides Pipedrive browser extensions for direct QuickBooks connection and contact synchronization. It adheres to QuickBooks compliance by requiring explicit user action to connect.
 
 Key functionalities include:
 - **Post-Installation Setup**: A two-step process for administrators to authorize users and configure invoice preferences (field mappings).
@@ -19,7 +19,13 @@ The application uses Express.js with a modular structure for handling OAuth flow
 Secure OAuth 2.0 is implemented for both Pipedrive and QuickBooks. It leverages `intuit-oauth` for QuickBooks and a custom Axios-based solution for Pipedrive, ensuring secure token management and refresh.
 
 ## Data Storage
-Replit Database (key-value store) is used for persistent storage of user OAuth tokens, realm IDs, and configuration data. It offers a simple, infrastructure-free solution for credential management.
+PostgreSQL is used for persistent storage with proper relational tables:
+- **users**: OAuth tokens, realm IDs, ShipStation credentials, and configuration data
+- **deal_mappings**: Links between Pipedrive deals and QuickBooks customers
+- **pending_invoices**: Invoices awaiting payment for ShipStation automation
+- **invoice_mappings**: Links between QuickBooks invoices and ShipStation orders
+
+The database schema is defined in `config/schema.sql` and the data access layer in `config/postgres.js`.
 
 ## Frontend Architecture
 Browser-based Pipedrive App Extensions, built with `@pipedrive/app-extensions-sdk`, provide UI components integrated directly into the Pipedrive interface. These extensions facilitate connection management and deal-contact operations.
@@ -69,9 +75,14 @@ A controller-based synchronization logic (`src/controllers/sync.js`) manages dat
 
 ## Database
 
-### Replit Database
-- **Type**: Key-value store (`@replit/database`).
-- **Usage**: Stores user OAuth tokens, refresh tokens, realm IDs, and API domain information, keyed by Pipedrive user ID.
+### PostgreSQL (Neon-backed)
+- **Type**: Relational database via `pg` package
+- **Tables**:
+  - `users`: OAuth tokens (Pipedrive & QuickBooks), ShipStation credentials (encrypted), setup preferences
+  - `deal_mappings`: Pipedrive deal ID to QuickBooks customer ID associations
+  - `pending_invoices`: Due on Receipt invoices waiting for payment polling
+  - `invoice_mappings`: QuickBooks invoice to ShipStation order associations
+- **Features**: Automatic timestamps, triggers for updated_at, indexes for efficient queries
 
 ## Key NPM Packages
 - **express**: Web server framework.
@@ -79,6 +90,8 @@ A controller-based synchronization logic (`src/controllers/sync.js`) manages dat
 - **dotenv**: Environment variable management.
 - **intuit-oauth**: QuickBooks OAuth client.
 - **pipedrive**: Official Pipedrive API client.
+- **pg**: PostgreSQL client for database operations.
+- **node-cron**: Scheduled job runner for payment polling.
 
 ## Environment Variables Required
 - `PORT`

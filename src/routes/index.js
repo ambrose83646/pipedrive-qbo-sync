@@ -1,6 +1,17 @@
 const express = require("express");
 const router = express.Router();
-const { getUser, setUser } = require("../../config/database");
+const { 
+  getUser, 
+  setUser, 
+  deleteUser,
+  listUsers,
+  setDealMapping, 
+  getDealMapping, 
+  deleteDealMapping,
+  addPendingInvoice,
+  setInvoiceMapping,
+  getInvoiceMapping
+} = require("../../config/postgres");
 const { getAuthUrl, getToken } = require("../auth/pipedrive");
 const qbAuth = require("../auth/quickbooks");
 const { syncContact } = require("../controllers/sync");
@@ -231,7 +242,7 @@ router.get("/api/debug/qb-test", async (req, res) => {
     let actualUserId = providedUserId;
     
     if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
-      const { listUsers } = require("../../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       for (const key of allKeys) {
@@ -303,7 +314,7 @@ router.get("/api/debug/qb-test", async (req, res) => {
 // Diagnostic endpoint to see all users and their QuickBooks connection status
 router.get("/api/debug/users", async (req, res) => {
   try {
-    const { listUsers } = require("../../config/database");
+    const { listUsers } = require("../../config/postgres");
     const allKeys = await listUsers();
     
     const users = [];
@@ -383,7 +394,7 @@ router.post("/api/disconnect-qb", express.json(), async (req, res) => {
     // If not found with direct lookups, scan all users
     if (!userData) {
       console.log(`[QB Disconnect] Direct lookup failed, scanning all users...`);
-      const { listUsers } = require("../../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       for (const key of allKeys) {
@@ -1237,7 +1248,7 @@ router.get("/api/user-status", async (req, res) => {
     // If no QB tokens found, scan all users for matching QB connection
     if (!userData || (!userData.qb_access_token && !userData.qb_realm_id)) {
       console.log(`[API User Status] No QB tokens found, checking all users...`);
-      const { listUsers } = require("../../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       console.log(`[API User Status] Scanning ${allKeys.length} stored users for QB connection...`);
@@ -1506,7 +1517,7 @@ router.get("/api/customer/:customerId", async (req, res) => {
       console.log(`No QB tokens for ${providedUserId}, checking alternative IDs for customer detail...`);
       
       // Get all users to find one with QB tokens
-      const { listUsers } = require("../../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       // Check if we can find a user with QB tokens that matches this domain
@@ -1598,7 +1609,7 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
       console.log(`No QB tokens for ${providedUserId}, checking alternative IDs for invoices...`);
       
       // Get all users to find one with QB tokens
-      const { listUsers } = require("../../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       // Check if we can find a user with QB tokens that matches this domain
@@ -1761,7 +1772,7 @@ router.get("/api/customers/search", async (req, res) => {
       console.log(`No QB tokens for ${providedUserId}, checking alternative IDs...`);
       
       // Get all users to find one with QB tokens
-      const { listUsers } = require("../../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       // Check if we can find a user with QB tokens that matches this domain
@@ -1965,7 +1976,7 @@ router.post("/api/attach-contact", express.json(), async (req, res) => {
       console.log(`[Attach Contact] No Pipedrive tokens for ${providedUserId}, checking alternative IDs...`);
       
       // Get all users to find one with Pipedrive tokens
-      const { listUsers } = require("../../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       // Collect all users with Pipedrive tokens, tracking their freshness
@@ -2039,7 +2050,7 @@ router.post("/api/attach-contact", express.json(), async (req, res) => {
             userData.qb_realm_id = sameTenantQB.data.qb_realm_id;
             
             // Persist the merged data
-            const { setUser } = require("../../config/database");
+            const { setUser } = require("../../config/postgres");
             await setUser(actualUserId, userData);
             console.log(`[Attach Contact] Merged and saved user data under ${actualUserId}`);
           } else if (sameTenantQB) {
@@ -2110,7 +2121,7 @@ router.post("/api/attach-contact", express.json(), async (req, res) => {
             userData.refresh_token = newTokens.refresh_token;
             
             // Persist updated tokens to database
-            const { setUser } = require("../../config/database");
+            const { setUser } = require("../../config/postgres");
             await setUser(actualUserId, {
               ...userData,
               access_token: newTokens.access_token,
@@ -2133,7 +2144,7 @@ router.post("/api/attach-contact", express.json(), async (req, res) => {
 
     // Store the deal-to-QB customer mapping in our database
     // This is more reliable than trying to store it in Pipedrive's notes field
-    const { setDealMapping } = require("../../config/database");
+    const { setDealMapping } = require("../../config/postgres");
     await setDealMapping(dealId, qbCustomerId, customerName);
     
     console.log(`[Attach Contact] Successfully linked deal ${dealId} to QB customer ${qbCustomerId}`);
@@ -2167,7 +2178,7 @@ router.get("/api/deal-contact", async (req, res) => {
     }
 
     // Get the deal-to-QB customer mapping from our database
-    const { getDealMapping } = require("../../config/database");
+    const { getDealMapping } = require("../../config/postgres");
     const mapping = await getDealMapping(dealId);
     
     if (!mapping) {
@@ -2229,7 +2240,7 @@ router.delete("/api/deal-contact", async (req, res) => {
       });
     }
 
-    const { deleteDealMapping } = require("../../config/database");
+    const { deleteDealMapping } = require("../../config/postgres");
     await deleteDealMapping(dealId);
     
     console.log(`[Unlink Contact] Successfully unlinked deal ${dealId}`);
@@ -2340,7 +2351,7 @@ router.get("/api/items/search", async (req, res) => {
     userData = await getUser(providedUserId);
     
     if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
-      const { listUsers } = require("../../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       for (const key of allKeys) {
@@ -2444,7 +2455,7 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
     userData = await getUser(actualUserId);
     
     if (!userData || !userData.access_token) {
-      const { listUsers } = require("../../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       for (const key of allKeys) {
@@ -2794,7 +2805,7 @@ router.post("/api/invoices", express.json(), async (req, res) => {
     userData = await getUser(providedUserId);
     
     if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
-      const { listUsers } = require("../../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       for (const key of allKeys) {
@@ -3091,7 +3102,7 @@ router.get("/api/invoices/:invoiceId/pdf", async (req, res) => {
     userData = await getUser(providedUserId);
     
     if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
-      const { listUsers } = require("../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       for (const key of allKeys) {
@@ -3183,7 +3194,7 @@ router.get("/api/invoices/:invoiceId/paylink", async (req, res) => {
     userData = await getUser(providedUserId);
     
     if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
-      const { listUsers } = require("../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       for (const key of allKeys) {
@@ -3311,7 +3322,7 @@ router.get("/api/shipstation/shipments", async (req, res) => {
     let actualUserId = userId;
     
     if (!userData || !userData.shipstation_api_key) {
-      const { listUsers } = require("../../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       for (const key of allKeys) {
@@ -3513,7 +3524,7 @@ router.post("/api/shipstation/orders", express.json(), async (req, res) => {
     let actualUserId = userId;
     
     if (!userData || !userData.shipstation_api_key) {
-      const { listUsers } = require("../../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       for (const key of allKeys) {
@@ -3590,7 +3601,7 @@ router.post("/api/shipstation/orders", express.json(), async (req, res) => {
     console.log(`[ShipStation] Order created: ${createdOrder.orderId} for invoice ${invoice.DocNumber}`);
     
     // Store the mapping in database
-    const { setDealMapping, getDealMapping } = require("../../config/database");
+    const { setDealMapping, getDealMapping } = require("../../config/postgres");
     const mappingKey = `ss_invoice:${invoice.Id}`;
     await setUser(mappingKey, {
       invoiceId: invoice.Id,
@@ -3638,7 +3649,7 @@ router.get("/api/shipstation/status", async (req, res) => {
     let userData = await getUser(userId);
     
     if (!userData || !userData.shipstation_api_key) {
-      const { listUsers } = require("../../config/database");
+      const { listUsers } = require("../../config/postgres");
       const allKeys = await listUsers();
       
       for (const key of allKeys) {

@@ -1,4 +1,4 @@
-const { getUser } = require('../../config/database');
+const { getUser } = require('../../config/postgres');
 const pipedrive = require('pipedrive');
 const OAuthClient = require('intuit-oauth');
 

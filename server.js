@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const routes = require('./src/routes/index');
 const { startPolling } = require('./src/jobs/paymentPoller');
+const { initializeDatabase } = require('./config/postgres');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,9 +21,19 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', routes);
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  
-  // Start payment polling for Due on Receipt invoices
-  startPolling();
-});
+async function startServer() {
+  try {
+    await initializeDatabase();
+    
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+      
+      startPolling();
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();

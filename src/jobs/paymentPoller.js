@@ -1,5 +1,15 @@
 const cron = require('node-cron');
-const { getUser, setUser, listUsers, deleteUser } = require('../../config/database');
+const { 
+  getUser, 
+  setUser, 
+  listPendingInvoices, 
+  deletePendingInvoice, 
+  updatePendingInvoiceRetry,
+  setInvoiceMapping,
+  getInvoiceMapping,
+  cleanupStaleEntries,
+  cleanupMaxRetries
+} = require('../../config/postgres');
 const axios = require('axios');
 const OAuthClient = require('intuit-oauth');
 const { encrypt, decrypt } = require('../utils/encryption');
@@ -69,7 +79,6 @@ async function makeShipStationApiCall(userData, method, endpoint, data = null) {
 async function createShipStationOrder(userData, invoice) {
   const orderNumber = invoice.DocNumber || `QB-${invoice.Id}`;
   
-  // Idempotency check: see if order already exists with this number
   try {
     const existingOrders = await makeShipStationApiCall(userData, 'GET', `/orders?orderNumber=${encodeURIComponent(orderNumber)}`);
     if (existingOrders.orders && existingOrders.orders.length > 0) {
@@ -82,7 +91,6 @@ async function createShipStationOrder(userData, invoice) {
     }
   } catch (dupeCheckError) {
     console.warn(`[PaymentPoller] Could not check for existing order ${orderNumber}:`, dupeCheckError.message);
-    // Continue with creation - ShipStation will reject if duplicate
   }
   
   const shipTo = {
@@ -133,58 +141,32 @@ async function createShipStationOrder(userData, invoice) {
 const MAX_RETRIES = 10;
 const STALE_DAYS = 30;
 
-// Helper to increment retry count on failure
-async function incrementRetry(pendingKey, pendingData, errorMessage) {
-  const newRetryCount = (pendingData.retryCount || 0) + 1;
-  await setUser(pendingKey, {
-    ...pendingData,
-    retryCount: newRetryCount,
-    lastError: errorMessage,
-    lastAttempt: new Date().toISOString()
-  });
-  console.log(`[PaymentPoller] Incremented retry count for ${pendingKey} to ${newRetryCount}`);
-}
-
 async function checkPendingInvoices() {
   console.log('[PaymentPoller] Starting payment check cycle...');
   
   try {
-    const allKeys = await listUsers('ss_pending:');
+    const staleRemoved = await cleanupStaleEntries(STALE_DAYS);
+    if (staleRemoved.length > 0) {
+      console.log(`[PaymentPoller] Cleaned up ${staleRemoved.length} stale entries`);
+    }
     
-    if (allKeys.length === 0) {
+    const maxRetryRemoved = await cleanupMaxRetries(MAX_RETRIES);
+    if (maxRetryRemoved.length > 0) {
+      console.log(`[PaymentPoller] Cleaned up ${maxRetryRemoved.length} max-retry entries`);
+    }
+    
+    const pendingInvoices = await listPendingInvoices();
+    
+    if (pendingInvoices.length === 0) {
       console.log('[PaymentPoller] No pending invoices to check');
       return;
     }
     
-    console.log(`[PaymentPoller] Found ${allKeys.length} pending invoice(s) to check`);
+    console.log(`[PaymentPoller] Found ${pendingInvoices.length} pending invoice(s) to check`);
     
-    for (const pendingKey of allKeys) {
+    for (const pending of pendingInvoices) {
       try {
-        const pendingData = await getUser(pendingKey);
-        
-        if (!pendingData) {
-          console.log(`[PaymentPoller] No data found for key ${pendingKey}, removing...`);
-          await deleteUser(pendingKey);
-          continue;
-        }
-        
-        const { invoiceId, invoiceNumber, userId, invoiceData, createdAt, retryCount = 0, lastError } = pendingData;
-        
-        // Check if entry is too old (stale)
-        const createdDate = createdAt ? new Date(createdAt) : new Date();
-        const daysSinceCreated = (Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
-        if (daysSinceCreated > STALE_DAYS) {
-          console.log(`[PaymentPoller] Invoice ${invoiceNumber} is stale (${Math.floor(daysSinceCreated)} days old), removing...`);
-          await deleteUser(pendingKey);
-          continue;
-        }
-        
-        // Check retry count
-        if (retryCount >= MAX_RETRIES) {
-          console.log(`[PaymentPoller] Invoice ${invoiceNumber} exceeded max retries (${retryCount}), removing. Last error: ${lastError}`);
-          await deleteUser(pendingKey);
-          continue;
-        }
+        const { invoiceId, invoiceNumber, userId, invoiceData, retryCount = 0, lastError } = pending;
         
         console.log(`[PaymentPoller] Checking invoice ${invoiceNumber} (${invoiceId}), attempt ${retryCount + 1}/${MAX_RETRIES}`);
         
@@ -192,13 +174,13 @@ async function checkPendingInvoices() {
         
         if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
           console.log(`[PaymentPoller] User ${userId} not found or QB not connected, skipping...`);
-          await incrementRetry(pendingKey, pendingData, 'User not found or QB not connected');
+          await updatePendingInvoiceRetry(invoiceId, retryCount + 1, 'User not found or QB not connected');
           continue;
         }
         
         if (!userData.shipstation_api_key) {
           console.log(`[PaymentPoller] User ${userId} has no ShipStation connection, removing pending entry...`);
-          await deleteUser(pendingKey);
+          await deletePendingInvoice(invoiceId);
           continue;
         }
         
@@ -213,12 +195,11 @@ async function checkPendingInvoices() {
             const errorMsg = refreshError.message || 'Unknown refresh error';
             console.error(`[PaymentPoller] Token refresh failed for user ${userId}:`, errorMsg);
             
-            // If refresh token is invalid/expired, mark for removal
             if (errorMsg.includes('invalid_grant') || errorMsg.includes('expired') || errorMsg.includes('revoked')) {
               console.log(`[PaymentPoller] QB connection is broken for user ${userId}, removing pending entry`);
-              await deleteUser(pendingKey);
+              await deletePendingInvoice(invoiceId);
             } else {
-              await incrementRetry(pendingKey, pendingData, `Token refresh failed: ${errorMsg}`);
+              await updatePendingInvoiceRetry(invoiceId, retryCount + 1, `Token refresh failed: ${errorMsg}`);
             }
             continue;
           }
@@ -251,6 +232,13 @@ async function checkPendingInvoices() {
           if (currentBalance <= 0) {
             console.log(`[PaymentPoller] Invoice ${invoiceNumber} is PAID! Creating ShipStation order...`);
             
+            const existingMapping = await getInvoiceMapping(invoiceId);
+            if (existingMapping) {
+              console.log(`[PaymentPoller] Invoice ${invoiceNumber} already has ShipStation order ${existingMapping.shipstationOrderId}, skipping...`);
+              await deletePendingInvoice(invoiceId);
+              continue;
+            }
+            
             try {
               const mergedInvoice = { ...invoiceData, ...currentInvoice };
               const ssOrder = await createShipStationOrder(userData, mergedInvoice);
@@ -258,32 +246,33 @@ async function checkPendingInvoices() {
               if (ssOrder && ssOrder.orderId) {
                 console.log(`[PaymentPoller] ShipStation order ${ssOrder.orderId} created for invoice ${invoiceNumber}`);
                 
-                const mappingKey = `ss_invoice:${invoiceId}`;
-                await setUser(mappingKey, {
-                  invoiceId: invoiceId,
-                  invoiceNumber: invoiceNumber,
-                  shipstationOrderId: ssOrder.orderId,
-                  shipstationOrderNumber: ssOrder.orderNumber,
-                  createdAt: new Date().toISOString(),
-                  triggeredBy: 'payment_polling'
-                });
+                await setInvoiceMapping(
+                  invoiceId,
+                  invoiceNumber,
+                  ssOrder.orderId.toString(),
+                  ssOrder.orderNumber,
+                  'payment_polling'
+                );
                 
-                await deleteUser(pendingKey);
+                await deletePendingInvoice(invoiceId);
                 console.log(`[PaymentPoller] Removed pending entry for invoice ${invoiceNumber}`);
               }
             } catch (ssError) {
               console.error(`[PaymentPoller] Failed to create ShipStation order for invoice ${invoiceNumber}:`, ssError.message);
+              await updatePendingInvoiceRetry(invoiceId, retryCount + 1, `ShipStation error: ${ssError.message}`);
             }
           }
         } catch (qbError) {
           if (qbError.response?.status === 401) {
-            console.log(`[PaymentPoller] QB token expired for user ${userId}, will retry next cycle`);
+            console.log(`[PaymentPoller] QB token expired for user ${userId}, incrementing retry and will retry next cycle`);
+            await updatePendingInvoiceRetry(invoiceId, retryCount + 1, 'QB token expired (401)');
           } else {
             console.error(`[PaymentPoller] Error fetching invoice ${invoiceNumber}:`, qbError.message);
+            await updatePendingInvoiceRetry(invoiceId, retryCount + 1, `QB API error: ${qbError.message}`);
           }
         }
       } catch (entryError) {
-        console.error(`[PaymentPoller] Error processing pending entry ${pendingKey}:`, entryError.message);
+        console.error(`[PaymentPoller] Error processing pending entry:`, entryError.message);
       }
     }
     
