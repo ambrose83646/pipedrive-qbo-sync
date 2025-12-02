@@ -90,6 +90,15 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **December 2, 2025**: Added discount field to invoice modal
+  - Users can now apply discounts as either percentage (%) or fixed dollar amount ($)
+  - Toggle button switches between discount types with live calculation updates
+  - Percentage discounts limited to 100%, fixed discounts clamped to subtotal
+  - Visual warning (orange border) when fixed discount exceeds subtotal
+  - Summary displays subtotal, discount line, and final total
+  - QuickBooks receives DiscountLineDetail as percentage-based to avoid account reference requirements
+  - Improved token refresh handling with graceful fallback for missing refresh tokens
+
 - **December 2, 2025**: Enhanced invoice creation with payment terms and customer email
   - Updated payment terms dropdown with three options: Due on Receipt, Net 30, Net 60
   - Added automatic due date calculation when payment terms are selected
