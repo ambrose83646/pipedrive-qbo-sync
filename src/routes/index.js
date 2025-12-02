@@ -6,6 +6,7 @@ const qbAuth = require("../auth/quickbooks");
 const { syncContact } = require("../controllers/sync");
 const OAuthClient = require("intuit-oauth");
 const axios = require("axios");
+const { encrypt, decrypt } = require("../utils/encryption");
 
 // Helper function to extract JSON data from QuickBooks API response
 // The intuit-oauth library may return data in either 'json' (pre-parsed) or 'body' (string)
@@ -471,7 +472,7 @@ router.post("/api/disconnect-qb", express.json(), async (req, res) => {
 // Setup preferences endpoints
 router.post("/api/setup/preferences", express.json(), async (req, res) => {
   try {
-    const { token, userId, authorizeAllUsers, preferences } = req.body;
+    const { token, userId, authorizeAllUsers, preferences, shipstation } = req.body;
     
     if (!token || !userId) {
       return res.status(400).json({ error: "Token and User ID are required" });
@@ -501,8 +502,8 @@ router.post("/api/setup/preferences", express.json(), async (req, res) => {
       return res.status(403).json({ error: "Setup token has expired" });
     }
     
-    // Save preferences and clear the setup token
-    await setUser(normalizedUserId, {
+    // Build updated user data
+    const updatedData = {
       ...userData,
       invoice_preferences: {
         authorizeAllUsers,
@@ -511,7 +512,18 @@ router.post("/api/setup/preferences", express.json(), async (req, res) => {
       },
       setup_token: null,
       setup_token_expires: null
-    });
+    };
+    
+    // Save ShipStation credentials if provided (encrypted)
+    if (shipstation && shipstation.apiKey && shipstation.apiSecret) {
+      updatedData.shipstation_api_key = encrypt(shipstation.apiKey);
+      updatedData.shipstation_api_secret = encrypt(shipstation.apiSecret);
+      updatedData.shipstation_auto_create = shipstation.autoCreateShipments !== false;
+      updatedData.shipstation_connected_at = new Date().toISOString();
+      console.log(`[Setup] ShipStation credentials saved (encrypted) for user: ${normalizedUserId}`);
+    }
+    
+    await setUser(normalizedUserId, updatedData);
     
     console.log(`[Setup] Preferences saved for user: ${normalizedUserId}`);
     res.json({ success: true, message: "Preferences saved successfully" });
@@ -519,6 +531,49 @@ router.post("/api/setup/preferences", express.json(), async (req, res) => {
   } catch (error) {
     console.error("Setup preferences error:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Test ShipStation connection
+router.post("/api/shipstation/test", express.json(), async (req, res) => {
+  try {
+    const { apiKey, apiSecret } = req.body;
+    
+    if (!apiKey || !apiSecret) {
+      return res.status(400).json({ error: "API Key and Secret are required" });
+    }
+    
+    // Create Base64 auth string
+    const authString = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
+    
+    // Test connection by fetching stores (lightweight API call)
+    const response = await axios.get('https://ssapi.shipstation.com/stores', {
+      headers: {
+        'Authorization': `Basic ${authString}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (response.status === 200) {
+      const stores = response.data;
+      console.log(`[ShipStation] Connection test successful, found ${stores.length || 0} stores`);
+      res.json({ 
+        success: true, 
+        message: 'Connected successfully',
+        storeCount: stores.length || 0
+      });
+    } else {
+      res.status(400).json({ error: 'Connection failed' });
+    }
+    
+  } catch (error) {
+    console.error('[ShipStation] Connection test failed:', error.message);
+    
+    if (error.response?.status === 401) {
+      return res.status(401).json({ error: 'Invalid API credentials' });
+    }
+    
+    res.status(500).json({ error: error.message || 'Connection failed' });
   }
 });
 
@@ -2793,9 +2848,70 @@ router.post("/api/invoices", express.json(), async (req, res) => {
         }
       }
       
+      // ShipStation integration - create order based on payment terms
+      let shipstationOrderCreated = false;
+      let shipstationOrderPending = false;
+      
+      if (userData.shipstation_api_key && userData.shipstation_auto_create !== false) {
+        try {
+          const invoiceBalance = parseFloat(result.Invoice.Balance || 0);
+          const isDueOnReceipt = paymentTerms === 'DueOnReceipt' || 
+                                  paymentTerms === 'Due on Receipt' ||
+                                  (result.Invoice.SalesTermRef?.name || '').toLowerCase().includes('receipt');
+          
+          console.log(`[ShipStation] Invoice ${result.Invoice.DocNumber} - Payment terms: ${paymentTerms}, Balance: ${invoiceBalance}, Due on Receipt: ${isDueOnReceipt}`);
+          
+          if (isDueOnReceipt && invoiceBalance > 0) {
+            // Due on Receipt with unpaid balance - store for later processing
+            console.log(`[ShipStation] Invoice ${result.Invoice.DocNumber} - Due on Receipt, pending payment. Storing for later.`);
+            
+            const pendingKey = `ss_pending:${result.Invoice.Id}`;
+            await setUser(pendingKey, {
+              invoiceId: result.Invoice.Id,
+              invoiceNumber: result.Invoice.DocNumber,
+              customerId: customerId,
+              userId: actualUserId,
+              totalAmount: result.Invoice.TotalAmt,
+              balance: invoiceBalance,
+              paymentTerms: paymentTerms,
+              createdAt: new Date().toISOString(),
+              invoiceData: result.Invoice
+            });
+            
+            shipstationOrderPending = true;
+            console.log(`[ShipStation] Stored pending shipment for invoice ${result.Invoice.DocNumber}`);
+          } else {
+            // Net 30/60 or paid invoice - create ShipStation order immediately
+            console.log(`[ShipStation] Creating order for invoice ${result.Invoice.DocNumber}`);
+            
+            const ssOrder = await createShipStationOrderFromInvoice(userData, result.Invoice);
+            
+            if (ssOrder && ssOrder.orderId) {
+              shipstationOrderCreated = true;
+              console.log(`[ShipStation] Order ${ssOrder.orderId} created for invoice ${result.Invoice.DocNumber}`);
+              
+              // Store the mapping
+              const mappingKey = `ss_invoice:${result.Invoice.Id}`;
+              await setUser(mappingKey, {
+                invoiceId: result.Invoice.Id,
+                invoiceNumber: result.Invoice.DocNumber,
+                shipstationOrderId: ssOrder.orderId,
+                shipstationOrderNumber: ssOrder.orderNumber,
+                createdAt: new Date().toISOString()
+              });
+            }
+          }
+        } catch (ssError) {
+          console.error('[ShipStation] Error processing invoice:', ssError.message);
+          // Don't fail the invoice creation just because ShipStation failed
+        }
+      }
+      
       res.json({
         success: true,
         emailSent: emailSent,
+        shipstationOrderCreated: shipstationOrderCreated,
+        shipstationOrderPending: shipstationOrderPending,
         invoice: {
           id: result.Invoice.Id,
           docNumber: result.Invoice.DocNumber,
@@ -3003,6 +3119,419 @@ router.get("/api/invoices/:invoiceId/paylink", async (req, res) => {
     
   } catch (error) {
     console.error("Get payment link error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ==================== SHIPSTATION ENDPOINTS ====================
+
+// Helper function to make ShipStation API calls
+async function makeShipStationApiCall(userData, method, endpoint, data = null) {
+  if (!userData.shipstation_api_key || !userData.shipstation_api_secret) {
+    throw new Error('ShipStation not connected');
+  }
+  
+  // Decrypt credentials
+  const apiKey = decrypt(userData.shipstation_api_key);
+  const apiSecret = decrypt(userData.shipstation_api_secret);
+  
+  const authString = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
+  
+  const config = {
+    method,
+    url: `https://ssapi.shipstation.com${endpoint}`,
+    headers: {
+      'Authorization': `Basic ${authString}`,
+      'Content-Type': 'application/json'
+    }
+  };
+  
+  if (data && (method === 'POST' || method === 'PUT')) {
+    config.data = data;
+  }
+  
+  const response = await axios(config);
+  return response.data;
+}
+
+// Get shipments for invoices (by order number = invoice DocNumber)
+router.get("/api/shipstation/shipments", async (req, res) => {
+  try {
+    const { userId, orderNumbers } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    // Find user with ShipStation credentials
+    let userData = await getUser(userId);
+    let actualUserId = userId;
+    
+    if (!userData || !userData.shipstation_api_key) {
+      const { listUsers } = require("../../config/database");
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.shipstation_api_key) {
+          const normalizedProvidedId = userId.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          const normalizedKey = key.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          
+          if (normalizedKey === normalizedProvidedId ||
+              testUserData.api_domain?.includes(normalizedProvidedId) ||
+              normalizedProvidedId.includes(normalizedKey)) {
+            userData = testUserData;
+            actualUserId = key;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (!userData || !userData.shipstation_api_key) {
+      return res.json({
+        success: true,
+        shipments: [],
+        connected: false,
+        message: 'ShipStation not connected'
+      });
+    }
+    
+    // Parse order numbers array
+    const orderNumberList = orderNumbers ? orderNumbers.split(',').map(n => n.trim()) : [];
+    
+    if (orderNumberList.length === 0) {
+      return res.json({
+        success: true,
+        shipments: [],
+        connected: true
+      });
+    }
+    
+    // Fetch shipments for each order number
+    const shipmentMap = {};
+    
+    for (const orderNumber of orderNumberList) {
+      try {
+        // First, find orders matching this order number
+        const ordersData = await makeShipStationApiCall(userData, 'GET', `/orders?orderNumber=${encodeURIComponent(orderNumber)}`);
+        
+        if (ordersData.orders && ordersData.orders.length > 0) {
+          for (const order of ordersData.orders) {
+            // Get shipments for this order
+            const shipmentsData = await makeShipStationApiCall(userData, 'GET', `/shipments?orderId=${order.orderId}`);
+            
+            if (shipmentsData.shipments && shipmentsData.shipments.length > 0) {
+              // Map shipments to our format
+              const formattedShipments = shipmentsData.shipments.map(ship => ({
+                shipmentId: ship.shipmentId,
+                orderNumber: orderNumber,
+                orderId: order.orderId,
+                trackingNumber: ship.trackingNumber,
+                carrierCode: ship.carrierCode,
+                serviceCode: ship.serviceCode,
+                shipDate: ship.shipDate,
+                deliveryDate: ship.deliveryDate,
+                shipmentStatus: getShipmentStatusLabel(ship),
+                voided: ship.voided,
+                shipTo: ship.shipTo,
+                items: order.items || []
+              }));
+              
+              shipmentMap[orderNumber] = formattedShipments;
+            } else {
+              // No shipments yet, but order exists
+              shipmentMap[orderNumber] = [{
+                orderId: order.orderId,
+                orderNumber: orderNumber,
+                orderStatus: order.orderStatus,
+                shipmentStatus: order.orderStatus === 'shipped' ? 'Shipped' : 'Awaiting Shipment',
+                items: order.items || [],
+                createDate: order.createDate
+              }];
+            }
+          }
+        }
+      } catch (orderError) {
+        console.error(`[ShipStation] Error fetching order ${orderNumber}:`, orderError.message);
+        // Continue with other orders
+      }
+    }
+    
+    res.json({
+      success: true,
+      shipments: shipmentMap,
+      connected: true
+    });
+    
+  } catch (error) {
+    console.error("[ShipStation] Shipments lookup error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+function getShipmentStatusLabel(shipment) {
+  if (shipment.voided) return 'Voided';
+  if (shipment.deliveryDate) return 'Delivered';
+  if (shipment.trackingNumber) return 'In Transit';
+  return 'Label Created';
+}
+
+// Helper function to create ShipStation order from QuickBooks invoice
+async function createShipStationOrderFromInvoice(userData, invoice, skipDupeCheck = false) {
+  if (!userData.shipstation_api_key || !userData.shipstation_api_secret) {
+    throw new Error('ShipStation not connected');
+  }
+  
+  const orderNumber = invoice.DocNumber || `QB-${invoice.Id}`;
+  
+  // Idempotency check: see if order already exists with this number
+  if (!skipDupeCheck) {
+    try {
+      const existingOrders = await makeShipStationApiCall(userData, 'GET', `/orders?orderNumber=${encodeURIComponent(orderNumber)}`);
+      if (existingOrders.orders && existingOrders.orders.length > 0) {
+        console.log(`[ShipStation] Order ${orderNumber} already exists (ID: ${existingOrders.orders[0].orderId}), skipping creation`);
+        return {
+          orderId: existingOrders.orders[0].orderId,
+          orderNumber: existingOrders.orders[0].orderNumber,
+          alreadyExists: true
+        };
+      }
+    } catch (dupeCheckError) {
+      console.warn(`[ShipStation] Could not check for existing order ${orderNumber}:`, dupeCheckError.message);
+      // Continue with creation - ShipStation will reject if duplicate
+    }
+  }
+  
+  // Build ship-to address from invoice
+  const shipTo = {
+    name: invoice.CustomerRef?.name || invoice.ShipAddr?.Line1 || 'Customer',
+    street1: invoice.ShipAddr?.Line1 || invoice.BillAddr?.Line1 || '',
+    street2: invoice.ShipAddr?.Line2 || invoice.BillAddr?.Line2 || '',
+    city: invoice.ShipAddr?.City || invoice.BillAddr?.City || '',
+    state: invoice.ShipAddr?.CountrySubDivisionCode || invoice.BillAddr?.CountrySubDivisionCode || '',
+    postalCode: invoice.ShipAddr?.PostalCode || invoice.BillAddr?.PostalCode || '',
+    country: invoice.ShipAddr?.Country || invoice.BillAddr?.Country || 'US',
+    phone: invoice.ShipAddr?.Phone || '',
+    email: invoice.BillEmail?.Address || ''
+  };
+  
+  // Map invoice line items to ShipStation items
+  const items = [];
+  if (invoice.Line) {
+    invoice.Line.forEach(line => {
+      if (line.DetailType === 'SalesItemLineDetail' && line.SalesItemLineDetail) {
+        items.push({
+          name: line.SalesItemLineDetail.ItemRef?.name || line.Description || 'Item',
+          quantity: line.SalesItemLineDetail.Qty || 1,
+          unitPrice: line.SalesItemLineDetail.UnitPrice || line.Amount || 0,
+          sku: line.SalesItemLineDetail.ItemRef?.value || ''
+        });
+      }
+    });
+  }
+  
+  const shipstationOrder = {
+    orderNumber: invoice.DocNumber || `QB-${invoice.Id}`,
+    orderDate: invoice.TxnDate || new Date().toISOString().split('T')[0],
+    orderStatus: 'awaiting_shipment',
+    billTo: shipTo,
+    shipTo: shipTo,
+    items: items,
+    amountPaid: parseFloat(invoice.TotalAmt) - parseFloat(invoice.Balance || 0),
+    customerEmail: invoice.BillEmail?.Address || '',
+    internalNotes: `QuickBooks Invoice #${invoice.DocNumber || invoice.Id}`,
+    advancedOptions: {
+      customField1: `QB_Invoice_${invoice.Id}`,
+      customField2: invoice.CustomerRef?.value || ''
+    }
+  };
+  
+  // Create order in ShipStation
+  const createdOrder = await makeShipStationApiCall(userData, 'POST', '/orders/createorder', shipstationOrder);
+  
+  return createdOrder;
+}
+
+// Create ShipStation order from QuickBooks invoice
+router.post("/api/shipstation/orders", express.json(), async (req, res) => {
+  try {
+    const { userId, invoice } = req.body;
+    
+    if (!userId || !invoice) {
+      return res.status(400).json({ error: "User ID and invoice data are required" });
+    }
+    
+    // Find user with ShipStation credentials
+    let userData = await getUser(userId);
+    let actualUserId = userId;
+    
+    if (!userData || !userData.shipstation_api_key) {
+      const { listUsers } = require("../../config/database");
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.shipstation_api_key) {
+          const normalizedProvidedId = userId.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          const normalizedKey = key.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          
+          if (normalizedKey === normalizedProvidedId ||
+              testUserData.api_domain?.includes(normalizedProvidedId) ||
+              normalizedProvidedId.includes(normalizedKey)) {
+            userData = testUserData;
+            actualUserId = key;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (!userData || !userData.shipstation_api_key) {
+      return res.status(400).json({
+        success: false,
+        error: "ShipStation not connected"
+      });
+    }
+    
+    // Build ShipStation order from QuickBooks invoice
+    const shipTo = {
+      name: invoice.CustomerRef?.name || invoice.ShipAddr?.Line1 || 'Customer',
+      street1: invoice.ShipAddr?.Line1 || invoice.BillAddr?.Line1 || '',
+      street2: invoice.ShipAddr?.Line2 || invoice.BillAddr?.Line2 || '',
+      city: invoice.ShipAddr?.City || invoice.BillAddr?.City || '',
+      state: invoice.ShipAddr?.CountrySubDivisionCode || invoice.BillAddr?.CountrySubDivisionCode || '',
+      postalCode: invoice.ShipAddr?.PostalCode || invoice.BillAddr?.PostalCode || '',
+      country: invoice.ShipAddr?.Country || invoice.BillAddr?.Country || 'US',
+      phone: invoice.ShipAddr?.Phone || '',
+      email: invoice.BillEmail?.Address || ''
+    };
+    
+    // Map invoice line items to ShipStation items
+    const items = [];
+    if (invoice.Line) {
+      invoice.Line.forEach(line => {
+        if (line.DetailType === 'SalesItemLineDetail' && line.SalesItemLineDetail) {
+          items.push({
+            name: line.SalesItemLineDetail.ItemRef?.name || line.Description || 'Item',
+            quantity: line.SalesItemLineDetail.Qty || 1,
+            unitPrice: line.SalesItemLineDetail.UnitPrice || line.Amount || 0,
+            sku: line.SalesItemLineDetail.ItemRef?.value || ''
+          });
+        }
+      });
+    }
+    
+    const shipstationOrder = {
+      orderNumber: invoice.DocNumber || `QB-${invoice.Id}`,
+      orderDate: invoice.TxnDate || new Date().toISOString().split('T')[0],
+      orderStatus: 'awaiting_shipment',
+      billTo: shipTo,
+      shipTo: shipTo,
+      items: items,
+      amountPaid: parseFloat(invoice.TotalAmt) - parseFloat(invoice.Balance || 0),
+      customerEmail: invoice.BillEmail?.Address || '',
+      internalNotes: `QuickBooks Invoice #${invoice.DocNumber || invoice.Id}`,
+      advancedOptions: {
+        customField1: `QB_Invoice_${invoice.Id}`,
+        customField2: invoice.CustomerRef?.value || ''
+      }
+    };
+    
+    // Create order in ShipStation
+    const createdOrder = await makeShipStationApiCall(userData, 'POST', '/orders/createorder', shipstationOrder);
+    
+    console.log(`[ShipStation] Order created: ${createdOrder.orderId} for invoice ${invoice.DocNumber}`);
+    
+    // Store the mapping in database
+    const { setDealMapping, getDealMapping } = require("../../config/database");
+    const mappingKey = `ss_invoice:${invoice.Id}`;
+    await setUser(mappingKey, {
+      invoiceId: invoice.Id,
+      invoiceNumber: invoice.DocNumber,
+      shipstationOrderId: createdOrder.orderId,
+      shipstationOrderNumber: createdOrder.orderNumber,
+      createdAt: new Date().toISOString()
+    });
+    
+    res.json({
+      success: true,
+      orderId: createdOrder.orderId,
+      orderNumber: createdOrder.orderNumber,
+      message: 'ShipStation order created successfully'
+    });
+    
+  } catch (error) {
+    console.error("[ShipStation] Order creation error:", error);
+    
+    // Handle duplicate order error
+    if (error.response?.status === 400 && error.response?.data?.Message?.includes('already exists')) {
+      return res.status(400).json({
+        success: false,
+        error: 'A ShipStation order already exists for this invoice'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get ShipStation connection status for a user
+router.get("/api/shipstation/status", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    // Find user with ShipStation credentials
+    let userData = await getUser(userId);
+    
+    if (!userData || !userData.shipstation_api_key) {
+      const { listUsers } = require("../../config/database");
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.shipstation_api_key) {
+          const normalizedProvidedId = userId.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          const normalizedKey = key.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          
+          if (normalizedKey === normalizedProvidedId ||
+              testUserData.api_domain?.includes(normalizedProvidedId) ||
+              normalizedProvidedId.includes(normalizedKey)) {
+            userData = testUserData;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (!userData || !userData.shipstation_api_key) {
+      return res.json({
+        connected: false,
+        autoCreateEnabled: false
+      });
+    }
+    
+    res.json({
+      connected: true,
+      autoCreateEnabled: userData.shipstation_auto_create !== false,
+      connectedAt: userData.shipstation_connected_at
+    });
+    
+  } catch (error) {
+    console.error("[ShipStation] Status check error:", error);
     res.status(500).json({
       success: false,
       error: error.message

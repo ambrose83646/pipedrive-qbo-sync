@@ -235,6 +235,96 @@
       color: white;
     }
     
+    .shipment-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      gap: 4px;
+    }
+    
+    .shipment-none {
+      background: #f5f5f5;
+      color: #8c8c8c;
+    }
+    
+    .shipment-awaiting {
+      background: #fff7e6;
+      color: #d48806;
+    }
+    
+    .shipment-transit {
+      background: #e6f7ff;
+      color: #1890ff;
+    }
+    
+    .shipment-delivered {
+      background: #f6ffed;
+      color: #52c41a;
+    }
+    
+    .shipment-pending-payment {
+      background: #fff1f0;
+      color: #cf1322;
+    }
+    
+    .shipment-section {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #f0f0f0;
+    }
+    
+    .shipment-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #595959;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .shipment-card {
+      background: #fafafa;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 8px;
+    }
+    
+    .shipment-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .tracking-link {
+      color: #1890ff;
+      text-decoration: none;
+      font-size: 13px;
+    }
+    
+    .tracking-link:hover {
+      text-decoration: underline;
+    }
+    
+    .shipment-items {
+      font-size: 12px;
+      color: #8c8c8c;
+    }
+    
+    .ss-connect-hint {
+      background: #fffbe6;
+      border: 1px solid #ffe58f;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 13px;
+      color: #ad6800;
+      margin-top: 16px;
+    }
+    
     .empty-state {
       text-align: center;
       padding: 60px 20px;
@@ -444,6 +534,8 @@
     let userId = null;
     let customerName = '';
     let dateRange = { type: 'this_quarter', startDate: null, endDate: null };
+    let shipmentData = {};
+    let shipstationConnected = false;
     
     async function init() {
       try {
@@ -521,6 +613,9 @@
           invoices = data.invoices || [];
           updateOverviewSummary(data.overview);
           renderInvoiceTable();
+          
+          // Load shipment data after rendering initial table
+          await loadShipmentData();
         } else {
           showError(data.error || 'Failed to load invoices');
         }
@@ -528,6 +623,68 @@
         console.error('Error loading invoices:', error);
         showError('Failed to load invoices: ' + error.message);
       }
+    }
+    
+    async function loadShipmentData() {
+      if (invoices.length === 0) return;
+      
+      try {
+        // Get all invoice DocNumbers to query ShipStation
+        const orderNumbers = invoices
+          .map(inv => inv.DocNumber)
+          .filter(Boolean)
+          .join(',');
+        
+        if (!orderNumbers) return;
+        
+        const response = await fetch(`/api/shipstation/shipments?userId=${encodeURIComponent(userId)}&orderNumbers=${encodeURIComponent(orderNumbers)}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          shipmentData = data.shipments || {};
+          shipstationConnected = data.connected;
+          
+          // Re-render table with shipment data
+          renderInvoiceTable();
+        }
+      } catch (error) {
+        console.error('Error loading shipment data:', error);
+        // Continue without shipment data
+      }
+    }
+    
+    function getShipmentStatus(invoice) {
+      const docNumber = invoice.DocNumber;
+      const shipments = shipmentData[docNumber];
+      
+      if (!shipstationConnected) {
+        return { label: '-', class: 'shipment-none', icon: '' };
+      }
+      
+      if (!shipments || shipments.length === 0) {
+        // Check payment terms - if "Due on Receipt" and not paid, show pending payment
+        const balance = parseFloat(invoice.Balance || 0);
+        const salesTermRef = invoice.SalesTermRef?.name || '';
+        
+        if (balance > 0 && salesTermRef.toLowerCase().includes('receipt')) {
+          return { label: 'Pending Payment', class: 'shipment-pending-payment', icon: '⏳' };
+        }
+        return { label: 'No Order', class: 'shipment-none', icon: '' };
+      }
+      
+      const shipment = shipments[0];
+      
+      if (shipment.shipmentStatus === 'Delivered') {
+        return { label: 'Delivered', class: 'shipment-delivered', icon: '✓' };
+      }
+      if (shipment.shipmentStatus === 'In Transit' || shipment.trackingNumber) {
+        return { label: 'In Transit', class: 'shipment-transit', icon: '🚚' };
+      }
+      if (shipment.shipmentStatus === 'Awaiting Shipment' || shipment.orderStatus === 'awaiting_shipment') {
+        return { label: 'Awaiting', class: 'shipment-awaiting', icon: '📦' };
+      }
+      
+      return { label: shipment.shipmentStatus || 'Order Created', class: 'shipment-awaiting', icon: '📦' };
     }
     
     function updateOverviewSummary(overview) {
@@ -622,6 +779,7 @@
               <th>Date</th>
               <th>Due Date</th>
               <th>Status</th>
+              <th>Shipment</th>
               <th style="text-align: right;">Amount</th>
               <th style="text-align: right;">Balance</th>
               <th style="text-align: center;">Action</th>
@@ -632,6 +790,7 @@
       
       invoices.forEach(invoice => {
         const status = getInvoiceStatus(invoice);
+        const shipStatus = getShipmentStatus(invoice);
         const invoiceNum = invoice.DocNumber || invoice.Id;
         
         tableHtml += `
@@ -640,6 +799,7 @@
             <td>${formatDate(invoice.TxnDate)}</td>
             <td>${formatDate(invoice.DueDate)}</td>
             <td><span class="status-badge ${status.class}">${status.label}</span></td>
+            <td><span class="shipment-badge ${shipStatus.class}">${shipStatus.icon} ${shipStatus.label}</span></td>
             <td class="amount-cell">${formatCurrency(invoice.TotalAmt)}</td>
             <td class="balance-cell">${formatCurrency(invoice.Balance)}</td>
             <td style="text-align: center;">
@@ -849,9 +1009,127 @@
         detailHtml += '</div>';
       }
       
+      // Add shipment section
+      detailHtml += renderShipmentSection(invoice);
+      
       document.getElementById('detailBody').innerHTML = detailHtml;
       document.getElementById('detailOverlay').classList.add('active');
       document.getElementById('detailPanel').classList.add('active');
+    }
+    
+    function renderShipmentSection(invoice) {
+      const docNumber = invoice.DocNumber;
+      const shipments = shipmentData[docNumber];
+      
+      let html = '<div class="shipment-section">';
+      html += '<div class="shipment-section-title">📦 Shipment Details</div>';
+      
+      if (!shipstationConnected) {
+        html += `
+          <div class="ss-connect-hint">
+            ShipStation is not connected. Connect ShipStation in your app settings to track shipments.
+          </div>
+        `;
+        html += '</div>';
+        return html;
+      }
+      
+      if (!shipments || shipments.length === 0) {
+        const balance = parseFloat(invoice.Balance || 0);
+        const salesTermRef = invoice.SalesTermRef?.name || '';
+        
+        if (balance > 0 && salesTermRef.toLowerCase().includes('receipt')) {
+          html += `
+            <div class="shipment-card">
+              <div class="shipment-header">
+                <span class="shipment-badge shipment-pending-payment">⏳ Pending Payment</span>
+              </div>
+              <div class="shipment-items">
+                Shipment will be created automatically once payment is received.
+              </div>
+            </div>
+          `;
+        } else {
+          html += `
+            <div class="shipment-card">
+              <div class="shipment-header">
+                <span class="shipment-badge shipment-none">No ShipStation Order</span>
+              </div>
+              <div class="shipment-items">
+                No order has been created in ShipStation for this invoice.
+              </div>
+            </div>
+          `;
+        }
+        html += '</div>';
+        return html;
+      }
+      
+      // Render each shipment
+      shipments.forEach(shipment => {
+        const statusClass = getShipmentBadgeClass(shipment.shipmentStatus);
+        
+        html += '<div class="shipment-card">';
+        html += '<div class="shipment-header">';
+        html += `<span class="shipment-badge ${statusClass}">${shipment.shipmentStatus}</span>`;
+        
+        if (shipment.trackingNumber) {
+          const trackingUrl = getTrackingUrl(shipment.carrierCode, shipment.trackingNumber);
+          html += `<a href="${trackingUrl}" target="_blank" class="tracking-link">${shipment.trackingNumber}</a>`;
+        }
+        html += '</div>';
+        
+        if (shipment.shipDate) {
+          html += `<div class="shipment-items">Ship Date: ${formatDate(shipment.shipDate)}</div>`;
+        }
+        
+        if (shipment.carrierCode || shipment.serviceCode) {
+          const carrier = [shipment.carrierCode, shipment.serviceCode].filter(Boolean).join(' - ');
+          html += `<div class="shipment-items">Carrier: ${carrier}</div>`;
+        }
+        
+        if (shipment.items && shipment.items.length > 0) {
+          html += '<div class="shipment-items" style="margin-top: 8px;">';
+          html += '<strong>Items:</strong><br>';
+          shipment.items.forEach(item => {
+            html += `${item.quantity || 1}x ${item.name || 'Item'}<br>`;
+          });
+          html += '</div>';
+        }
+        
+        html += '</div>';
+      });
+      
+      html += '</div>';
+      return html;
+    }
+    
+    function getShipmentBadgeClass(status) {
+      if (!status) return 'shipment-none';
+      const s = status.toLowerCase();
+      if (s.includes('delivered')) return 'shipment-delivered';
+      if (s.includes('transit')) return 'shipment-transit';
+      if (s.includes('awaiting') || s.includes('pending')) return 'shipment-awaiting';
+      return 'shipment-awaiting';
+    }
+    
+    function getTrackingUrl(carrier, trackingNumber) {
+      if (!carrier || !trackingNumber) return '#';
+      
+      const c = carrier.toLowerCase();
+      if (c.includes('ups')) {
+        return `https://www.ups.com/track?tracknum=${trackingNumber}`;
+      }
+      if (c.includes('fedex')) {
+        return `https://www.fedex.com/fedextrack/?trknbr=${trackingNumber}`;
+      }
+      if (c.includes('usps')) {
+        return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${trackingNumber}`;
+      }
+      if (c.includes('dhl')) {
+        return `https://www.dhl.com/en/express/tracking.html?AWB=${trackingNumber}`;
+      }
+      return `https://www.google.com/search?q=${trackingNumber}+tracking`;
     }
     
     function closeDetail() {
