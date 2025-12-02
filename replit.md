@@ -93,7 +93,9 @@ Preferred communication style: Simple, everyday language.
 - **December 2, 2025**: Added invoice list modal for viewing all invoices within Pipedrive
   - Created new `invoice-list-modal.html` extension that opens via Pipedrive SDK (modal ID: 27de700c-7063-46e0-9562-2acb3462ba1d)
   - Added PDF download feature - each invoice row has a "PDF" button to download the invoice
-  - Backend endpoint `/api/invoices/:invoiceId/pdf` fetches PDF from QuickBooks API
+  - Backend endpoint `/api/invoices/:invoiceId/pdf` fetches PDF from QuickBooks API (uses axios with arraybuffer responseType for proper binary handling)
+  - Added "Pay" button to copy QuickBooks payment link to clipboard (requires QuickBooks Payments enabled on account)
+  - Backend endpoint `/api/invoices/:invoiceId/paylink` fetches invoice with `?include=invoiceLink` parameter
   - Displays invoice table with columns: Invoice #, Date, Due Date, Status, Amount, Balance, Action
   - Status badges: Paid (green), Open (orange), Overdue (red) with robust date handling
   - Slide-in detail panel shows line items (products, discounts, taxes, groups), email, shipping address, memos
