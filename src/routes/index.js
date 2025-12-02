@@ -2864,33 +2864,38 @@ router.get("/api/invoices/:invoiceId/pdf", async (req, res) => {
     const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
     const realmId = userData.qb_realm_id;
     
-    // Fetch PDF from QuickBooks
-    const pdfResponse = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
-      return await qbClient.makeApiCall({
-        url: `${baseUrl}/v3/company/${realmId}/invoice/${invoiceId}/pdf`,
+    // Fetch PDF from QuickBooks using axios for proper binary handling
+    // The intuit-oauth makeApiCall doesn't handle binary responses correctly
+    const pdfBuffer = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
+      const axios = require('axios');
+      const pdfUrl = `${baseUrl}/v3/company/${realmId}/invoice/${invoiceId}/pdf`;
+      
+      const response = await axios({
         method: 'GET',
+        url: pdfUrl,
         headers: {
+          'Authorization': `Bearer ${currentUserData.qb_access_token}`,
           'Accept': 'application/pdf'
-        }
+        },
+        responseType: 'arraybuffer'
       });
+      
+      return response.data;
     });
     
-    if (!pdfResponse) {
+    if (!pdfBuffer) {
       return res.status(500).json({
         success: false,
         error: "Failed to fetch PDF from QuickBooks"
       });
     }
     
-    // The response body contains the PDF data
-    const pdfData = pdfResponse.body || pdfResponse;
-    
     // Set headers for PDF download
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoiceId}.pdf"`);
     
-    // Send the PDF data
-    res.send(Buffer.from(pdfData));
+    // Send the PDF buffer directly
+    res.send(Buffer.from(pdfBuffer));
     
   } catch (error) {
     console.error("Download PDF error:", error);
