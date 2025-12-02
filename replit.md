@@ -90,6 +90,22 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **December 2, 2025**: Added invoice list modal for viewing all invoices within Pipedrive
+  - Created new `invoice-list-modal.html` extension that opens via Pipedrive SDK (modal ID: 1d5c0945-7264-435f-8aa2-986bed03ba6b)
+  - Displays invoice table with columns: Invoice #, Date, Due Date, Status, Amount, Balance, Action
+  - Status badges: Paid (green), Open (orange), Overdue (red) with robust date handling
+  - Slide-in detail panel shows line items (products, discounts, taxes, groups), email, shipping address, memos
+  - Respects date range filter from the main QuickBooks Manager panel
+  - Fixed date parsing to handle QuickBooks YYYY-MM-DD format correctly (prevents off-by-one-day in US time zones)
+  - Handles all QuickBooks line detail types: SalesItemLineDetail, DiscountLineDetail, GroupLineDetail (with child expansion), TaxLineDetail, etc.
+  - "View all invoices" button now opens this modal instead of external QuickBooks link
+
+- **December 2, 2025**: Added date range selector to QuickBooks Manager panel
+  - Dropdown with presets: This Quarter (default), Last Quarter, This Year, Custom
+  - Custom range allows picking specific start/end dates
+  - Invoice overview data filters by selected date range
+  - Fixed cross-browser event handling by passing element references instead of relying on global event
+
 - **December 2, 2025**: Added discount field to invoice modal
   - Users can now apply discounts as either percentage (%) or fixed dollar amount ($)
   - Toggle button switches between discount types with live calculation updates
