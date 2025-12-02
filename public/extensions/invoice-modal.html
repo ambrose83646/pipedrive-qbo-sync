@@ -441,6 +441,104 @@
       display: block;
     }
     
+    .discount-section {
+      margin-top: 24px;
+      padding: 16px 20px;
+      background: #fffbe6;
+      border: 1px solid #ffe58f;
+      border-radius: 8px;
+    }
+    
+    .discount-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    
+    .discount-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+    
+    .discount-toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .discount-type-toggle {
+      display: inline-flex;
+      border: 1px solid #d9d9d9;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    
+    .discount-type-btn {
+      padding: 6px 12px;
+      background: white;
+      border: none;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #595959;
+    }
+    
+    .discount-type-btn:first-child {
+      border-right: 1px solid #d9d9d9;
+    }
+    
+    .discount-type-btn.active {
+      background: #1890ff;
+      color: white;
+    }
+    
+    .discount-type-btn:hover:not(.active) {
+      background: #f5f5f5;
+    }
+    
+    .discount-input-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .discount-input {
+      width: 120px;
+      padding: 8px 12px;
+      border: 1px solid #d9d9d9;
+      border-radius: 6px;
+      font-size: 14px;
+      text-align: right;
+    }
+    
+    .discount-input:focus {
+      outline: none;
+      border-color: #1890ff;
+      box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1);
+    }
+    
+    .discount-symbol {
+      font-size: 14px;
+      color: #595959;
+      font-weight: 500;
+    }
+    
+    .discount-calculated {
+      font-size: 13px;
+      color: #52c41a;
+      margin-top: 8px;
+    }
+    
+    .summary-row.discount-row {
+      color: #52c41a;
+    }
+    
+    .summary-row.discount-row .summary-value {
+      color: #52c41a;
+    }
+    
     /* Responsive Styles */
     @media (max-width: 768px) {
       .modal-container {
@@ -537,6 +635,8 @@
     let lineItems = [];
     let lineItemCounter = 0;
     let productSearchTimeouts = {};
+    let discountType = 'percent'; // 'percent' or 'amount'
+    let discountValue = 0;
     
     document.addEventListener('DOMContentLoaded', async function() {
       try {
@@ -705,10 +805,34 @@
           </div>
         </div>
         
+        <div class="discount-section">
+          <div class="discount-header">
+            <span class="discount-title">Discount (optional)</span>
+            <div class="discount-toggle-container">
+              <div class="discount-type-toggle">
+                <button type="button" class="discount-type-btn active" id="discountPercentBtn" onclick="setDiscountType('percent')">%</button>
+                <button type="button" class="discount-type-btn" id="discountAmountBtn" onclick="setDiscountType('amount')">$</button>
+              </div>
+            </div>
+          </div>
+          <div class="discount-input-container">
+            <span class="discount-symbol" id="discountSymbolPrefix" style="display: none;">$</span>
+            <input type="number" class="discount-input" id="discountInput" placeholder="0" min="0" step="0.01" value="" oninput="updateDiscount(this.value)">
+            <span class="discount-symbol" id="discountSymbolSuffix">%</span>
+          </div>
+          <div class="discount-calculated" id="discountCalculated" style="display: none;">
+            Discount amount: <span id="discountAmountDisplay">$0.00</span>
+          </div>
+        </div>
+        
         <div class="invoice-summary">
           <div class="summary-row">
             <span class="summary-label">Subtotal</span>
             <span class="summary-value" id="subtotalValue">$0.00</span>
+          </div>
+          <div class="summary-row discount-row" id="discountRow" style="display: none;">
+            <span class="summary-label">Discount</span>
+            <span class="summary-value" id="discountDisplayValue">-$0.00</span>
           </div>
           <div class="summary-row">
             <span class="summary-label summary-total">Total</span>
@@ -824,9 +948,88 @@
     }
     
     function updateTotals() {
-      const total = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-      document.getElementById('subtotalValue').textContent = `$${total.toFixed(2)}`;
+      const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+      document.getElementById('subtotalValue').textContent = `$${subtotal.toFixed(2)}`;
+      
+      // Calculate discount
+      let discountAmount = 0;
+      let discountExceedsSubtotal = false;
+      
+      if (discountValue > 0) {
+        if (discountType === 'percent') {
+          discountAmount = subtotal * (discountValue / 100);
+          // Show the calculated amount for percentage discounts
+          document.getElementById('discountCalculated').style.display = 'block';
+          document.getElementById('discountAmountDisplay').textContent = `$${discountAmount.toFixed(2)}`;
+        } else {
+          discountAmount = discountValue;
+          // Check if fixed discount exceeds subtotal
+          if (discountAmount > subtotal && subtotal > 0) {
+            discountExceedsSubtotal = true;
+            discountAmount = subtotal; // Clamp to subtotal
+          }
+          // Hide the calculated amount for fixed amount discounts
+          document.getElementById('discountCalculated').style.display = 'none';
+        }
+        
+        // Show discount row in summary
+        document.getElementById('discountRow').style.display = 'flex';
+        document.getElementById('discountDisplayValue').textContent = `-$${discountAmount.toFixed(2)}`;
+        
+        // Show warning if discount was clamped
+        const discountInput = document.getElementById('discountInput');
+        if (discountExceedsSubtotal) {
+          discountInput.style.borderColor = '#faad14';
+          discountInput.title = 'Discount cannot exceed subtotal';
+        } else {
+          discountInput.style.borderColor = '#d9d9d9';
+          discountInput.title = '';
+        }
+      } else {
+        document.getElementById('discountRow').style.display = 'none';
+        document.getElementById('discountCalculated').style.display = 'none';
+        const discountInput = document.getElementById('discountInput');
+        if (discountInput) {
+          discountInput.style.borderColor = '#d9d9d9';
+          discountInput.title = '';
+        }
+      }
+      
+      const total = Math.max(0, subtotal - discountAmount);
       document.getElementById('totalValue').textContent = `$${total.toFixed(2)}`;
+    }
+    
+    function setDiscountType(type) {
+      discountType = type;
+      
+      // Update toggle buttons
+      document.getElementById('discountPercentBtn').classList.toggle('active', type === 'percent');
+      document.getElementById('discountAmountBtn').classList.toggle('active', type === 'amount');
+      
+      // Update symbols
+      if (type === 'percent') {
+        document.getElementById('discountSymbolPrefix').style.display = 'none';
+        document.getElementById('discountSymbolSuffix').style.display = 'inline';
+        document.getElementById('discountSymbolSuffix').textContent = '%';
+      } else {
+        document.getElementById('discountSymbolPrefix').style.display = 'inline';
+        document.getElementById('discountSymbolSuffix').style.display = 'none';
+      }
+      
+      // Recalculate totals
+      updateTotals();
+    }
+    
+    function updateDiscount(value) {
+      discountValue = parseFloat(value) || 0;
+      
+      // Validate percentage discount doesn't exceed 100%
+      if (discountType === 'percent' && discountValue > 100) {
+        discountValue = 100;
+        document.getElementById('discountInput').value = 100;
+      }
+      
+      updateTotals();
     }
     
     function searchProducts(itemId, searchTerm) {
@@ -1017,6 +1220,15 @@
         
         const email = document.getElementById('invoiceEmail').value;
         
+        // Build discount object if discount is applied
+        let discount = null;
+        if (discountValue > 0) {
+          discount = {
+            type: discountType,
+            value: discountValue
+          };
+        }
+        
         const response = await fetch(`/api/invoices?userId=${userId}`, {
           method: 'POST',
           headers: {
@@ -1035,7 +1247,8 @@
             dueDate: dueDate || undefined,
             memo: memo || undefined,
             paymentTerms: paymentTermsValue,
-            shippingAddress: shippingAddress
+            shippingAddress: shippingAddress,
+            discount: discount
           })
         });
         

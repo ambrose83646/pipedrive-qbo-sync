@@ -2565,10 +2565,11 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
 // Create QuickBooks invoice
 router.post("/api/invoices", express.json(), async (req, res) => {
   try {
-    const { customerId, customerEmail, lineItems, dueDate, memo, paymentTerms, shippingAddress } = req.body;
+    const { customerId, customerEmail, lineItems, dueDate, memo, paymentTerms, shippingAddress, discount } = req.body;
     const providedUserId = req.query.userId || req.body.userId || 'test';
     
     console.log('Creating invoice for customer:', customerId, 'Email:', customerEmail, 'User ID:', providedUserId);
+    console.log('Discount:', discount ? `${discount.type} - ${discount.value}` : 'none');
 
     if (!customerId) {
       return res.status(400).json({
@@ -2627,30 +2628,66 @@ router.post("/api/invoices", express.json(), async (req, res) => {
     const realmId = userData.qb_realm_id;
     
     // Build invoice object
+    const invoiceLines = lineItems.map((item, index) => {
+      const line = {
+        DetailType: "SalesItemLineDetail",
+        Amount: (item.quantity || 1) * (item.unitPrice || 0),
+        Description: item.description || item.name || '',
+        SalesItemLineDetail: {
+          Qty: item.quantity || 1,
+          UnitPrice: item.unitPrice || 0
+        }
+      };
+      
+      // Add item reference if provided
+      if (item.itemId) {
+        line.SalesItemLineDetail.ItemRef = {
+          value: item.itemId
+        };
+      }
+      
+      return line;
+    });
+    
+    // Add discount line if provided
+    if (discount && discount.value > 0) {
+      // Calculate the subtotal first
+      const subtotal = lineItems.reduce((sum, item) => 
+        sum + ((item.quantity || 1) * (item.unitPrice || 0)), 0);
+      
+      if (subtotal > 0) {
+        let discountAmount;
+        let discountPercent;
+        
+        if (discount.type === 'percent') {
+          // Percentage discount - use directly
+          discountPercent = Math.min(discount.value, 100); // Cap at 100%
+          discountAmount = subtotal * (discountPercent / 100);
+        } else {
+          // Fixed amount discount - convert to percentage to avoid needing DiscountAccountRef
+          discountAmount = Math.min(discount.value, subtotal); // Cannot exceed subtotal
+          discountPercent = (discountAmount / subtotal) * 100;
+        }
+        
+        // QuickBooks uses percentage-based discounts to avoid needing account references
+        invoiceLines.push({
+          DetailType: "DiscountLineDetail",
+          Amount: discountAmount,
+          DiscountLineDetail: {
+            PercentBased: true,
+            DiscountPercent: discountPercent
+          }
+        });
+        
+        console.log(`Applied discount: ${discount.type} = ${discount.value}, computed as ${discountPercent.toFixed(2)}%, amount = $${discountAmount.toFixed(2)}`);
+      }
+    }
+    
     const invoiceData = {
       CustomerRef: {
         value: customerId
       },
-      Line: lineItems.map((item, index) => {
-        const line = {
-          DetailType: "SalesItemLineDetail",
-          Amount: (item.quantity || 1) * (item.unitPrice || 0),
-          Description: item.description || item.name || '',
-          SalesItemLineDetail: {
-            Qty: item.quantity || 1,
-            UnitPrice: item.unitPrice || 0
-          }
-        };
-        
-        // Add item reference if provided
-        if (item.itemId) {
-          line.SalesItemLineDetail.ItemRef = {
-            value: item.itemId
-          };
-        }
-        
-        return line;
-      })
+      Line: invoiceLines
     };
     
     // Add due date if provided
