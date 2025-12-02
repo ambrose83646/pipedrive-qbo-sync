@@ -315,6 +315,91 @@
       color: #8c8c8c;
     }
     
+    .shipment-order-number {
+      font-size: 11px;
+      color: #595959;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    
+    .shipment-order-number a {
+      color: #1890ff;
+      text-decoration: none;
+    }
+    
+    .shipment-order-number a:hover {
+      text-decoration: underline;
+    }
+    
+    .shipment-details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    
+    .shipment-detail-item {
+      font-size: 12px;
+    }
+    
+    .shipment-detail-label {
+      color: #8c8c8c;
+      display: block;
+      margin-bottom: 2px;
+    }
+    
+    .shipment-detail-value {
+      color: #262626;
+      font-weight: 500;
+    }
+    
+    .shipment-tracking-section {
+      background: #e6f7ff;
+      border-radius: 4px;
+      padding: 8px 10px;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .shipment-tracking-label {
+      font-size: 11px;
+      color: #1890ff;
+      font-weight: 500;
+    }
+    
+    .shipment-tracking-number {
+      font-size: 13px;
+      color: #1890ff;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    
+    .shipment-tracking-number:hover {
+      text-decoration: underline;
+    }
+    
+    .shipment-items-section {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #e8e8e8;
+    }
+    
+    .shipment-items-title {
+      font-size: 11px;
+      color: #8c8c8c;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    
+    .shipment-item-row {
+      font-size: 12px;
+      color: #262626;
+      padding: 2px 0;
+    }
+    
     .ss-connect-hint {
       background: #fffbe6;
       border: 1px solid #ffe58f;
@@ -1070,29 +1155,105 @@
         const statusClass = getShipmentBadgeClass(shipment.shipmentStatus);
         
         html += '<div class="shipment-card">';
+        
+        // Order number at the top
+        if (shipment.orderNumber || shipment.orderId) {
+          html += '<div class="shipment-order-number">';
+          html += `<strong>Order:</strong> ${shipment.orderNumber || ''}`;
+          if (shipment.orderId) {
+            html += ` <span style="color: #8c8c8c;">(ID: ${shipment.orderId})</span>`;
+          }
+          html += '</div>';
+        }
+        
+        // Status header
         html += '<div class="shipment-header">';
         html += `<span class="shipment-badge ${statusClass}">${shipment.shipmentStatus}</span>`;
-        
-        if (shipment.trackingNumber) {
-          const trackingUrl = getTrackingUrl(shipment.carrierCode, shipment.trackingNumber);
-          html += `<a href="${trackingUrl}" target="_blank" class="tracking-link">${shipment.trackingNumber}</a>`;
-        }
         html += '</div>';
         
+        // Details grid
+        html += '<div class="shipment-details-grid">';
+        
+        // Ship Date
         if (shipment.shipDate) {
-          html += `<div class="shipment-items">Ship Date: ${formatDate(shipment.shipDate)}</div>`;
+          html += '<div class="shipment-detail-item">';
+          html += '<span class="shipment-detail-label">Ship Date</span>';
+          html += `<span class="shipment-detail-value">${formatDate(shipment.shipDate)}</span>`;
+          html += '</div>';
         }
         
-        if (shipment.carrierCode || shipment.serviceCode) {
-          const carrier = [shipment.carrierCode, shipment.serviceCode].filter(Boolean).join(' - ');
-          html += `<div class="shipment-items">Carrier: ${carrier}</div>`;
+        // Delivery Date (if delivered)
+        if (shipment.deliveryDate) {
+          html += '<div class="shipment-detail-item">';
+          html += '<span class="shipment-detail-label">Delivered</span>';
+          html += `<span class="shipment-detail-value">${formatDate(shipment.deliveryDate)}</span>`;
+          html += '</div>';
         }
         
+        // Carrier
+        if (shipment.carrierCode) {
+          html += '<div class="shipment-detail-item">';
+          html += '<span class="shipment-detail-label">Carrier</span>';
+          html += `<span class="shipment-detail-value">${formatCarrierName(shipment.carrierCode)}</span>`;
+          html += '</div>';
+        }
+        
+        // Service
+        if (shipment.serviceCode) {
+          html += '<div class="shipment-detail-item">';
+          html += '<span class="shipment-detail-label">Service</span>';
+          html += `<span class="shipment-detail-value">${formatServiceName(shipment.serviceCode)}</span>`;
+          html += '</div>';
+        }
+        
+        // Order Status (when no shipment yet)
+        if (shipment.orderStatus && !shipment.trackingNumber) {
+          html += '<div class="shipment-detail-item">';
+          html += '<span class="shipment-detail-label">Order Status</span>';
+          html += `<span class="shipment-detail-value">${formatOrderStatus(shipment.orderStatus)}</span>`;
+          html += '</div>';
+        }
+        
+        // Create Date (when order exists but not shipped)
+        if (shipment.createDate && !shipment.shipDate) {
+          html += '<div class="shipment-detail-item">';
+          html += '<span class="shipment-detail-label">Order Created</span>';
+          html += `<span class="shipment-detail-value">${formatDate(shipment.createDate)}</span>`;
+          html += '</div>';
+        }
+        
+        html += '</div>'; // end details grid
+        
+        // Tracking section (prominent)
+        if (shipment.trackingNumber) {
+          const trackingUrl = getTrackingUrl(shipment.carrierCode, shipment.trackingNumber);
+          html += '<div class="shipment-tracking-section">';
+          html += '<span class="shipment-tracking-label">TRACKING NUMBER</span>';
+          html += `<a href="${trackingUrl}" target="_blank" class="shipment-tracking-number">${shipment.trackingNumber} ↗</a>`;
+          html += '</div>';
+        }
+        
+        // Ship-to address (if available)
+        if (shipment.shipTo && (shipment.shipTo.city || shipment.shipTo.state)) {
+          html += '<div style="font-size: 11px; color: #8c8c8c; margin-top: 8px;">';
+          html += '<strong>Ship To:</strong> ';
+          const addressParts = [
+            shipment.shipTo.name,
+            shipment.shipTo.city,
+            shipment.shipTo.state,
+            shipment.shipTo.postalCode
+          ].filter(Boolean);
+          html += addressParts.join(', ');
+          html += '</div>';
+        }
+        
+        // Items section
         if (shipment.items && shipment.items.length > 0) {
-          html += '<div class="shipment-items" style="margin-top: 8px;">';
-          html += '<strong>Items:</strong><br>';
+          html += '<div class="shipment-items-section">';
+          html += '<div class="shipment-items-title">ITEMS IN SHIPMENT</div>';
           shipment.items.forEach(item => {
-            html += `${item.quantity || 1}x ${item.name || 'Item'}<br>`;
+            const sku = item.sku ? ` (${item.sku})` : '';
+            html += `<div class="shipment-item-row">${item.quantity || 1}x ${item.name || 'Item'}${sku}</div>`;
           });
           html += '</div>';
         }
@@ -1130,6 +1291,49 @@
         return `https://www.dhl.com/en/express/tracking.html?AWB=${trackingNumber}`;
       }
       return `https://www.google.com/search?q=${trackingNumber}+tracking`;
+    }
+    
+    function formatCarrierName(carrierCode) {
+      if (!carrierCode) return '-';
+      const carriers = {
+        'ups': 'UPS',
+        'fedex': 'FedEx',
+        'usps': 'USPS',
+        'dhl_express': 'DHL Express',
+        'dhl_ecommerce': 'DHL eCommerce',
+        'stamps_com': 'Stamps.com',
+        'endicia': 'Endicia',
+        'ups_mi': 'UPS Mail Innovations',
+        'amazon_buy_shipping': 'Amazon',
+        'ontrac': 'OnTrac',
+        'globegistics': 'Globegistics',
+        'asendia': 'Asendia',
+        'purolator': 'Purolator',
+        'canada_post': 'Canada Post',
+        'royal_mail': 'Royal Mail',
+        'australia_post': 'Australia Post'
+      };
+      return carriers[carrierCode.toLowerCase()] || carrierCode.toUpperCase();
+    }
+    
+    function formatServiceName(serviceCode) {
+      if (!serviceCode) return '-';
+      return serviceCode
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, l => l.toUpperCase());
+    }
+    
+    function formatOrderStatus(orderStatus) {
+      if (!orderStatus) return '-';
+      const statuses = {
+        'awaiting_payment': 'Awaiting Payment',
+        'awaiting_shipment': 'Awaiting Shipment',
+        'pending_fulfillment': 'Pending Fulfillment',
+        'shipped': 'Shipped',
+        'on_hold': 'On Hold',
+        'cancelled': 'Cancelled'
+      };
+      return statuses[orderStatus.toLowerCase()] || orderStatus.replace(/_/g, ' ');
     }
     
     function closeDetail() {
