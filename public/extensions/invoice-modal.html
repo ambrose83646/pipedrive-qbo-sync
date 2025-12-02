@@ -533,6 +533,7 @@
     let dealId = null;
     let customerId = null;
     let customerName = null;
+    let customerEmail = null;
     let lineItems = [];
     let lineItemCounter = 0;
     let productSearchTimeouts = {};
@@ -574,6 +575,9 @@
           return;
         }
         
+        // Fetch customer email from QuickBooks
+        await fetchCustomerEmail();
+        
         showInvoiceForm();
         
       } catch (error) {
@@ -589,6 +593,22 @@
           <button class="btn btn-cancel" style="margin-top: 16px;" onclick="closeModal()">Close</button>
         </div>
       `;
+    }
+    
+    async function fetchCustomerEmail() {
+      try {
+        const response = await fetch(`/api/customer/${customerId}?userId=${encodeURIComponent(userId)}`);
+        const result = await response.json();
+        
+        if (result.success && result.customer) {
+          customerEmail = result.customer.PrimaryEmailAddr?.Address || null;
+          console.log('Fetched customer email:', customerEmail);
+        } else {
+          console.warn('Could not fetch customer email:', result.error);
+        }
+      } catch (error) {
+        console.error('Error fetching customer email:', error);
+      }
     }
     
     function showInvoiceForm() {
@@ -609,8 +629,8 @@
             <input type="text" class="form-input" id="invoiceCustomer" value="${customerName}" readonly>
           </div>
           <div class="form-group">
-            <label class="form-label">Due Date</label>
-            <input type="date" class="form-input" id="invoiceDueDate" value="${todayStr}">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-input" id="invoiceEmail" value="${customerEmail || ''}" placeholder="No email on file" readonly style="background-color: #f8f9fa;">
           </div>
         </div>
         
@@ -623,6 +643,10 @@
               <option value="Net 30">Net 30</option>
               <option value="Net 60">Net 60</option>
             </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Due Date</label>
+            <input type="date" class="form-input" id="invoiceDueDate" value="${todayStr}">
           </div>
         </div>
         
@@ -991,6 +1015,8 @@
           };
         }
         
+        const email = document.getElementById('invoiceEmail').value;
+        
         const response = await fetch(`/api/invoices?userId=${userId}`, {
           method: 'POST',
           headers: {
@@ -998,6 +1024,7 @@
           },
           body: JSON.stringify({
             customerId: customerId,
+            customerEmail: email || undefined,
             lineItems: lineItems.map(item => ({
               itemId: item.itemId,
               name: item.name,

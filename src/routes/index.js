@@ -2480,10 +2480,10 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
 // Create QuickBooks invoice
 router.post("/api/invoices", express.json(), async (req, res) => {
   try {
-    const { customerId, lineItems, dueDate, memo, paymentTerms, shippingAddress } = req.body;
+    const { customerId, customerEmail, lineItems, dueDate, memo, paymentTerms, shippingAddress } = req.body;
     const providedUserId = req.query.userId || req.body.userId || 'test';
     
-    console.log('Creating invoice for customer:', customerId, 'User ID:', providedUserId);
+    console.log('Creating invoice for customer:', customerId, 'Email:', customerEmail, 'User ID:', providedUserId);
 
     if (!customerId) {
       return res.status(400).json({
@@ -2596,6 +2596,13 @@ router.post("/api/invoices", express.json(), async (req, res) => {
       if (shippingAddress.CountrySubDivisionCode) invoiceData.ShipAddr.CountrySubDivisionCode = shippingAddress.CountrySubDivisionCode;
       if (shippingAddress.PostalCode) invoiceData.ShipAddr.PostalCode = shippingAddress.PostalCode;
       if (shippingAddress.Country) invoiceData.ShipAddr.Country = shippingAddress.Country;
+    }
+    
+    // Add customer email for invoice delivery
+    if (customerEmail) {
+      invoiceData.BillEmail = {
+        Address: customerEmail
+      };
     }
     
     console.log('Creating invoice with data:', JSON.stringify(invoiceData, null, 2));
