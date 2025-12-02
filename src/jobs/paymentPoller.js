@@ -135,7 +135,13 @@ async function createShipStationOrder(userData, invoice) {
     }
   };
   
-  return await makeShipStationApiCall(userData, 'POST', '/orders/createorder', shipstationOrder);
+  console.log(`[PaymentPoller] Creating ShipStation order - Number: ${shipstationOrder.orderNumber}, Customer: ${shipTo.name}, Items: ${items.length}, Amount: $${shipstationOrder.amountPaid.toFixed(2)}`);
+  
+  const createdOrder = await makeShipStationApiCall(userData, 'POST', '/orders/createorder', shipstationOrder);
+  
+  console.log(`[PaymentPoller] ShipStation order created - ID: ${createdOrder.orderId}, Number: ${createdOrder.orderNumber}`);
+  
+  return createdOrder;
 }
 
 const MAX_RETRIES = 10;

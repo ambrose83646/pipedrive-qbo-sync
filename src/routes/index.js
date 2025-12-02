@@ -3312,6 +3312,7 @@ async function makeShipStationApiCall(userData, method, endpoint, data = null) {
 router.get("/api/shipstation/shipments", async (req, res) => {
   try {
     const { userId, orderNumbers } = req.query;
+    console.log(`[ShipStation] Fetching shipments for user: ${userId}, orders: ${orderNumbers || 'none'}`);
     
     if (!userId) {
       return res.status(400).json({ error: "User ID is required" });
@@ -3412,6 +3413,9 @@ router.get("/api/shipstation/shipments", async (req, res) => {
       }
     }
     
+    const shipmentCount = Object.values(shipmentMap).reduce((sum, arr) => sum + arr.length, 0);
+    console.log(`[ShipStation] Found ${shipmentCount} shipment(s) for ${Object.keys(shipmentMap).length} order(s)`);
+    
     res.json({
       success: true,
       shipments: shipmentMap,
@@ -3504,8 +3508,12 @@ async function createShipStationOrderFromInvoice(userData, invoice, skipDupeChec
     }
   };
   
+  console.log(`[ShipStation] Creating order - Number: ${shipstationOrder.orderNumber}, Customer: ${shipTo.name}, Items: ${items.length}, Amount: $${shipstationOrder.amountPaid.toFixed(2)}`);
+  
   // Create order in ShipStation
   const createdOrder = await makeShipStationApiCall(userData, 'POST', '/orders/createorder', shipstationOrder);
+  
+  console.log(`[ShipStation] Order created successfully - ID: ${createdOrder.orderId}, Number: ${createdOrder.orderNumber}`);
   
   return createdOrder;
 }
@@ -3514,8 +3522,10 @@ async function createShipStationOrderFromInvoice(userData, invoice, skipDupeChec
 router.post("/api/shipstation/orders", express.json(), async (req, res) => {
   try {
     const { userId, invoice } = req.body;
+    console.log(`[ShipStation] Order creation request for user: ${userId}, invoice: ${invoice?.DocNumber || invoice?.Id}`);
     
     if (!userId || !invoice) {
+      console.log('[ShipStation] Order creation failed: missing userId or invoice data');
       return res.status(400).json({ error: "User ID and invoice data are required" });
     }
     
@@ -3640,6 +3650,7 @@ router.post("/api/shipstation/orders", express.json(), async (req, res) => {
 router.get("/api/shipstation/status", async (req, res) => {
   try {
     const { userId } = req.query;
+    console.log(`[ShipStation] Status check for user: ${userId}`);
     
     if (!userId) {
       return res.status(400).json({ error: "User ID is required" });
@@ -3669,12 +3680,14 @@ router.get("/api/shipstation/status", async (req, res) => {
     }
     
     if (!userData || !userData.shipstation_api_key) {
+      console.log(`[ShipStation] Status: Not connected for user ${userId}`);
       return res.json({
         connected: false,
         autoCreateEnabled: false
       });
     }
     
+    console.log(`[ShipStation] Status: Connected for user ${userId}, autoCreate: ${userData.shipstation_auto_create !== false}`);
     res.json({
       connected: true,
       autoCreateEnabled: userData.shipstation_auto_create !== false,
