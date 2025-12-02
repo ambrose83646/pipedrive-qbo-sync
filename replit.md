@@ -91,7 +91,7 @@ Preferred communication style: Simple, everyday language.
 # Recent Changes
 
 - **December 2, 2025**: Added invoice list modal for viewing all invoices within Pipedrive
-  - Created new `invoice-list-modal.html` extension that opens via Pipedrive SDK (modal ID: 1d5c0945-7264-435f-8aa2-986bed03ba6b)
+  - Created new `invoice-list-modal.html` extension that opens via Pipedrive SDK (modal ID: 27de700c-7063-46e0-9562-2acb3462ba1d)
   - Displays invoice table with columns: Invoice #, Date, Due Date, Status, Amount, Balance, Action
   - Status badges: Paid (green), Open (orange), Overdue (red) with robust date handling
   - Slide-in detail panel shows line items (products, discounts, taxes, groups), email, shipping address, memos
