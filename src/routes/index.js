@@ -2906,4 +2906,102 @@ router.get("/api/invoices/:invoiceId/pdf", async (req, res) => {
   }
 });
 
+// Get payment link for an invoice
+router.get("/api/invoices/:invoiceId/paylink", async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+    const providedUserId = req.query.userId || 'test';
+    
+    console.log('Getting payment link for invoice:', invoiceId, 'User ID:', providedUserId);
+
+    // Find user with QB tokens
+    let userData = null;
+    let actualUserId = providedUserId;
+    
+    userData = await getUser(providedUserId);
+    
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      const { listUsers } = require("../config/database");
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.qb_access_token && testUserData.qb_realm_id) {
+          const normalizedProvidedId = providedUserId.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          const normalizedKey = key.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+          
+          if (normalizedKey === normalizedProvidedId ||
+              testUserData.api_domain?.includes(normalizedProvidedId) ||
+              normalizedProvidedId.includes(normalizedKey)) {
+            userData = testUserData;
+            actualUserId = key;
+            break;
+          }
+          
+          if (!userData && testUserData.qb_realm_id) {
+            userData = testUserData;
+            actualUserId = key;
+          }
+        }
+      }
+    }
+    
+    if (!userData || !userData.qb_access_token || !userData.qb_realm_id) {
+      return res.status(400).json({
+        success: false,
+        error: "QuickBooks not connected for this user"
+      });
+    }
+
+    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const realmId = userData.qb_realm_id;
+    
+    // Fetch invoice with invoiceLink parameter
+    const invoiceData = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
+      const axios = require('axios');
+      const invoiceUrl = `${baseUrl}/v3/company/${realmId}/invoice/${invoiceId}?include=invoiceLink&minorversion=65`;
+      
+      const response = await axios({
+        method: 'GET',
+        url: invoiceUrl,
+        headers: {
+          'Authorization': `Bearer ${currentUserData.qb_access_token}`,
+          'Accept': 'application/json'
+        }
+      });
+      
+      return response.data;
+    });
+    
+    if (!invoiceData || !invoiceData.Invoice) {
+      return res.status(500).json({
+        success: false,
+        error: "Failed to fetch invoice from QuickBooks"
+      });
+    }
+    
+    const paymentLink = invoiceData.Invoice.InvoiceLink || invoiceData.Invoice.invoiceLink;
+    
+    if (!paymentLink) {
+      return res.status(404).json({
+        success: false,
+        error: "No payment link available. QuickBooks Payments may not be enabled for this account."
+      });
+    }
+    
+    res.json({
+      success: true,
+      paymentLink: paymentLink,
+      invoiceNumber: invoiceData.Invoice.DocNumber
+    });
+    
+  } catch (error) {
+    console.error("Get payment link error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
