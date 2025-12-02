@@ -90,6 +90,13 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
+- **December 2, 2025**: Enhanced invoice creation with payment terms and customer email
+  - Updated payment terms dropdown with three options: Due on Receipt, Net 30, Net 60
+  - Added automatic due date calculation when payment terms are selected
+  - Invoice modal now fetches customer email from QuickBooks linked contact on load
+  - Email is displayed as read-only field in the invoice form and included in QuickBooks invoice via BillEmail field
+  - This enables direct invoice emailing from QuickBooks to the customer
+
 - **November 25, 2025**: Fixed contact linking with tenant isolation and database storage
   - Overhauled user lookup to prioritize freshest Pipedrive tokens by `created_at` timestamp
   - Added tenant-safe QB token merging: only merges if api_domain AND qb_realm_id match (prevents cross-tenant credential leakage)
