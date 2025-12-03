@@ -334,6 +334,23 @@ async function getInvoiceMapping(invoiceId) {
   };
 }
 
+async function getInvoiceMappingByNumber(invoiceNumber) {
+  const result = await pool.query(
+    'SELECT * FROM invoice_mappings WHERE invoice_number = $1',
+    [invoiceNumber]
+  );
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
+  return {
+    invoiceId: row.invoice_id,
+    invoiceNumber: row.invoice_number,
+    shipstationOrderId: row.shipstation_order_id,
+    shipstationOrderNumber: row.shipstation_order_number,
+    triggeredBy: row.triggered_by,
+    createdAt: row.created_at?.toISOString()
+  };
+}
+
 async function deleteInvoiceMapping(invoiceId) {
   await pool.query('DELETE FROM invoice_mappings WHERE invoice_id = $1', [invoiceId]);
   return true;
@@ -373,6 +390,7 @@ module.exports = {
   deletePendingInvoice,
   setInvoiceMapping,
   getInvoiceMapping,
+  getInvoiceMappingByNumber,
   deleteInvoiceMapping,
   cleanupStaleEntries,
   cleanupMaxRetries

@@ -3294,10 +3294,11 @@ async function makeShipStationApiCall(userData, method, endpoint, data = null) {
 }
 
 // Get shipments for invoices (by order number = invoice DocNumber)
+// Orders are stored in ShipStation with format QB-{tenant}-{invoiceNumber}
 router.get("/api/shipstation/shipments", async (req, res) => {
   try {
     const { userId, orderNumbers } = req.query;
-    console.log(`[ShipStation] Fetching shipments for user: ${userId}, orders: ${orderNumbers || 'none'}`);
+    console.log(`[ShipStation] Fetching shipments for user: ${userId}, invoices: ${orderNumbers || 'none'}`);
     
     if (!userId) {
       return res.status(400).json({ error: "User ID is required" });
@@ -3337,10 +3338,10 @@ router.get("/api/shipstation/shipments", async (req, res) => {
       });
     }
     
-    // Parse order numbers array
-    const orderNumberList = orderNumbers ? orderNumbers.split(',').map(n => n.trim()) : [];
+    // Parse invoice DocNumbers from frontend
+    const invoiceDocNumbers = orderNumbers ? orderNumbers.split(',').map(n => n.trim()) : [];
     
-    if (orderNumberList.length === 0) {
+    if (invoiceDocNumbers.length === 0) {
       return res.json({
         success: true,
         shipments: [],
@@ -3348,24 +3349,56 @@ router.get("/api/shipstation/shipments", async (req, res) => {
       });
     }
     
-    // Fetch shipments for each order number
+    // Get the tenant prefix for this user (last 4 digits of pipedrive_user_id)
+    // Validate that we have a numeric user ID for tenant suffix
+    const pipedriveUserId = userData.pipedrive_user_id;
+    let tenantSuffix = null;
+    
+    if (pipedriveUserId && /^\d+$/.test(String(pipedriveUserId))) {
+      tenantSuffix = String(pipedriveUserId).slice(-4);
+    }
+    
+    console.log(`[ShipStation] Using tenant suffix: ${tenantSuffix} (from pipedrive_user_id: ${pipedriveUserId})`);
+    
+    // Import getInvoiceMappingByNumber for fallback lookups
+    const { getInvoiceMappingByNumber } = require("../../config/postgres");
+    
+    // Fetch shipments for each invoice DocNumber
+    // Map results back to DocNumber keys for frontend compatibility
     const shipmentMap = {};
     
-    for (const orderNumber of orderNumberList) {
+    for (const docNumber of invoiceDocNumbers) {
       try {
-        // First, find orders matching this order number
-        const ordersData = await makeShipStationApiCall(userData, 'GET', `/orders?orderNumber=${encodeURIComponent(orderNumber)}`);
+        let ssOrderNumber = null;
+        let ordersData = null;
         
-        if (ordersData.orders && ordersData.orders.length > 0) {
+        // Strategy 1: Build order number from tenant suffix if available
+        if (tenantSuffix) {
+          ssOrderNumber = `QB-${tenantSuffix}-${docNumber}`;
+          console.log(`[ShipStation] Looking up order: ${ssOrderNumber} for invoice ${docNumber}`);
+          ordersData = await makeShipStationApiCall(userData, 'GET', `/orders?orderNumber=${encodeURIComponent(ssOrderNumber)}`);
+        }
+        
+        // Strategy 2: Fallback to invoice_mappings table if direct lookup failed
+        if (!ordersData || !ordersData.orders || ordersData.orders.length === 0) {
+          const mapping = await getInvoiceMappingByNumber(docNumber);
+          if (mapping && mapping.shipstationOrderNumber) {
+            ssOrderNumber = mapping.shipstationOrderNumber;
+            console.log(`[ShipStation] Fallback: Using stored order number ${ssOrderNumber} from invoice_mappings`);
+            ordersData = await makeShipStationApiCall(userData, 'GET', `/orders?orderNumber=${encodeURIComponent(ssOrderNumber)}`);
+          }
+        }
+        
+        if (ordersData && ordersData.orders && ordersData.orders.length > 0) {
           for (const order of ordersData.orders) {
             // Get shipments for this order
             const shipmentsData = await makeShipStationApiCall(userData, 'GET', `/shipments?orderId=${order.orderId}`);
             
             if (shipmentsData.shipments && shipmentsData.shipments.length > 0) {
-              // Map shipments to our format
+              // Map shipments to our format - use docNumber as key for frontend
               const formattedShipments = shipmentsData.shipments.map(ship => ({
                 shipmentId: ship.shipmentId,
-                orderNumber: orderNumber,
+                orderNumber: ssOrderNumber,
                 orderId: order.orderId,
                 trackingNumber: ship.trackingNumber,
                 carrierCode: ship.carrierCode,
@@ -3378,12 +3411,13 @@ router.get("/api/shipstation/shipments", async (req, res) => {
                 items: order.items || []
               }));
               
-              shipmentMap[orderNumber] = formattedShipments;
+              // Key by DocNumber for frontend compatibility
+              shipmentMap[docNumber] = formattedShipments;
             } else {
               // No shipments yet, but order exists
-              shipmentMap[orderNumber] = [{
+              shipmentMap[docNumber] = [{
                 orderId: order.orderId,
-                orderNumber: orderNumber,
+                orderNumber: ssOrderNumber,
                 orderStatus: order.orderStatus,
                 shipmentStatus: order.orderStatus === 'shipped' ? 'Shipped' : 'Awaiting Shipment',
                 items: order.items || [],
@@ -3393,13 +3427,13 @@ router.get("/api/shipstation/shipments", async (req, res) => {
           }
         }
       } catch (orderError) {
-        console.error(`[ShipStation] Error fetching order ${orderNumber}:`, orderError.message);
+        console.error(`[ShipStation] Error fetching order for invoice ${docNumber}:`, orderError.message);
         // Continue with other orders
       }
     }
     
     const shipmentCount = Object.values(shipmentMap).reduce((sum, arr) => sum + arr.length, 0);
-    console.log(`[ShipStation] Found ${shipmentCount} shipment(s) for ${Object.keys(shipmentMap).length} order(s)`);
+    console.log(`[ShipStation] Found ${shipmentCount} order(s)/shipment(s) for ${Object.keys(shipmentMap).length} invoice(s)`);
     
     res.json({
       success: true,
