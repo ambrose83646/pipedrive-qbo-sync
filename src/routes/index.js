@@ -3013,24 +3013,19 @@ router.post("/api/invoices", express.json(), async (req, res) => {
           console.log(`[ShipStation] Invoice ${result.Invoice.DocNumber} - Payment terms: ${paymentTerms}, Balance: ${invoiceBalance}, Due on Receipt: ${isDueOnReceipt}`);
           
           if (isDueOnReceipt && invoiceBalance > 0) {
-            // Due on Receipt with unpaid balance - store for later processing
-            console.log(`[ShipStation] Invoice ${result.Invoice.DocNumber} - Due on Receipt, pending payment. Storing for later.`);
+            // Due on Receipt with unpaid balance - add to pending_invoices table for payment poller
+            console.log(`[ShipStation] Invoice ${result.Invoice.DocNumber} - Due on Receipt, pending payment. Adding to pending invoices.`);
             
-            const pendingKey = `ss_pending:${result.Invoice.Id}`;
-            await setUser(pendingKey, {
-              invoiceId: result.Invoice.Id,
-              invoiceNumber: result.Invoice.DocNumber,
-              customerId: customerId,
-              userId: actualUserId,
-              totalAmount: result.Invoice.TotalAmt,
-              balance: invoiceBalance,
-              paymentTerms: paymentTerms,
-              createdAt: new Date().toISOString(),
-              invoiceData: result.Invoice
-            });
+            // addPendingInvoice(invoiceId, invoiceNumber, userId, invoiceData)
+            await addPendingInvoice(
+              result.Invoice.Id,
+              result.Invoice.DocNumber,
+              actualUserId,
+              result.Invoice  // Store full invoice data for ShipStation order creation
+            );
             
             shipstationOrderPending = true;
-            console.log(`[ShipStation] Stored pending shipment for invoice ${result.Invoice.DocNumber}`);
+            console.log(`[ShipStation] Added invoice ${result.Invoice.DocNumber} to pending invoices for payment polling`);
           } else {
             // Net 30/60 or paid invoice - create ShipStation order immediately
             console.log(`[ShipStation] Creating order for invoice ${result.Invoice.DocNumber}`);
