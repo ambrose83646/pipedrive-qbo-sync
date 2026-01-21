@@ -1194,6 +1194,136 @@ router.get("/success", (req, res) => {
   );
 });
 
+// Disconnect landing page - Required by QuickBooks for production app approval
+router.get("/disconnect", (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Disconnect QuickBooks - Onit Invoice Builder</title>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          background: #f5f5f5;
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .container {
+          max-width: 500px;
+          margin: 0 auto;
+          padding: 40px 20px;
+        }
+        .card {
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          padding: 40px;
+          text-align: center;
+        }
+        .icon {
+          width: 64px;
+          height: 64px;
+          margin: 0 auto 20px;
+          background: #f0f4f8;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .icon svg {
+          width: 32px;
+          height: 32px;
+          color: #317ae2;
+        }
+        h1 {
+          font-size: 24px;
+          color: #1a1a2e;
+          margin-bottom: 15px;
+        }
+        p {
+          color: #666;
+          margin-bottom: 20px;
+        }
+        .info-box {
+          background: #e8f4fd;
+          border-left: 4px solid #317ae2;
+          padding: 15px;
+          border-radius: 4px;
+          text-align: left;
+          margin-bottom: 25px;
+        }
+        .info-box h3 {
+          font-size: 14px;
+          color: #1a1a2e;
+          margin-bottom: 8px;
+        }
+        .info-box ol {
+          margin-left: 20px;
+          font-size: 14px;
+          color: #444;
+        }
+        .info-box li {
+          margin-bottom: 5px;
+        }
+        .footer-text {
+          font-size: 13px;
+          color: #888;
+          margin-top: 20px;
+        }
+        .footer-text a {
+          color: #317ae2;
+          text-decoration: none;
+        }
+        .footer-text a:hover {
+          text-decoration: underline;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="card">
+          <div class="icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </div>
+          <h1>Disconnect QuickBooks</h1>
+          <p>To disconnect your QuickBooks account from Onit Invoice Builder, please follow these steps:</p>
+          
+          <div class="info-box">
+            <h3>How to Disconnect:</h3>
+            <ol>
+              <li>Open Pipedrive and navigate to any deal</li>
+              <li>Click on the Onit Invoice Builder panel</li>
+              <li>Go to Settings</li>
+              <li>Click "Disconnect QuickBooks"</li>
+            </ol>
+          </div>
+          
+          <p>Once disconnected, no new data will be synced between Pipedrive and QuickBooks. Your existing data in both systems will remain unchanged.</p>
+          
+          <p class="footer-text">
+            Questions? Contact <a href="mailto:kurtis@capitaleleven.com">kurtis@capitaleleven.com</a><br><br>
+            <a href="/privacy">Privacy Policy</a> | <a href="/eula">Terms of Use</a>
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 router.get("/api/user-status", async (req, res) => {
   try {
     // Helper function to normalize userId - strip https://, http://, and .pipedrive.com suffix
