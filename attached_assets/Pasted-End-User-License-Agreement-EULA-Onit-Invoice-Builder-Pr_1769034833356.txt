@@ -1,0 +1,153 @@
+End User License Agreement (EULA) — Onit Invoice Builder (Private App)
+Effective Date: 12/1/25							
+App Name: Onit Invoice Builder (the “App”)
+Owner: Onit Incorporated (“Onit,” “we,” “us”)
+Audience: Onit employees and Onit-authorized representatives only (“you”)
+This End User License Agreement (“Agreement”) governs your access to and use of the App, a private application that enables creation of customized QuickBooks invoices from within Pipedrive CRM. By installing, accessing, or using the App, you agree to this Agreement.
+
+1) Eligibility and Authorized Use
+1.1 Authorized Users Only. You may use the App only if you are (a) an employee of Onit or (b) an authorized representative acting on Onit’s behalf and approved by Onit.
+1.2 Business Use Only. The App is intended solely for Onit’s internal business purposes and authorized client/service activities approved by Onit.
+1.3 Account Requirement. Use of the App may require active accounts for Pipedrive and QuickBooks (or QuickBooks Online) and appropriate permissions in those systems.
+
+2) License Grant and Restrictions
+2.1 Limited License. Subject to this Agreement, Onit grants you a limited, revocable, non-exclusive, non-transferable license to use the App solely for Authorized Use.
+2.2 Restrictions. You will not, and will not allow others to:
+copy, modify, translate, or create derivative works of the App except as expressly permitted by Onit in writing;
+
+
+reverse engineer, decompile, or attempt to extract source code, underlying ideas, or algorithms;
+
+
+circumvent security controls or access the App outside permitted roles/permissions;
+
+
+use the App for any unlawful purpose or to process data you are not authorized to access;
+
+
+sell, sublicense, rent, lease, or provide the App to any third party;
+
+
+use the App to transmit malware, spam, or content that violates law or third-party rights.
+
+
+
+3) App Functionality and Third-Party Services
+3.1 Integrations. The App may connect with:
+Pipedrive CRM (to read or use deal/contact/company/product/invoice-related information), and
+
+
+QuickBooks (to create and/or update invoices and related accounting records).
+
+ 3.2 Third-Party Terms. Pipedrive, QuickBooks/Intuit, and any related services are third-party services (“Third-Party Services”). Your use of Third-Party Services is governed by their terms, not this Agreement. Onit does not control Third-Party Services and is not responsible for their availability, security, or behavior.
+
+ 3.3 No Affiliation. QuickBooks is a product of Intuit and Pipedrive is provided by its respective owner. The App is not endorsed by or affiliated with those providers except as applicable via their developer/integration programs.
+
+
+
+4) Access, Authentication, and Credentials
+4.1 Authentication. The App may use OAuth or similar methods to connect to Third-Party Services.
+4.2 Credential Security. You must keep your credentials secure, use strong authentication, and never share tokens, passwords, or login sessions.
+4.3 Least Privilege. You must request and use only the minimum access necessary to perform your job duties.
+4.4 Responsibility for Activity. You are responsible for all activity performed using your access, whether authorized by you or not, unless caused by Onit’s failure to implement reasonable security controls.
+
+5) Data and Privacy
+5.1 Data Types. The App may process data such as: customer/contact info, deal details, product/service line items, pricing, tax fields, invoice templates, invoice amounts, payment terms, and related metadata (“App Data”).
+5.2 Data Handling. Onit may:
+read data from Pipedrive to populate invoices;
+
+
+transmit invoice and customer data to QuickBooks to create/update invoices;
+
+
+store limited configuration data needed to operate the App (e.g., template mappings, field mappings, user preferences, integration identifiers, error logs).
+
+ 5.3 Logs and Monitoring. Onit may collect operational telemetry and audit logs (e.g., timestamps, user IDs, actions taken, API responses, error details) to secure, maintain, and improve the App.
+
+ 5.4 Confidentiality of Business Data. App Data is Onit confidential information (or Onit-controlled customer/client information) and must be handled under Section 6.
+
+ 5.5 Privacy Notice/Policies. Where applicable, App Data handling is governed by Onit policies, including information security and privacy policies, plus any applicable customer agreements and legal requirements.
+
+ 5.6 Data Accuracy. You are responsible for verifying invoice accuracy (customer, amount, tax, terms, line items) before sending or posting invoices. The App is an assistive tool, not a substitute for review.
+
+
+
+6) Confidentiality
+6.1 Confidential Information. The App, its design, documentation, source and object code, workflows, configurations, and non-public business information are Onit’s confidential information (“Confidential Information”).
+6.2 Obligations. You will:
+use Confidential Information only for Authorized Use;
+
+
+protect it using at least reasonable care and no less than the care you use for your own confidential information;
+
+
+not disclose Confidential Information to any third party except as required for Authorized Use and permitted by Onit and applicable agreements.
+
+ 6.3 Exclusions. Confidential Information does not include information that is publicly available through no fault of yours, lawfully obtained from a third party without duty of confidentiality, or independently developed without use of Confidential Information.
+
+ 6.4 Compelled Disclosure. If legally compelled to disclose Confidential Information, you will provide Onit prompt notice (unless prohibited by law) and cooperate to seek protective treatment.
+
+
+
+7) Intellectual Property
+7.1 Ownership. Onit retains all right, title, and interest in and to the App, including all intellectual property rights. No rights are granted except as expressly stated.
+7.2 Feedback. If you provide feedback or suggestions, you grant Onit the right to use them without restriction or compensation.
+
+8) Acceptable Use and Compliance
+8.1 Policy Compliance. You must comply with all Onit policies (including security, acceptable use, and data handling) and all applicable laws and regulations.
+8.2 Prohibited Data. You must not input or process data in violation of contractual obligations, privacy obligations, export controls, sanctions, or professional duties.
+8.3 Recordkeeping. You must follow Onit’s invoicing/accounting procedures, approval workflows, and record retention requirements.
+
+9) Security
+9.1 Security Measures. Onit will use commercially reasonable administrative, technical, and organizational safeguards appropriate to the App’s risk profile.
+9.2 User Duties. You must promptly report suspected security incidents, compromised credentials, or unauthorized use to Onit per internal procedures.
+9.3 No Security Testing Without Permission. You may not probe, scan, or test the App’s security without Onit’s prior written authorization.
+
+10) Updates, Changes, and Availability
+10.1 Updates. Onit may update, modify, or discontinue features at any time.
+10.2 Availability. The App may be unavailable due to maintenance, outages, Third-Party Service interruptions, or other reasons. Onit does not guarantee uninterrupted operation.
+
+11) Support
+11.1 Internal Support. Support is provided, if at all, through Onit’s designated internal support channels and may be changed or discontinued.
+11.2 Third-Party Issues. Issues caused by Pipedrive/QuickBooks outages, API changes, or account configuration may not be resolvable by Onit.
+
+12) Disclaimers
+12.1 As-Is. To the maximum extent permitted by law, the App is provided “AS IS” and “AS AVAILABLE.”
+12.2 No Warranties. Onit disclaims all warranties, express or implied, including implied warranties of merchantability, fitness for a particular purpose, non-infringement, and accuracy.
+12.3 Accounting/Tax Disclaimer. The App does not provide accounting, tax, or legal advice. You are responsible for compliance with invoicing and accounting requirements and for reviewing outputs.
+
+13) Limitation of Liability
+To the maximum extent permitted by law:
+13.1 No Indirect Damages. Onit will not be liable for any indirect, incidental, special, consequential, or punitive damages, or loss of profits, revenue, goodwill, data, or business interruption.
+13.2 Liability Cap. Onit’s total liability arising out of or related to the App will not exceed $100 (or, if required by law and applicable, the amount paid by Onit for the App in the prior 12 months, which for an internal tool may be $0).
+13.3 Basis of Bargain. These limitations apply even if a remedy fails of its essential purpose.
+
+14) Indemnification (User)
+You agree to indemnify and hold harmless Onit from claims, damages, liabilities, and expenses arising from your misuse of the App, violation of this Agreement, violation of law, or violation of Third-Party Service terms, except to the extent caused by Onit’s gross negligence or willful misconduct.
+
+15) Termination
+15.1 Termination by Onit. Onit may suspend or terminate your access immediately for any reason, including suspected misuse, security concerns, or role changes.
+15.2 Termination by You. You may stop using the App at any time.
+15.3 Effect. Upon termination, you must cease use and delete any App materials provided to you (if applicable). Sections that by their nature should survive will survive (including confidentiality, IP, disclaimers, limitation of liability, and indemnification).
+
+16) Export Controls and Sanctions
+You may not use the App in violation of export control laws or sanctions regulations. You represent that you are not located in, under control of, or a national/resident of any sanctioned jurisdiction (to the extent applicable).
+
+17) Governing Law; Dispute Resolution
+Governing Law: This Agreement is governed by the laws of [State/Country], excluding conflict of laws rules.
+Venue: Any dispute will be brought in the state or federal courts located in [County, State], and you consent to their jurisdiction.
+(Replace bracketed fields with Onit’s preferred governing law/venue.)
+
+18) Miscellaneous
+18.1 Entire Agreement. This Agreement is the entire agreement regarding the App and supersedes prior understandings about the App.
+18.2 Severability. If any provision is unenforceable, the remaining provisions remain in effect.
+18.3 No Waiver. Failure to enforce a provision is not a waiver.
+18.4 Assignment. You may not assign this Agreement. Onit may assign it as part of a merger, acquisition, or reorganization.
+18.5 Changes. Onit may update this Agreement; continued use after notice constitutes acceptance.
+
+19) Contact
+Questions about this Agreement or the App should be directed to:
+Onit Incorporated
+Attn: Kurtis Taylor
+Email: kurtis@capitaleleven.com 
+
