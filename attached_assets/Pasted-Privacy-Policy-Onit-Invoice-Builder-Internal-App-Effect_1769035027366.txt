@@ -1,0 +1,166 @@
+Privacy Policy — Onit Invoice Builder (Internal App)
+Effective Date: 12/1/2025
+App Name: Onit Invoice Builder (the “App”)
+Company: Onit Incorporated (“Onit,” “we,” “us”)
+Audience: Onit employees and Onit-authorized representatives only (“Users”)
+This Privacy Policy describes how the App handles information. The App is an internal tool intended solely for Onit’s business operations.
+
+1) Core Principle: No Data Tracking, Sharing, Storage, or Sale
+The App is designed to be restrictive by default:
+No tracking of Users across apps, websites, or services.
+
+
+No analytics, ad tech, marketing pixels, or behavioral profiling.
+
+
+No sale of data.
+
+
+No sharing of data with third parties for marketing or advertising.
+
+
+No persistent storage of customer or invoice content within the App outside the Third-Party Systems described below.
+
+
+The App functions as a pass-through interface that helps Users create QuickBooks invoices from within Pipedrive.
+
+2) Systems Involved and Where Data Lives
+The App interacts only with the following systems, each controlled by its respective provider and/or Onit’s accounts:
+Pipedrive CRM (source data: contacts, deals, products, line items, etc.)
+
+
+QuickBooks (destination data: invoices and related accounting records)
+
+
+Invoice/customer data is read from Pipedrive and written to QuickBooks.
+The App itself does not store invoice/customer content.
+
+3) Information the App Processes (In-Memory Only)
+When you use the App, it may temporarily process the following data in memory solely to perform your requested action:
+Customer/contact identifiers and basic details (e.g., name, email, billing address, phone)
+
+
+Deal and product/service details (e.g., descriptions, quantities, rates, taxes)
+
+
+Invoice fields (e.g., invoice number, terms, due date, totals)
+
+
+Internal mapping selections you choose during invoice creation (e.g., template selection)
+
+
+This data is processed only to generate the invoice payload sent to QuickBooks.
+
+4) What the App Does 
+Not
+ Collect
+The App does not:
+collect browsing history or device fingerprints
+
+
+collect precise location data
+
+
+use cookies for analytics or marketing
+
+
+run session replay or heatmaps
+
+
+build user profiles
+
+
+collect data from unrelated sources
+
+
+transmit data to advertisers or data brokers
+
+
+
+5) Storage Policy
+5.1 No Content Storage.
+The App does not persistently store:
+invoice content
+
+
+customer contact content
+
+
+deal details
+
+
+product/service line items
+
+
+attachments
+
+
+5.2 Minimal Operational Data (Strictly Limited).
+If required for secure operation, the App may retain only the minimum operational data below, and only for as long as necessary:
+integration status flags (e.g., “connected” / “disconnected”)
+
+
+non-content identifiers needed to route requests (e.g., internal user ID, Pipedrive org ID, QuickBooks company ID)
+
+
+security-related events (e.g., authentication success/failure, token refresh failure)
+
+
+error metadata needed to diagnose failures (e.g., HTTP status codes, timestamps)
+
+
+No operational logs will include invoice/customer content.
+5.3 Retention.
+Any minimal operational data retained is subject to short retention windows and will be deleted or rotated automatically per Onit internal policy.
+
+6) Sharing and Disclosure
+6.1 No Sharing.
+Onit does not share App Data with third parties, except:
+Pipedrive and QuickBooks as necessary to perform the requested invoice action, using Onit-controlled accounts and permissions.
+
+
+6.2 Legal/Compliance Exception (Rare).
+If required by law, subpoena, or court order, Onit may disclose information as legally necessary. Where permitted, Onit will notify impacted Users.
+
+7) Security
+Onit uses reasonable safeguards appropriate for an internal tool, including:
+role-based access controls
+
+
+least-privilege permissions
+
+
+secure authentication methods (e.g., OAuth where applicable)
+
+
+encrypted transmission (TLS) when communicating with Third-Party Systems
+
+
+Users must protect their credentials and report suspected misuse immediately.
+
+8) Third-Party Services
+The App relies on Pipedrive and QuickBooks APIs. Their handling of data is governed by their own policies and your organization’s account configuration. This Privacy Policy applies only to the App’s behavior.
+
+9) User Responsibilities and Data Accuracy
+You are responsible for:
+ensuring you have permission to access and process the data you use
+
+
+verifying invoice details before finalizing or sending invoices
+
+
+following Onit’s invoicing and accounting procedures
+
+
+
+10) Children’s Privacy
+The App is not directed to children and is intended solely for business users. Onit does not knowingly collect children’s personal information through the App.
+
+11) Changes to This Policy
+Onit may update this Privacy Policy to reflect changes in the App. Updates will be communicated through internal channels. Continued use of the App after the effective date of an update constitutes acceptance.
+
+12) Contact
+Questions about this Privacy Policy or the App:
+Onit Incorporated
+Attn: Kurtis Taylor
+Email: kurtis@capitaleleven.com
