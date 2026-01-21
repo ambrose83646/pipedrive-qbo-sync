@@ -15,6 +15,7 @@ ignorePorts = false
 
 [agent]
 expertMode = true
+integrations = ["javascript_database:1.0.0"]
 
 [workflows]
 runButton = "Project"
