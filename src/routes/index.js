@@ -221,6 +221,14 @@ router.get("/", (req, res) => {
   res.send("Hello!");
 });
 
+router.get("/eula", (req, res) => {
+  res.sendFile("eula.html", { root: "./public" });
+});
+
+router.get("/privacy", (req, res) => {
+  res.sendFile("privacy.html", { root: "./public" });
+});
+
 router.get("/test-db", async (req, res) => {
   try {
     const testData = { name: "Test User", token: "fake" };
