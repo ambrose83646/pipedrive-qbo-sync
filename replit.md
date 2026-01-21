@@ -80,8 +80,9 @@ A controller-based synchronization logic (`src/controllers/sync.js`) manages dat
 
 ## Database
 
-### PostgreSQL (Neon-backed)
+### PostgreSQL (Replit-hosted)
 - **Type**: Relational database via `pg` package
+- **Infrastructure**: Replit's native database (separate dev/prod environments)
 - **Tables**:
   - `users`: OAuth tokens (Pipedrive & QuickBooks), ShipStation credentials (encrypted), setup preferences
   - `deal_mappings`: Pipedrive deal ID to QuickBooks customer ID associations
