@@ -1155,12 +1155,25 @@ router.get("/auth/pipedrive/callback", async (req, res) => {
             <p>3. Click "Connect to QuickBooks" to complete the integration</p>
           </div>
           
-          <button onclick="window.close()">Close This Window</button>
+          <button onclick="goToPipedrive()">Close This Window</button>
         </div>
         <script>
-          // Try to close the window after 5 seconds
+          function goToPipedrive() {
+            // Try to navigate back to Pipedrive settings
+            const pipedriveUrl = 'https://app.pipedrive.com/settings/installed_apps';
+            
+            // First try to close the window (works if opened by script)
+            if (window.opener) {
+              window.close();
+            } else {
+              // Redirect to Pipedrive if window can't be closed
+              window.location.href = pipedriveUrl;
+            }
+          }
+          
+          // Auto-redirect after 5 seconds
           setTimeout(function() {
-            window.close();
+            goToPipedrive();
           }, 5000);
         </script>
       </body>

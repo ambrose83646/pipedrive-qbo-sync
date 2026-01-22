@@ -5,8 +5,47 @@ const { encrypt, decrypt } = require('../src/utils/encryption');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  // Connection resilience settings for Neon serverless
+  max: 10,                        // Maximum number of clients in pool
+  idleTimeoutMillis: 30000,       // Close idle clients after 30 seconds
+  connectionTimeoutMillis: 10000, // Wait 10 seconds for connection
+  allowExitOnIdle: true           // Allow pool to close when idle (helps with serverless)
 });
+
+// Handle pool errors gracefully (prevents crashes on connection drops)
+pool.on('error', (err) => {
+  console.error('[Database] Unexpected pool error:', err.message);
+  // Don't exit - the pool will recover automatically
+});
+
+// Resilient query wrapper with retry logic for Neon serverless
+// Retries on connection termination errors (57P01, ECONNRESET, etc.)
+async function resilientQuery(text, params, maxRetries = 3) {
+  const retryableErrors = ['57P01', '57P02', '57P03', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT'];
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await pool.query(text, params);
+    } catch (error) {
+      lastError = error;
+      const errorCode = error.code || '';
+      const isRetryable = retryableErrors.includes(errorCode) || 
+                          error.message?.includes('Connection terminated') ||
+                          error.message?.includes('connection reset');
+      
+      if (isRetryable && attempt < maxRetries) {
+        console.log(`[Database] Query failed (attempt ${attempt}/${maxRetries}), retrying: ${errorCode}`);
+        // Wait briefly before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
 
 async function initializeDatabase() {
   try {
@@ -34,7 +73,7 @@ async function getUser(userId) {
   
   // First try exact match on pipedrive_user_id
   for (const tryId of [...new Set(possibleIds.filter(id => id))]) {
-    const result = await pool.query(
+    const result = await resilientQuery(
       'SELECT * FROM users WHERE pipedrive_user_id = $1',
       [tryId]
     );
@@ -45,7 +84,7 @@ async function getUser(userId) {
   
   // Try matching by pipedrive_numeric_id (for when userId is the numeric Pipedrive user ID)
   for (const tryId of [...new Set(possibleIds.filter(id => id))]) {
-    const result = await pool.query(
+    const result = await resilientQuery(
       'SELECT * FROM users WHERE pipedrive_numeric_id = $1',
       [tryId]
     );
@@ -56,7 +95,7 @@ async function getUser(userId) {
   
   // Fallback: search by pipedrive_api_domain (for cases where userId is domain but stored ID is numeric)
   for (const tryId of [...new Set(possibleIds.filter(id => id))]) {
-    const result = await pool.query(
+    const result = await resilientQuery(
       'SELECT * FROM users WHERE pipedrive_api_domain ILIKE $1 OR pipedrive_api_domain ILIKE $2',
       [`%${tryId}%`, `%${normalized}%`]
     );
@@ -71,7 +110,7 @@ async function getUser(userId) {
 async function setUser(userId, data) {
   const normalized = normalizeUserId(userId);
   
-  const existing = await pool.query(
+  const existing = await resilientQuery(
     'SELECT id FROM users WHERE pipedrive_user_id = $1',
     [normalized]
   );
@@ -82,7 +121,7 @@ async function setUser(userId, data) {
   const qbRefreshToken = encrypt(data.qb_refresh_token);
   
   if (existing.rows.length > 0) {
-    await pool.query(`
+    await resilientQuery(`
       UPDATE users SET
         pipedrive_access_token = $2,
         pipedrive_refresh_token = $3,
@@ -133,7 +172,7 @@ async function setUser(userId, data) {
       data.pipedrive_numeric_id || null
     ]);
   } else {
-    await pool.query(`
+    await resilientQuery(`
       INSERT INTO users (
         pipedrive_user_id,
         pipedrive_access_token,
@@ -190,12 +229,12 @@ async function setUser(userId, data) {
 
 async function deleteUser(userId) {
   const normalized = normalizeUserId(userId);
-  await pool.query('DELETE FROM users WHERE pipedrive_user_id = $1', [normalized]);
+  await resilientQuery('DELETE FROM users WHERE pipedrive_user_id = $1', [normalized]);
   return true;
 }
 
 async function listUsers(prefix = '') {
-  const result = await pool.query('SELECT pipedrive_user_id FROM users');
+  const result = await resilientQuery('SELECT pipedrive_user_id FROM users');
   const allIds = result.rows.map(row => row.pipedrive_user_id);
   
   if (prefix) {
@@ -244,7 +283,7 @@ function rowToUserData(row) {
 }
 
 async function setDealMapping(dealId, qbCustomerId, customerName) {
-  await pool.query(`
+  await resilientQuery(`
     INSERT INTO deal_mappings (deal_id, qb_customer_id, customer_name, linked_at)
     VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
     ON CONFLICT (deal_id) DO UPDATE SET
@@ -256,7 +295,7 @@ async function setDealMapping(dealId, qbCustomerId, customerName) {
 }
 
 async function getDealMapping(dealId) {
-  const result = await pool.query(
+  const result = await resilientQuery(
     'SELECT * FROM deal_mappings WHERE deal_id = $1',
     [dealId]
   );
@@ -270,12 +309,12 @@ async function getDealMapping(dealId) {
 }
 
 async function deleteDealMapping(dealId) {
-  await pool.query('DELETE FROM deal_mappings WHERE deal_id = $1', [dealId]);
+  await resilientQuery('DELETE FROM deal_mappings WHERE deal_id = $1', [dealId]);
   return true;
 }
 
 async function addPendingInvoice(invoiceId, invoiceNumber, userId, invoiceData) {
-  await pool.query(`
+  await resilientQuery(`
     INSERT INTO pending_invoices (invoice_id, invoice_number, user_id, invoice_data, created_at)
     VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
     ON CONFLICT (invoice_id) DO UPDATE SET
@@ -287,7 +326,7 @@ async function addPendingInvoice(invoiceId, invoiceNumber, userId, invoiceData) 
 }
 
 async function getPendingInvoice(invoiceId) {
-  const result = await pool.query(
+  const result = await resilientQuery(
     'SELECT * FROM pending_invoices WHERE invoice_id = $1',
     [invoiceId]
   );
@@ -306,7 +345,7 @@ async function getPendingInvoice(invoiceId) {
 }
 
 async function listPendingInvoices() {
-  const result = await pool.query('SELECT * FROM pending_invoices ORDER BY created_at ASC');
+  const result = await resilientQuery('SELECT * FROM pending_invoices ORDER BY created_at ASC');
   return result.rows.map(row => ({
     invoiceId: row.invoice_id,
     invoiceNumber: row.invoice_number,
@@ -320,7 +359,7 @@ async function listPendingInvoices() {
 }
 
 async function updatePendingInvoiceRetry(invoiceId, retryCount, errorMessage) {
-  await pool.query(`
+  await resilientQuery(`
     UPDATE pending_invoices SET
       retry_count = $2,
       last_error = $3,
@@ -331,12 +370,12 @@ async function updatePendingInvoiceRetry(invoiceId, retryCount, errorMessage) {
 }
 
 async function deletePendingInvoice(invoiceId) {
-  await pool.query('DELETE FROM pending_invoices WHERE invoice_id = $1', [invoiceId]);
+  await resilientQuery('DELETE FROM pending_invoices WHERE invoice_id = $1', [invoiceId]);
   return true;
 }
 
 async function setInvoiceMapping(invoiceId, invoiceNumber, shipstationOrderId, shipstationOrderNumber, triggeredBy) {
-  await pool.query(`
+  await resilientQuery(`
     INSERT INTO invoice_mappings (invoice_id, invoice_number, shipstation_order_id, shipstation_order_number, triggered_by, created_at)
     VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
     ON CONFLICT (invoice_id) DO UPDATE SET
@@ -348,7 +387,7 @@ async function setInvoiceMapping(invoiceId, invoiceNumber, shipstationOrderId, s
 }
 
 async function getInvoiceMapping(invoiceId) {
-  const result = await pool.query(
+  const result = await resilientQuery(
     'SELECT * FROM invoice_mappings WHERE invoice_id = $1',
     [invoiceId]
   );
@@ -365,7 +404,7 @@ async function getInvoiceMapping(invoiceId) {
 }
 
 async function getInvoiceMappingByNumber(invoiceNumber) {
-  const result = await pool.query(
+  const result = await resilientQuery(
     'SELECT * FROM invoice_mappings WHERE invoice_number = $1',
     [invoiceNumber]
   );
@@ -382,13 +421,13 @@ async function getInvoiceMappingByNumber(invoiceNumber) {
 }
 
 async function deleteInvoiceMapping(invoiceId) {
-  await pool.query('DELETE FROM invoice_mappings WHERE invoice_id = $1', [invoiceId]);
+  await resilientQuery('DELETE FROM invoice_mappings WHERE invoice_id = $1', [invoiceId]);
   return true;
 }
 
 async function cleanupStaleEntries(staleDays = 30) {
   const staleDate = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000);
-  const result = await pool.query(
+  const result = await resilientQuery(
     'DELETE FROM pending_invoices WHERE created_at < $1 RETURNING invoice_id',
     [staleDate]
   );
@@ -396,7 +435,7 @@ async function cleanupStaleEntries(staleDays = 30) {
 }
 
 async function cleanupMaxRetries(maxRetries = 10) {
-  const result = await pool.query(
+  const result = await resilientQuery(
     'DELETE FROM pending_invoices WHERE retry_count >= $1 RETURNING invoice_id',
     [maxRetries]
   );
@@ -406,7 +445,7 @@ async function cleanupMaxRetries(maxRetries = 10) {
 // Get ShipStation credentials - simply returns the first user with SS credentials
 // ShipStation API key/secret are global for the installation, not per-user
 async function getShipStationCredentials() {
-  const result = await pool.query(`
+  const result = await resilientQuery(`
     SELECT * FROM users 
     WHERE shipstation_api_key IS NOT NULL 
     ORDER BY shipstation_connected_at DESC
