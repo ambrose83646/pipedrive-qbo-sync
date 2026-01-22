@@ -665,8 +665,10 @@ router.post("/api/shipstation/test", express.json(), async (req, res) => {
 // Save ShipStation credentials
 router.post("/api/shipstation/save", express.json(), async (req, res) => {
   try {
-    const { userId, apiKey, apiSecret } = req.body;
+    const { userId, apiKey, apiSecret, companyDomain, numericUserId } = req.body;
     const pipedriveToken = req.headers['x-pipedrive-token'];
+    
+    console.log(`[ShipStation] Save request - userId: ${userId}, companyDomain: ${companyDomain}, numericUserId: ${numericUserId}`);
     
     if (!userId || !apiKey || !apiSecret) {
       return res.status(400).json({ error: "User ID, API Key, and Secret are required" });
@@ -682,12 +684,15 @@ router.post("/api/shipstation/save", express.json(), async (req, res) => {
     }
     
     const normalizedInput = normalizeUserId(userId);
+    const normalizedDomain = companyDomain ? normalizeUserId(companyDomain) : null;
     
     // Try multiple userId formats to find the user
     const possibleUserIds = [
       userId,
       normalizedInput,
-      normalizedInput + '.pipedrive.com'
+      normalizedInput + '.pipedrive.com',
+      normalizedDomain,
+      normalizedDomain ? normalizedDomain + '.pipedrive.com' : null
     ];
     
     let userData = null;
@@ -698,7 +703,38 @@ router.post("/api/shipstation/save", express.json(), async (req, res) => {
       if (tryUserData && tryUserData.qb_access_token) {
         userData = tryUserData;
         foundUserId = tryUserId;
+        console.log(`[ShipStation] Found user by direct lookup: ${tryUserId}`);
         break;
+      }
+    }
+    
+    // Fallback: scan all users for matching pipedrive_numeric_id or company domain
+    if (!userData) {
+      console.log(`[ShipStation] Direct lookup failed, scanning all users for: ${userId}`);
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.qb_access_token) {
+          const normalizedKey = normalizeUserId(key);
+          
+          // Match by: numeric ID stored in pipedrive_numeric_id, or userId matches key, or numericUserId
+          const isMatch = 
+            normalizedKey === normalizedInput ||
+            (testUserData.pipedrive_numeric_id && testUserData.pipedrive_numeric_id === userId) ||
+            (testUserData.pipedrive_numeric_id && testUserData.pipedrive_numeric_id === normalizedInput) ||
+            (numericUserId && testUserData.pipedrive_numeric_id === numericUserId) ||
+            (numericUserId && key === numericUserId) ||
+            (normalizedDomain && normalizedKey === normalizedDomain) ||
+            (normalizedDomain && testUserData.pipedrive_user_id === normalizedDomain);
+          
+          if (isMatch) {
+            console.log(`[ShipStation] Found user via scan: ${key} (matches ${userId})`);
+            userData = testUserData;
+            foundUserId = key;
+            break;
+          }
+        }
       }
     }
     
@@ -735,8 +771,10 @@ router.post("/api/shipstation/save", express.json(), async (req, res) => {
 // Disconnect ShipStation
 router.post("/api/shipstation/disconnect", express.json(), async (req, res) => {
   try {
-    const { userId } = req.body;
+    const { userId, companyDomain, numericUserId } = req.body;
     const pipedriveToken = req.headers['x-pipedrive-token'];
+    
+    console.log(`[ShipStation] Disconnect request - userId: ${userId}, companyDomain: ${companyDomain}, numericUserId: ${numericUserId}`);
     
     if (!userId) {
       return res.status(400).json({ error: "User ID is required" });
@@ -752,12 +790,15 @@ router.post("/api/shipstation/disconnect", express.json(), async (req, res) => {
     }
     
     const normalizedInput = normalizeUserId(userId);
+    const normalizedDomain = companyDomain ? normalizeUserId(companyDomain) : null;
     
     // Try multiple userId formats to find the user
     const possibleUserIds = [
       userId,
       normalizedInput,
-      normalizedInput + '.pipedrive.com'
+      normalizedInput + '.pipedrive.com',
+      normalizedDomain,
+      normalizedDomain ? normalizedDomain + '.pipedrive.com' : null
     ];
     
     let userData = null;
@@ -768,7 +809,37 @@ router.post("/api/shipstation/disconnect", express.json(), async (req, res) => {
       if (tryUserData && tryUserData.shipstation_api_key) {
         userData = tryUserData;
         foundUserId = tryUserId;
+        console.log(`[ShipStation] Found user for disconnect by direct lookup: ${tryUserId}`);
         break;
+      }
+    }
+    
+    // Fallback: scan all users for matching pipedrive_numeric_id or company domain
+    if (!userData) {
+      console.log(`[ShipStation] Direct lookup failed for disconnect, scanning all users`);
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData && testUserData.shipstation_api_key) {
+          const normalizedKey = normalizeUserId(key);
+          
+          const isMatch = 
+            normalizedKey === normalizedInput ||
+            (testUserData.pipedrive_numeric_id && testUserData.pipedrive_numeric_id === userId) ||
+            (testUserData.pipedrive_numeric_id && testUserData.pipedrive_numeric_id === normalizedInput) ||
+            (numericUserId && testUserData.pipedrive_numeric_id === numericUserId) ||
+            (numericUserId && key === numericUserId) ||
+            (normalizedDomain && normalizedKey === normalizedDomain) ||
+            (normalizedDomain && testUserData.pipedrive_user_id === normalizedDomain);
+          
+          if (isMatch) {
+            console.log(`[ShipStation] Found user for disconnect via scan: ${key}`);
+            userData = testUserData;
+            foundUserId = key;
+            break;
+          }
+        }
       }
     }
     
