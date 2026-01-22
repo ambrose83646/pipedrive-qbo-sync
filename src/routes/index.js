@@ -3797,16 +3797,28 @@ router.get("/api/shipstation/shipments", async (req, res) => {
       });
     }
     
-    // Get the tenant prefix for this user (last 4 digits of pipedrive_user_id)
-    // Validate that we have a numeric user ID for tenant suffix
-    const pipedriveUserId = userData.pipedrive_user_id;
+    // Get the tenant prefix for this user (last 4 digits of numeric pipedrive user ID)
+    // Try multiple sources: 1) pipedrive_numeric_id on userData, 2) userId from query param, 3) pipedrive_user_id
     let tenantSuffix = null;
+    let sourceId = null;
     
-    if (pipedriveUserId && /^\d+$/.test(String(pipedriveUserId))) {
-      tenantSuffix = String(pipedriveUserId).slice(-4);
+    // Priority 1: Use the stored pipedrive_numeric_id if available
+    if (userData.pipedrive_numeric_id && /^\d+$/.test(String(userData.pipedrive_numeric_id))) {
+      sourceId = userData.pipedrive_numeric_id;
+      tenantSuffix = String(sourceId).slice(-4);
+    }
+    // Priority 2: Use the userId from query param if it's numeric
+    else if (userId && /^\d+$/.test(String(userId))) {
+      sourceId = userId;
+      tenantSuffix = String(sourceId).slice(-4);
+    }
+    // Priority 3: Fall back to pipedrive_user_id if numeric
+    else if (userData.pipedrive_user_id && /^\d+$/.test(String(userData.pipedrive_user_id))) {
+      sourceId = userData.pipedrive_user_id;
+      tenantSuffix = String(sourceId).slice(-4);
     }
     
-    console.log(`[ShipStation] Using tenant suffix: ${tenantSuffix} (from pipedrive_user_id: ${pipedriveUserId})`);
+    console.log(`[ShipStation] Using tenant suffix: ${tenantSuffix} (from source: ${sourceId})`);
     
     // Import getInvoiceMappingByNumber for fallback lookups
     const { getInvoiceMappingByNumber } = require("../../config/postgres");
