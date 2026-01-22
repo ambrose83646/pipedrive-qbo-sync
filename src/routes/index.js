@@ -1339,37 +1339,53 @@ router.get("/auth/qb/callback", async (req, res) => {
     
     console.log(`[QB OAuth] Storing QB data for userId: ${userId}, realmId: ${qbTokenData.realm_id}`);
 
-    // Try to find existing user - first by provided userId, then look for any user with Pipedrive tokens
+    // Try to find existing user - we need to find the CANONICAL user (the one created by Pipedrive OAuth)
+    // The userId from the Pipedrive Extension SDK is often numeric, but the canonical user
+    // might be stored under the company subdomain (e.g., "onitathlere" vs "23527284")
     let existingUser = await getUser(userId);
     let actualUserId = userId;
     
-    // If no user found with this userId, or user has no Pipedrive tokens, try to find the canonical user
-    // This handles the case where QB OAuth is initiated with a different userId format than Pipedrive OAuth
-    if (!existingUser || !existingUser.pipedrive_access_token) {
-      console.log(`[QB OAuth] No user with Pipedrive tokens found for userId: ${userId}, searching for existing installation...`);
+    // Check if userId looks like a numeric Pipedrive user ID (from SDK) vs company subdomain
+    const isNumericUserId = /^\d+$/.test(userId);
+    
+    // ALWAYS search for the canonical user if:
+    // 1. No user found with this userId, OR
+    // 2. The found user has no Pipedrive tokens (not the canonical install), OR
+    // 3. The userId is numeric (likely from SDK, need to find the original company subdomain user)
+    const shouldSearchForCanonical = !existingUser || !existingUser.pipedrive_access_token || isNumericUserId;
+    
+    if (shouldSearchForCanonical) {
+      console.log(`[QB OAuth] Searching for canonical user (numeric userId: ${isNumericUserId}, has existing: ${!!existingUser}, has PD tokens: ${!!existingUser?.pipedrive_access_token})`);
       const { listUsers } = require("../../config/postgres");
       const allUserIds = await listUsers();
       
+      // Find the best candidate - prefer user with Pipedrive tokens
+      let bestCandidate = null;
+      let bestCandidateId = null;
+      
       for (const candidateId of allUserIds) {
+        // Skip the numeric userId we already checked
+        if (candidateId === userId) continue;
+        
         const candidateUser = await getUser(candidateId);
-        if (candidateUser && candidateUser.pipedrive_access_token && !candidateUser.qb_access_token) {
-          // Found a user with Pipedrive tokens but no QB tokens - this is our target
-          console.log(`[QB OAuth] Found existing Pipedrive installation under userId: ${candidateId}, merging QB tokens`);
-          existingUser = candidateUser;
-          actualUserId = candidateId;
-          break;
-        } else if (candidateUser && candidateUser.pipedrive_access_token) {
-          // Found a user with Pipedrive tokens (may already have QB tokens - update anyway)
-          console.log(`[QB OAuth] Found existing Pipedrive installation under userId: ${candidateId}`);
-          existingUser = candidateUser;
-          actualUserId = candidateId;
-          break;
+        if (candidateUser && candidateUser.pipedrive_access_token) {
+          // Found a user with Pipedrive tokens - this is likely the canonical user
+          console.log(`[QB OAuth] Found canonical Pipedrive installation under userId: ${candidateId} (has QB tokens: ${!!candidateUser.qb_access_token})`);
+          bestCandidate = candidateUser;
+          bestCandidateId = candidateId;
+          break; // First user with Pipedrive tokens wins
         }
       }
-    }
-    
-    if (!existingUser) {
-      existingUser = {};
+      
+      // Use the canonical user if found, otherwise fall back to what we have
+      if (bestCandidate) {
+        existingUser = bestCandidate;
+        actualUserId = bestCandidateId;
+        console.log(`[QB OAuth] Using canonical user: ${actualUserId} instead of provided: ${userId}`);
+      } else if (!existingUser) {
+        existingUser = {};
+        console.log(`[QB OAuth] No existing user found, creating new record for: ${userId}`);
+      }
     }
     
     console.log(`[QB OAuth] Using actualUserId: ${actualUserId} for storing QB tokens`);
@@ -1385,10 +1401,14 @@ router.get("/auth/qb/callback", async (req, res) => {
       qb_updated_at: new Date().toISOString(),
     };
     
-    // Store the numeric user ID if provided (for alternative lookup)
-    if (numericUserId) {
-      updatedUser.pipedrive_numeric_id = numericUserId;
-      console.log(`[QB OAuth] Storing pipedrive_numeric_id: ${numericUserId}`);
+    // Store the numeric user ID for alternative lookup
+    // This ensures the canonical user can be found by either the subdomain or numeric ID
+    const numericIdToStore = numericUserId || (isNumericUserId ? userId : null);
+    if (numericIdToStore && !existingUser.pipedrive_numeric_id) {
+      updatedUser.pipedrive_numeric_id = numericIdToStore;
+      console.log(`[QB OAuth] Storing pipedrive_numeric_id: ${numericIdToStore}`);
+    } else if (numericIdToStore) {
+      console.log(`[QB OAuth] pipedrive_numeric_id already set: ${existingUser.pipedrive_numeric_id}`);
     }
 
     await setUser(actualUserId, updatedUser);
