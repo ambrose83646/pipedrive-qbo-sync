@@ -757,9 +757,12 @@ router.post("/api/shipstation/save", express.json(), async (req, res) => {
       shipstation_connected_at: new Date().toISOString()
     };
     
-    await setUser(foundUserId, updatedData);
+    // Use the pipedrive_user_id from the found userData, not foundUserId
+    // This ensures we update the SAME row we found, not create a new one
+    const actualUserId = userData.pipedrive_user_id || foundUserId;
+    await setUser(actualUserId, updatedData);
     
-    console.log(`[ShipStation] Credentials saved for user: ${foundUserId}`);
+    console.log(`[ShipStation] Credentials saved for user: ${actualUserId} (found via: ${foundUserId})`);
     res.json({ success: true, message: 'ShipStation connected successfully' });
     
   } catch (error) {
@@ -862,9 +865,12 @@ router.post("/api/shipstation/disconnect", express.json(), async (req, res) => {
       shipstation_connected_at: null
     };
     
-    await setUser(foundUserId, updatedData);
+    // Use the pipedrive_user_id from the found userData, not foundUserId
+    // This ensures we update the SAME row we found, not create a new one
+    const actualUserId = userData.pipedrive_user_id || foundUserId;
+    await setUser(actualUserId, updatedData);
     
-    console.log(`[ShipStation] Disconnected for user: ${foundUserId}`);
+    console.log(`[ShipStation] Disconnected for user: ${actualUserId} (found via: ${foundUserId})`);
     res.json({ success: true, message: 'ShipStation disconnected' });
     
   } catch (error) {
@@ -1155,18 +1161,21 @@ router.get("/auth/pipedrive/callback", async (req, res) => {
             <p>3. Click "Connect to QuickBooks" to complete the integration</p>
           </div>
           
-          <button onclick="goToPipedrive()">Close This Window</button>
+          <button onclick="goToPipedrive()">Go to App Settings</button>
         </div>
         <script>
           function goToPipedrive() {
-            // Try to navigate back to Pipedrive settings
-            const pipedriveUrl = 'https://app.pipedrive.com/settings/installed_apps';
+            // Navigate to the specific app settings page
+            // Company domain is extracted from the OAuth api_domain
+            const companyDomain = '${tokenData.api_domain?.replace('.pipedrive.com', '') || 'app'}';
+            const appId = '2792631f04be9ef1';
+            const pipedriveUrl = 'https://' + companyDomain + '.pipedrive.com/settings/marketplace/app/' + appId + '/app-settings';
             
             // First try to close the window (works if opened by script)
             if (window.opener) {
               window.close();
             } else {
-              // Redirect to Pipedrive if window can't be closed
+              // Redirect to Pipedrive app settings
               window.location.href = pipedriveUrl;
             }
           }
