@@ -3727,10 +3727,33 @@ async function makeShipStationApiCall(userData, method, endpoint, data = null) {
   
   if (data && (method === 'POST' || method === 'PUT')) {
     config.data = data;
+    // Log the full request payload for debugging
+    console.log(`[ShipStation API] ${method} ${endpoint} - Request payload:`, JSON.stringify(data, null, 2));
   }
   
-  const response = await axios(config);
-  return response.data;
+  try {
+    const response = await axios(config);
+    return response.data;
+  } catch (error) {
+    // Log detailed error information from ShipStation
+    console.error(`[ShipStation API] ${method} ${endpoint} - Error:`, {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      errorData: error.response?.data,
+      message: error.message
+    });
+    
+    // Re-throw with more context
+    const errorMessage = error.response?.data?.Message || 
+                         error.response?.data?.message || 
+                         error.response?.data?.ExceptionMessage ||
+                         (typeof error.response?.data === 'string' ? error.response.data : null) ||
+                         error.message;
+    const enhancedError = new Error(`ShipStation API error: ${errorMessage}`);
+    enhancedError.statusCode = error.response?.status;
+    enhancedError.responseData = error.response?.data;
+    throw enhancedError;
+  }
 }
 
 // Get shipments for invoices (by order number = invoice DocNumber)
