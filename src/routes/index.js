@@ -45,6 +45,39 @@ function getQBResponseData(response) {
   throw new Error('No valid response data found');
 }
 
+// US State name to abbreviation mapping
+const STATE_ABBREVIATIONS = {
+  'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA',
+  'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE', 'florida': 'FL', 'georgia': 'GA',
+  'hawaii': 'HI', 'idaho': 'ID', 'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA',
+  'kansas': 'KS', 'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+  'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS', 'missouri': 'MO',
+  'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+  'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH',
+  'oklahoma': 'OK', 'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+  'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT', 'vermont': 'VT',
+  'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV', 'wisconsin': 'WI', 'wyoming': 'WY',
+  'district of columbia': 'DC', 'puerto rico': 'PR', 'guam': 'GU', 'virgin islands': 'VI'
+};
+
+// Helper to convert state name to 2-letter abbreviation
+function normalizeStateCode(stateInput) {
+  if (!stateInput) return stateInput;
+  const trimmed = stateInput.trim();
+  // If already a 2-letter code, return as uppercase
+  if (trimmed.length === 2) {
+    return trimmed.toUpperCase();
+  }
+  // Look up full state name
+  const abbr = STATE_ABBREVIATIONS[trimmed.toLowerCase()];
+  if (abbr) {
+    console.log(`[State Normalize] Converted "${stateInput}" to "${abbr}"`);
+    return abbr;
+  }
+  // Return original if not found (could be international)
+  return trimmed;
+}
+
 // Helper function to check if token needs refresh (expires within 10 minutes)
 function tokenNeedsRefresh(userData) {
   if (!userData.qb_expires_at) {
@@ -3180,7 +3213,10 @@ router.post("/api/invoices", express.json(), async (req, res) => {
       if (shippingAddress.Line1) invoiceData.ShipAddr.Line1 = shippingAddress.Line1;
       if (shippingAddress.Line2) invoiceData.ShipAddr.Line2 = shippingAddress.Line2;
       if (shippingAddress.City) invoiceData.ShipAddr.City = shippingAddress.City;
-      if (shippingAddress.CountrySubDivisionCode) invoiceData.ShipAddr.CountrySubDivisionCode = shippingAddress.CountrySubDivisionCode;
+      if (shippingAddress.CountrySubDivisionCode) {
+        // Convert full state names to 2-letter codes for QuickBooks production API
+        invoiceData.ShipAddr.CountrySubDivisionCode = normalizeStateCode(shippingAddress.CountrySubDivisionCode);
+      }
       if (shippingAddress.PostalCode) invoiceData.ShipAddr.PostalCode = shippingAddress.PostalCode;
       if (shippingAddress.Country) invoiceData.ShipAddr.Country = shippingAddress.Country;
     }
