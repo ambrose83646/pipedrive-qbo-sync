@@ -2,6 +2,14 @@ const { getUser } = require('../../config/postgres');
 const pipedrive = require('pipedrive');
 const OAuthClient = require('intuit-oauth');
 
+// Helper function to get the correct QuickBooks API base URL based on environment
+function getQBBaseUrl() {
+  const env = process.env.QB_ENVIRONMENT || 'sandbox';
+  return env === 'production' 
+    ? 'https://quickbooks.api.intuit.com'
+    : 'https://sandbox-quickbooks.api.intuit.com';
+}
+
 async function syncContact(pipedriveUserId, personId) {
   try {
     // 1. Get user tokens from Replit DB
@@ -54,7 +62,7 @@ async function syncContact(pipedriveUserId, personId) {
     const qbClient = new OAuthClient({
       clientId: process.env.QB_CLIENT_ID,
       clientSecret: process.env.QB_CLIENT_SECRET,
-      environment: 'sandbox', // Change to 'production' for live
+      environment: process.env.QB_ENVIRONMENT || 'sandbox',
       redirectUri: process.env.APP_URL + '/auth/qb/callback',
       logging: false
     });
@@ -70,7 +78,7 @@ async function syncContact(pipedriveUserId, personId) {
     });
 
     const companyId = userData.qb_realm_id;
-    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const baseUrl = getQBBaseUrl();
     
     // 6. Check if customer exists in QuickBooks
     const query = `SELECT * FROM Customer WHERE DisplayName = '${person.name.replace(/'/g, "\\'")}'`;

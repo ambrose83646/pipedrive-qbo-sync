@@ -3,7 +3,7 @@ const OAuthClient = require('intuit-oauth');
 const oauthClient = new OAuthClient({
   clientId: process.env.QB_CLIENT_ID,
   clientSecret: process.env.QB_CLIENT_SECRET,
-  environment: 'sandbox',
+  environment: process.env.QB_ENVIRONMENT || 'sandbox',
   redirectUri: process.env.APP_URL + '/auth/qb/callback'
 });
 

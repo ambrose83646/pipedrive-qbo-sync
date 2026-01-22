@@ -14,13 +14,21 @@ const axios = require('axios');
 const OAuthClient = require('intuit-oauth');
 const { encrypt, decrypt } = require('../utils/encryption');
 
+// Helper function to get the correct QuickBooks API base URL based on environment
+function getQBBaseUrl() {
+  const env = process.env.QB_ENVIRONMENT || 'sandbox';
+  return env === 'production' 
+    ? 'https://quickbooks.api.intuit.com'
+    : 'https://sandbox-quickbooks.api.intuit.com';
+}
+
 let pollingInterval = null;
 
 async function refreshQBToken(userId, userData) {
   const qbClient = new OAuthClient({
     clientId: process.env.QB_CLIENT_ID,
     clientSecret: process.env.QB_CLIENT_SECRET,
-    environment: 'sandbox',
+    environment: process.env.QB_ENVIRONMENT || 'sandbox',
     redirectUri: process.env.APP_URL + '/auth/qb/callback'
   });
   
@@ -263,7 +271,7 @@ async function checkPendingInvoices() {
           }
         }
         
-        const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+        const baseUrl = getQBBaseUrl();
         const realmId = userData.qb_realm_id;
         
         try {

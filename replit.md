@@ -106,3 +106,4 @@ A controller-based synchronization logic (`src/controllers/sync.js`) manages dat
 - `PIPEDRIVE_CLIENT_SECRET`
 - `QB_CLIENT_ID`
 - `QB_CLIENT_SECRET`
+- `QB_ENVIRONMENT` - QuickBooks environment: `sandbox` (default) or `production`

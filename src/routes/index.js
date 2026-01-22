@@ -19,6 +19,14 @@ const OAuthClient = require("intuit-oauth");
 const axios = require("axios");
 const { encrypt, decrypt } = require("../utils/encryption");
 
+// Helper function to get the correct QuickBooks API base URL based on environment
+function getQBBaseUrl() {
+  const env = process.env.QB_ENVIRONMENT || 'sandbox';
+  return env === 'production' 
+    ? 'https://quickbooks.api.intuit.com'
+    : 'https://sandbox-quickbooks.api.intuit.com';
+}
+
 // Helper function to extract JSON data from QuickBooks API response
 // The intuit-oauth library may return data in either 'json' (pre-parsed) or 'body' (string)
 function getQBResponseData(response) {
@@ -127,7 +135,7 @@ async function makeQBApiCall(userId, userData, apiCallFunction) {
     const qbClient = new OAuthClient({
       clientId: process.env.QB_CLIENT_ID,
       clientSecret: process.env.QB_CLIENT_SECRET,
-      environment: 'sandbox',
+      environment: process.env.QB_ENVIRONMENT || 'sandbox',
       redirectUri: process.env.APP_URL + '/auth/qb/callback',
       logging: true
     });
@@ -271,7 +279,7 @@ router.get("/api/debug/qb-test", async (req, res) => {
       });
     }
     
-    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const baseUrl = getQBBaseUrl();
     const realmId = userData.qb_realm_id;
     const query = `SELECT * FROM Customer MAXRESULTS 1`;
     const encodedQuery = encodeURIComponent(query);
@@ -460,6 +468,29 @@ router.post("/api/disconnect-qb", express.json(), async (req, res) => {
         console.error(`[QB Disconnect] User has no QB connection to disconnect`);
         return res.status(400).json({ error: "No QuickBooks connection found" });
       }
+    }
+    
+    // Revoke the token with QuickBooks before clearing from database
+    try {
+      const revokeClient = new OAuthClient({
+        clientId: process.env.QB_CLIENT_ID,
+        clientSecret: process.env.QB_CLIENT_SECRET,
+        environment: process.env.QB_ENVIRONMENT || 'sandbox',
+        redirectUri: process.env.APP_URL + '/auth/qb/callback'
+      });
+      
+      revokeClient.setToken({
+        access_token: userData.qb_access_token,
+        refresh_token: userData.qb_refresh_token,
+        token_type: 'Bearer',
+        realmId: userData.qb_realm_id
+      });
+      
+      await revokeClient.revoke();
+      console.log(`[QB Disconnect] Token successfully revoked with QuickBooks`);
+    } catch (revokeError) {
+      // Log but don't fail - token might already be expired/revoked
+      console.warn(`[QB Disconnect] Token revocation failed (may already be expired):`, revokeError.message);
     }
     
     // Clear QB tokens but preserve other user data
@@ -1502,7 +1533,7 @@ router.get("/api/user-status", async (req, res) => {
         const oauthClient = new OAuthClient({
           clientId: process.env.QB_CLIENT_ID,
           clientSecret: process.env.QB_CLIENT_SECRET,
-          environment: "sandbox",
+          environment: process.env.QB_ENVIRONMENT || "sandbox",
           redirectUri: `${process.env.APP_URL}/auth/qb/callback`,
         });
         
@@ -1518,7 +1549,7 @@ router.get("/api/user-status", async (req, res) => {
         
         // Get company info
         const companyInfoResponse = await oauthClient.makeApiCall({
-          url: `https://sandbox-quickbooks.api.intuit.com/v3/company/${userData.qb_realm_id}/companyinfo/${userData.qb_realm_id}`,
+          url: `${getQBBaseUrl()}/v3/company/${userData.qb_realm_id}/companyinfo/${userData.qb_realm_id}`,
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -1636,7 +1667,7 @@ async function createQBClient(userId) {
   const qbClient = new OAuthClient({
     clientId: process.env.QB_CLIENT_ID,
     clientSecret: process.env.QB_CLIENT_SECRET,
-    environment: 'sandbox',
+    environment: process.env.QB_ENVIRONMENT || 'sandbox',
     redirectUri: process.env.APP_URL + '/auth/qb/callback',
     logging: false
   });
@@ -1714,7 +1745,7 @@ router.get("/api/customer/:customerId", async (req, res) => {
       });
     }
     
-    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const baseUrl = getQBBaseUrl();
     const companyId = userData.qb_realm_id;
     
     // Make API call with automatic token refresh - pass actualUserId for correct persistence
@@ -1806,7 +1837,7 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
       });
     }
     
-    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const baseUrl = getQBBaseUrl();
     const companyId = userData.qb_realm_id;
     
     // Build query for invoices
@@ -1976,7 +2007,7 @@ router.get("/api/customers/search", async (req, res) => {
 
     console.log(`[Search] Found QB connection for user: ${actualUserId}, realm: ${userData.qb_realm_id}`);
     
-    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const baseUrl = getQBBaseUrl();
     const realmId = userData.qb_realm_id;
     
     // Build query to search customers by DisplayName
@@ -2064,7 +2095,7 @@ router.post("/api/create-customer", express.json(), async (req, res) => {
     }
 
     const { qbClient, companyId } = await createQBClient(userId);
-    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const baseUrl = getQBBaseUrl();
     
     const customerData = {
       DisplayName: name,
@@ -2354,7 +2385,7 @@ router.get("/api/deal-contact", async (req, res) => {
     // Get customer details from QuickBooks
     try {
       const { qbClient, companyId } = await createQBClient(userId);
-      const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+      const baseUrl = getQBBaseUrl();
       
       const customerResponse = await qbClient.makeApiCall({
         url: `${baseUrl}/v3/company/${companyId}/customer/${qbCustomerId}?minorversion=65`,
@@ -2544,7 +2575,7 @@ router.get("/api/items/search", async (req, res) => {
       });
     }
 
-    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const baseUrl = getQBBaseUrl();
     const realmId = userData.qb_realm_id;
     
     // Build query to search items by Name - get both products and services
@@ -2998,7 +3029,7 @@ router.post("/api/invoices", express.json(), async (req, res) => {
       });
     }
 
-    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const baseUrl = getQBBaseUrl();
     const realmId = userData.qb_realm_id;
     
     // Build invoice object
@@ -3280,7 +3311,7 @@ router.get("/api/invoices/:invoiceId/pdf", async (req, res) => {
       });
     }
 
-    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const baseUrl = getQBBaseUrl();
     const realmId = userData.qb_realm_id;
     
     // Fetch PDF from QuickBooks using axios for proper binary handling
@@ -3372,7 +3403,7 @@ router.get("/api/invoices/:invoiceId/paylink", async (req, res) => {
       });
     }
 
-    const baseUrl = 'https://sandbox-quickbooks.api.intuit.com';
+    const baseUrl = getQBBaseUrl();
     const realmId = userData.qb_realm_id;
     
     // Fetch invoice with invoiceLink parameter
