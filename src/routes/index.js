@@ -3646,11 +3646,17 @@ function buildShipStationOrderNumber(userId, invoiceNumber) {
 
 // Helper function to create ShipStation order from QuickBooks invoice
 async function createShipStationOrderFromInvoice(userData, invoice, userId) {
-  const { getInvoiceMapping, setInvoiceMapping } = require("../../config/postgres");
+  const { getInvoiceMapping, setInvoiceMapping, getShipStationCredentials } = require("../../config/postgres");
   
-  if (!userData.shipstation_api_key || !userData.shipstation_api_secret) {
+  // ShipStation credentials are global - fetch from any user that has them
+  const ssCredentials = await getShipStationCredentials();
+  
+  if (!ssCredentials || !ssCredentials.shipstation_api_key || !ssCredentials.shipstation_api_secret) {
     throw new Error('ShipStation not connected');
   }
+  
+  // Use the global ShipStation credentials for API calls
+  const ssUserData = ssCredentials;
   
   const invoiceId = invoice.Id;
   const invoiceNumber = invoice.DocNumber || invoice.Id;
@@ -3677,7 +3683,7 @@ async function createShipStationOrderFromInvoice(userData, invoice, userId) {
   
   // Step 3: Check if order already exists in ShipStation with this number
   try {
-    const existingOrders = await makeShipStationApiCall(userData, 'GET', `/orders?orderNumber=${encodeURIComponent(orderNumber)}`);
+    const existingOrders = await makeShipStationApiCall(ssUserData, 'GET', `/orders?orderNumber=${encodeURIComponent(orderNumber)}`);
     if (existingOrders.orders && existingOrders.orders.length > 0) {
       const existingOrder = existingOrders.orders[0];
       console.log(`[ShipStation] Order ${orderNumber} already exists (ID: ${existingOrder.orderId}), saving mapping`);
@@ -3743,7 +3749,7 @@ async function createShipStationOrderFromInvoice(userData, invoice, userId) {
   console.log(`[ShipStation] Creating order - Number: ${shipstationOrder.orderNumber}, Customer: ${shipTo.name}, Items: ${items.length}, Amount: $${shipstationOrder.amountPaid.toFixed(2)}`);
   
   // Create order in ShipStation
-  const createdOrder = await makeShipStationApiCall(userData, 'POST', '/orders/createorder', shipstationOrder);
+  const createdOrder = await makeShipStationApiCall(ssUserData, 'POST', '/orders/createorder', shipstationOrder);
   
   console.log(`[ShipStation] Order created successfully - ID: ${createdOrder.orderId}, Number: ${createdOrder.orderNumber}`);
   
