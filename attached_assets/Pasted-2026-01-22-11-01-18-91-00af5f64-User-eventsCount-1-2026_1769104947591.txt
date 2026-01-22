@@ -1,0 +1,140 @@
+2026-01-22 11:01:18.91
+00af5f64
+User
+_eventsCount: 1,
+2026-01-22 11:01:18.91
+00af5f64
+User
+where: undefined,
+2026-01-22 11:01:18.91
+00af5f64
+User
+_maxListeners: undefined,
+2026-01-22 11:01:18.91
+00af5f64
+User
+at /home/runner/workspace/node_modules/pg/lib/connection.js:116:12
+2026-01-22 11:01:18.91
+00af5f64
+User
+port: 5432,
+2026-01-22 11:01:18.91
+00af5f64
+User
+fallback_application_name: undefined,
+2026-01-22 11:01:18.91
+00af5f64
+User
+port: 5432,
+2026-01-22 11:01:18.91
+00af5f64
+User
+detail: undefined,
+2026-01-22 11:01:18.91
+00af5f64
+User
+isDomainSocket: false,
+2026-01-22 11:01:18.91
+00af5f64
+User
+severity: 'FATAL',
+2026-01-22 11:01:18.91
+00af5f64
+User
+code: '57P01',
+2026-01-22 11:01:18.91
+00af5f64
+User
+error: terminating connection due to administrator command
+2026-01-22 11:01:18.91
+00af5f64
+User
+internalQuery: undefined,
+2026-01-22 11:01:18.91
+00af5f64
+User
+client: Client {
+2026-01-22 11:01:18.91
+00af5f64
+User
+node:events:497
+2026-01-22 11:01:18.91
+00af5f64
+User
+host: 'ep-solitary-dream-ahgrgxma.c-3.us-east-1.aws.neon.tech',
+2026-01-22 11:01:18.91
+00af5f64
+User
+database: 'neondb',
+2026-01-22 11:01:18.91
+00af5f64
+User
+column: undefined,
+2026-01-22 11:01:18.91
+00af5f64
+User
+at TLSWrap.onStreamRead (node:internal/stream_base_commons:189:23)
+2026-01-22 11:01:18.91
+00af5f64
+User
+binary: false,
+2026-01-22 11:01:18.91
+00af5f64
+User
+at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+2026-01-22 11:01:18.91
+00af5f64
+User
+at Parser.handlePacket (/home/runner/workspace/node_modules/pg-protocol/dist/parser.js:122:29)
+2026-01-22 11:01:18.91
+00af5f64
+User
+at TLSSocket.emit (node:events:519:28)
+2026-01-22 11:01:18.91
+00af5f64
+User
+host: 'ep-solitary-dream-ahgrgxma.c-3.us-east-1.aws.neon.tech',
+2026-01-22 11:01:18.91
+00af5f64
+User
+position: undefined,
+2026-01-22 11:01:18.91
+00af5f64
+User
+_events: [Object: null prototype] { error: [Function (anonymous)] },
+2026-01-22 11:01:18.91
+00af5f64
+User
+constraint: undefined,
+2026-01-22 11:01:18.91
+00af5f64
+User
+at Parser.parse (/home/runner/workspace/node_modules/pg-protocol/dist/parser.js:35:38)
+2026-01-22 11:01:18.91
+00af5f64
+User
+at Readable.push (node:internal/streams/readable:392:5)
+2026-01-22 11:01:18.91
+00af5f64
+User
+at Client.idleListener (/home/runner/workspace/node_modules/pg-pool/index.js:62:10)
+2026-01-22 11:01:18.91
+00af5f64
+User
+client_encoding: '',
+2026-01-22 11:01:18.91
+00af5f64
+User
+at addChunk (node:internal/streams/readable:561:12) {
+2026-01-22 11:01:18.91
+00af5f64
+User
+database: 'neondb',
+2026-01-22 11:01:18.91
+00af5f64
+User
+hint: undefined,
+2026-01-22 11:01:18.91
+00af5f64
+User
+internalPosition: undefined,
