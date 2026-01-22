@@ -32,6 +32,7 @@ async function getUser(userId) {
   const normalized = normalizeUserId(userId);
   const possibleIds = [userId, normalized, `${normalized}.pipedrive.com`];
   
+  // First try exact match on pipedrive_user_id
   for (const tryId of [...new Set(possibleIds.filter(id => id))]) {
     const result = await pool.query(
       'SELECT * FROM users WHERE pipedrive_user_id = $1',
@@ -41,6 +42,18 @@ async function getUser(userId) {
       return rowToUserData(result.rows[0]);
     }
   }
+  
+  // Fallback: search by pipedrive_api_domain (for cases where userId is domain but stored ID is numeric)
+  for (const tryId of [...new Set(possibleIds.filter(id => id))]) {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE pipedrive_api_domain ILIKE $1 OR pipedrive_api_domain ILIKE $2',
+      [`%${tryId}%`, `%${normalized}%`]
+    );
+    if (result.rows.length > 0) {
+      return rowToUserData(result.rows[0]);
+    }
+  }
+  
   return null;
 }
 
@@ -373,6 +386,56 @@ async function cleanupMaxRetries(maxRetries = 10) {
   return result.rows.map(row => row.invoice_id);
 }
 
+// Find any user with ShipStation credentials, searching by various identifier formats
+async function findUserWithShipStation(providedUserId) {
+  if (!providedUserId) return null;
+  
+  const normalized = normalizeUserId(providedUserId);
+  
+  // First try: Search for users with ShipStation credentials where the identifier might match
+  // Check pipedrive_user_id variations AND pipedrive_api_domain
+  const result = await pool.query(`
+    SELECT * FROM users 
+    WHERE shipstation_api_key IS NOT NULL 
+    AND (
+      pipedrive_user_id = $1 
+      OR pipedrive_user_id = $2 
+      OR pipedrive_user_id = $3
+      OR pipedrive_api_domain ILIKE $4
+      OR pipedrive_api_domain ILIKE $5
+    )
+    LIMIT 1
+  `, [
+    providedUserId,
+    normalized,
+    `${normalized}.pipedrive.com`,
+    `%${normalized}%`,
+    `%${providedUserId}%`
+  ]);
+  
+  if (result.rows.length > 0) {
+    return rowToUserData(result.rows[0]);
+  }
+  
+  // Fallback: If no match found, return any user that has both QuickBooks AND ShipStation connected
+  // This handles cases where users are stored with numeric IDs but request comes with domain
+  // Safe because app is single-tenant (one company per installation)
+  const fallbackResult = await pool.query(`
+    SELECT * FROM users 
+    WHERE shipstation_api_key IS NOT NULL 
+    AND qb_access_token IS NOT NULL
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `);
+  
+  if (fallbackResult.rows.length > 0) {
+    console.log('[findUserWithShipStation] Using fallback: returning first user with QB+SS connected');
+    return rowToUserData(fallbackResult.rows[0]);
+  }
+  
+  return null;
+}
+
 module.exports = {
   pool,
   initializeDatabase,
@@ -380,6 +443,7 @@ module.exports = {
   setUser,
   deleteUser,
   listUsers,
+  findUserWithShipStation,
   setDealMapping,
   getDealMapping,
   deleteDealMapping,

@@ -970,12 +970,48 @@
         // Initialize Pipedrive SDK
         sdk = await new AppExtensionsSDK().initialize();
         
-        // Get user context - try SDK first, then URL params
+        // Get user context - use api_domain/company_domain for consistency with Settings page
         try {
-          const user = await sdk.execute('GET_USER');
-          userId = user?.id || urlParams.get('userId') || 'test';
+          // First try to get signed token for api_domain
+          const token = await sdk.execute('GET_SIGNED_TOKEN');
+          if (token?.api_domain) {
+            userId = token.api_domain.replace('https://', '');
+            console.log('Using api_domain from token:', userId);
+          } else if (token?.data?.api_domain) {
+            userId = token.data.api_domain.replace('https://', '');
+            console.log('Using api_domain from token.data:', userId);
+          }
+          
+          // Fallback to company_domain from context
+          if (!userId || userId === 'test') {
+            try {
+              const context = await sdk.execute('GET_CONTEXT');
+              if (context?.company_domain) {
+                userId = context.company_domain + '.pipedrive.com';
+                console.log('Using company_domain from context:', userId);
+              } else if (context?.user?.company_domain) {
+                userId = context.user.company_domain + '.pipedrive.com';
+                console.log('Using user.company_domain from context:', userId);
+              }
+            } catch (contextError) {
+              console.log('Could not get context:', contextError);
+            }
+          }
+          
+          // Final fallback to URL params or numeric user ID
+          if (!userId || userId === 'test') {
+            const urlUserId = urlParams.get('userId');
+            if (urlUserId) {
+              userId = urlUserId;
+              console.log('Using URL param userId:', userId);
+            } else {
+              const user = await sdk.execute('GET_USER');
+              userId = user?.id?.toString() || 'test';
+              console.log('Using numeric user ID:', userId);
+            }
+          }
         } catch (e) {
-          console.log('GET_USER not available, using URL parameter');
+          console.log('SDK error getting user, using URL parameter:', e);
           userId = urlParams.get('userId') || 'test';
         }
         

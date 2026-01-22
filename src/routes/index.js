@@ -3499,29 +3499,42 @@ router.get("/api/shipstation/shipments", async (req, res) => {
     // Find user with ShipStation credentials
     let userData = await getUser(userId);
     let actualUserId = userId;
+    console.log(`[ShipStation] Shipments - Direct lookup result: ${userData ? 'found' : 'not found'}, has SS key: ${!!userData?.shipstation_api_key}`);
     
     if (!userData || !userData.shipstation_api_key) {
-      const { listUsers } = require("../../config/postgres");
-      const allKeys = await listUsers();
+      const { listUsers, findUserWithShipStation } = require("../../config/postgres");
       
-      for (const key of allKeys) {
-        const testUserData = await getUser(key);
-        if (testUserData && testUserData.shipstation_api_key) {
-          const normalizedProvidedId = userId.replace('https://', '').replace(/\.pipedrive\.com$/, '');
-          const normalizedKey = key.replace('https://', '').replace(/\.pipedrive\.com$/, '');
-          
-          if (normalizedKey === normalizedProvidedId ||
-              testUserData.api_domain?.includes(normalizedProvidedId) ||
-              normalizedProvidedId.includes(normalizedKey)) {
-            userData = testUserData;
-            actualUserId = key;
-            break;
+      // First try the enhanced lookup
+      const ssUser = await findUserWithShipStation(userId);
+      if (ssUser) {
+        console.log(`[ShipStation] Shipments - Found via findUserWithShipStation`);
+        userData = ssUser;
+      } else {
+        // Fallback: iterate through all users
+        const allKeys = await listUsers();
+        console.log(`[ShipStation] Shipments - Fallback: checking ${allKeys.length} users`);
+        
+        for (const key of allKeys) {
+          const testUserData = await getUser(key);
+          if (testUserData && testUserData.shipstation_api_key) {
+            const normalizedProvidedId = userId.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+            const normalizedKey = key.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+            
+            if (normalizedKey === normalizedProvidedId ||
+                testUserData.api_domain?.includes(normalizedProvidedId) ||
+                normalizedProvidedId.includes(normalizedKey)) {
+              userData = testUserData;
+              actualUserId = key;
+              console.log(`[ShipStation] Shipments - Match found via fallback`);
+              break;
+            }
           }
         }
       }
     }
     
     if (!userData || !userData.shipstation_api_key) {
+      console.log(`[ShipStation] Shipments - Not connected for user ${userId}`);
       return res.json({
         success: true,
         shipments: [],
@@ -3864,22 +3877,36 @@ router.get("/api/shipstation/status", async (req, res) => {
     
     // Find user with ShipStation credentials
     let userData = await getUser(userId);
+    console.log(`[ShipStation] Direct lookup result: ${userData ? 'found' : 'not found'}, has SS key: ${!!userData?.shipstation_api_key}`);
     
     if (!userData || !userData.shipstation_api_key) {
-      const { listUsers } = require("../../config/postgres");
-      const allKeys = await listUsers();
+      const { listUsers, findUserWithShipStation } = require("../../config/postgres");
       
-      for (const key of allKeys) {
-        const testUserData = await getUser(key);
-        if (testUserData && testUserData.shipstation_api_key) {
-          const normalizedProvidedId = userId.replace('https://', '').replace(/\.pipedrive\.com$/, '');
-          const normalizedKey = key.replace('https://', '').replace(/\.pipedrive\.com$/, '');
-          
-          if (normalizedKey === normalizedProvidedId ||
-              testUserData.api_domain?.includes(normalizedProvidedId) ||
-              normalizedProvidedId.includes(normalizedKey)) {
-            userData = testUserData;
-            break;
+      // First try the enhanced lookup that searches by api_domain
+      const ssUser = await findUserWithShipStation(userId);
+      if (ssUser) {
+        console.log(`[ShipStation] Found via findUserWithShipStation`);
+        userData = ssUser;
+      } else {
+        // Fallback: iterate through all users
+        const allKeys = await listUsers();
+        console.log(`[ShipStation] Fallback: checking ${allKeys.length} users`);
+        
+        for (const key of allKeys) {
+          const testUserData = await getUser(key);
+          if (testUserData && testUserData.shipstation_api_key) {
+            const normalizedProvidedId = userId.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+            const normalizedKey = key.replace('https://', '').replace(/\.pipedrive\.com$/, '');
+            
+            console.log(`[ShipStation] Comparing: provided=${normalizedProvidedId}, key=${normalizedKey}, api_domain=${testUserData.api_domain}`);
+            
+            if (normalizedKey === normalizedProvidedId ||
+                testUserData.api_domain?.includes(normalizedProvidedId) ||
+                normalizedProvidedId.includes(normalizedKey)) {
+              userData = testUserData;
+              console.log(`[ShipStation] Match found via fallback`);
+              break;
+            }
           }
         }
       }
