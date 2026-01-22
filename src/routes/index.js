@@ -1166,10 +1166,10 @@ router.get("/auth/pipedrive/callback", async (req, res) => {
         <script>
           function goToPipedrive() {
             // Navigate to the specific app settings page
-            // Company domain is extracted from the OAuth api_domain
-            const companyDomain = '${tokenData.api_domain?.replace('.pipedrive.com', '') || 'app'}';
+            // companySubdomain is the pipedrive_user_id (e.g., "onitathlere")
+            const companySubdomain = '${userId.replace('.pipedrive.com', '')}';
             const appId = '2792631f04be9ef1';
-            const pipedriveUrl = 'https://' + companyDomain + '.pipedrive.com/settings/marketplace/app/' + appId + '/app-settings';
+            const pipedriveUrl = 'https://' + companySubdomain + '.pipedrive.com/settings/marketplace/app/' + appId + '/app-settings';
             
             // First try to close the window (works if opened by script)
             if (window.opener) {
