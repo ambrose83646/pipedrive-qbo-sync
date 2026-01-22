@@ -1,0 +1,148 @@
+2026-01-22 12:51:46.38
+b13b9c25
+User
+statusText: 'Bad Request',
+2026-01-22 12:51:46.38
+b13b9c25
+User
+},
+2026-01-22 12:51:46.38
+b13b9c25
+User
+message: 'Request failed with status code 400'
+2026-01-22 12:51:46.38
+b13b9c25
+User
+Message: 'The request is invalid.',
+2026-01-22 12:51:46.38
+b13b9c25
+User
+}
+2026-01-22 12:51:46.38
+b13b9c25
+User
+[ShipStation] Error processing invoice: ShipStation API error: The request is invalid.
+2026-01-22 12:51:46.38
+b13b9c25
+User
+}
+2026-01-22 12:51:46.38
+b13b9c25
+User
+'apiOrder.billTo.country': [Array],
+2026-01-22 12:51:46.38
+b13b9c25
+User
+status: 400,
+2026-01-22 12:51:46.38
+b13b9c25
+User
+ModelState: {
+2026-01-22 12:51:46.38
+b13b9c25
+User
+[ShipStation API] POST /orders/createorder - Error: {
+2026-01-22 12:51:46.38
+b13b9c25
+User
+message: 'Request failed with status code 400'
+2026-01-22 12:51:46.38
+b13b9c25
+User
+}
+2026-01-22 12:51:46.38
+b13b9c25
+User
+[ShipStation API] POST /orders/createorder - Error: {
+2026-01-22 12:51:46.38
+b13b9c25
+User
+ModelState: {
+2026-01-22 12:51:46.38
+b13b9c25
+User
+},
+2026-01-22 12:51:46.38
+b13b9c25
+User
+status: 400,
+2026-01-22 12:51:46.38
+b13b9c25
+User
+statusText: 'Bad Request',
+2026-01-22 12:51:46.38
+b13b9c25
+User
+'apiOrder.billTo.country': [Array],
+2026-01-22 12:51:46.38
+b13b9c25
+User
+}
+2026-01-22 12:51:46.38
+b13b9c25
+User
+'apiOrder.shipTo.country': [Array]
+2026-01-22 12:51:46.38
+b13b9c25
+User
+Message: 'The request is invalid.',
+2026-01-22 12:51:46.38
+b13b9c25
+User
+errorData: {
+2026-01-22 12:51:46.38
+b13b9c25
+User
+[ShipStation] Error processing invoice: ShipStation API error: The request is invalid.
+2026-01-22 12:51:46.38
+b13b9c25
+User
+message: 'Request failed with status code 400'
+2026-01-22 12:51:46.38
+b13b9c25
+User
+}
+2026-01-22 12:51:46.38
+b13b9c25
+User
+[ShipStation API] POST /orders/createorder - Error: {
+2026-01-22 12:51:46.38
+b13b9c25
+User
+ModelState: {
+2026-01-22 12:51:46.38
+b13b9c25
+User
+},
+2026-01-22 12:51:46.38
+b13b9c25
+User
+status: 400,
+2026-01-22 12:51:46.38
+b13b9c25
+User
+statusText: 'Bad Request',
+2026-01-22 12:51:46.38
+b13b9c25
+User
+'apiOrder.billTo.country': [Array],
+2026-01-22 12:51:46.38
+b13b9c25
+User
+}
+2026-01-22 12:51:46.38
+b13b9c25
+User
+'apiOrder.shipTo.country': [Array]
+2026-01-22 12:51:46.38
+b13b9c25
+User
+Message: 'The request is invalid.',
+2026-01-22 12:51:46.38
+b13b9c25
+User
+errorData: {
+2026-01-22 12:51:46.38
+b13b9c25
+User
+[ShipStation] Error processing invoice: ShipStation API error: The request is invalid.
