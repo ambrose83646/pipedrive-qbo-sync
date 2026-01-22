@@ -930,7 +930,8 @@
       if (!invoice) return;
       
       // Always refresh shipment data for this specific invoice when opening detail
-      const docNumber = invoice.DocNumber;
+      // Use fallback chain since QuickBooks may return invoice number in different fields
+      const docNumber = invoice.DocNumber || invoice.docNumber || invoice.Id || invoice.id;
       if (docNumber) {
         console.log('[ShipStation Modal] Fetching shipment data for invoice:', docNumber);
         try {
@@ -1148,11 +1149,12 @@
     }
     
     function renderShipmentSection(invoice) {
-      const docNumber = invoice.DocNumber;
+      // Use fallback chain to find invoice number - QuickBooks may return it in different fields
+      const docNumber = invoice.DocNumber || invoice.docNumber || invoice.Id || invoice.id;
       const shipments = shipmentData[docNumber];
       
       // Debug logging
-      console.log('[ShipStation Modal] renderShipmentSection - docNumber:', docNumber);
+      console.log('[ShipStation Modal] renderShipmentSection - docNumber:', docNumber, '(from DocNumber:', invoice.DocNumber, ', Id:', invoice.Id, ')');
       console.log('[ShipStation Modal] renderShipmentSection - shipmentData keys:', Object.keys(shipmentData));
       console.log('[ShipStation Modal] renderShipmentSection - shipments for this invoice:', shipments);
       console.log('[ShipStation Modal] renderShipmentSection - shipstationConnected:', shipstationConnected);
