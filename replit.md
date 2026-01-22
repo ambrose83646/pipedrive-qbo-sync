@@ -112,11 +112,12 @@ A controller-based synchronization logic (`src/controllers/sync.js`) manages dat
 
 The app uses Pipedrive company domain (e.g., "onitathlete.pipedrive.com") as the primary user identifier. This is set during OAuth and stored in `pipedrive_user_id`. The `pipedrive_api_domain` field stores the full API domain for reference.
 
-### ShipStation Lookup Logic
-When checking ShipStation connection status, the app uses a multi-tier lookup:
-1. Direct match on `pipedrive_user_id` with normalized variations
-2. Search by `pipedrive_api_domain` if direct match fails
-3. Fallback: Return any user with both QuickBooks AND ShipStation connected (safe for single-tenant usage)
+### ShipStation Credentials
+ShipStation API key and secret are **global** for the installation (not per-user). When querying ShipStation:
+1. The app finds any record with ShipStation credentials stored
+2. Uses those credentials to query ShipStation by order number (format: `QB-{tenant}-{invoiceNumber}`)
+
+This simplifies lookups since we just need credentials to authenticate, then match invoices to orders by number.
 
 ### Important: Single-Tenant Design
-This app is designed for single-tenant deployment (one Pipedrive company per installation). The fallback lookup assumes only one active company uses the app at a time.
+This app is designed for single-tenant deployment (one Pipedrive company per installation).
