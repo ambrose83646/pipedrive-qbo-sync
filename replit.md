@@ -51,7 +51,7 @@ A controller-based synchronization logic (`src/controllers/sync.js`) manages dat
 - **ShipStation Integration**: Automated order creation based on invoice payment status, with shipment tracking and status display.
 - **Invoice List Modal**: View all invoices within Pipedrive, with PDF download, payment link copying, and detailed line item display.
 - **Contact Linking**: Secure, tenant-isolated linking of Pipedrive deals to QuickBooks customers, with an unlink feature.
-- **Token Refresh**: Automatic token refresh for both Pipedrive and QuickBooks to handle expired tokens.
+- **Token Refresh**: Automatic token refresh for both Pipedrive and QuickBooks to handle expired tokens. Uses PostgreSQL advisory locks to prevent concurrent refresh attempts across multiple server instances (QuickBooks refresh tokens are single-use).
 
 # External Dependencies
 
