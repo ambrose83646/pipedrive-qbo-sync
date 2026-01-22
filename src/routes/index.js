@@ -220,13 +220,15 @@ async function makeQBApiCall(userId, userData, apiCallFunction) {
     return response;
   } catch (error) {
     console.error(`[makeQBApiCall] API call error for user ${userId}:`, error.message);
+    const errorBody = error.response?.body || error.response?.data;
     console.error(`[makeQBApiCall] Error details:`, {
       name: error.name,
       statusCode: error.response?.statusCode || error.response?.status,
-      errorBody: error.response?.body || error.response?.data,
       authHeader: error.authHeader,
       intuit_tid: error.intuit_tid
     });
+    // Log full error body with JSON.stringify to see nested Error arrays
+    console.error(`[makeQBApiCall] Full error body:`, JSON.stringify(errorBody, null, 2));
     
     // Check if error is due to unauthorized (expired token)
     const statusCode = error.response?.statusCode || error.response?.status || error.statusCode;
