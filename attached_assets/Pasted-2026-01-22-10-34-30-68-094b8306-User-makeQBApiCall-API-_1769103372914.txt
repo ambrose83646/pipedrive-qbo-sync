@@ -1,0 +1,120 @@
+2026-01-22 10:34:30.68
+094b8306
+User
+[makeQBApiCall] API call error for user 23527284: Request failed with status code 400
+2026-01-22 10:34:30.68
+094b8306
+User
+time: '2026-01-22T09:34:29.936-08:00'
+2026-01-22 10:34:30.68
+094b8306
+User
+},
+2026-01-22 10:34:30.68
+094b8306
+User
+authHeader: undefined,
+2026-01-22 10:34:30.68
+094b8306
+User
+statusCode: 400,
+2026-01-22 10:34:30.68
+094b8306
+User
+name: 'AxiosError',
+2026-01-22 10:34:30.68
+094b8306
+User
+Fault: { Error: [Array], type: 'ValidationFault' },
+2026-01-22 10:34:30.68
+094b8306
+User
+[makeQBApiCall] Error details: {
+2026-01-22 10:34:30.68
+094b8306
+User
+intuit_tid: ''
+2026-01-22 10:34:30.68
+094b8306
+User
+}
+2026-01-22 10:34:30.68
+094b8306
+User
+errorBody: {
+2026-01-22 10:34:30.68
+094b8306
+User
+'Accept-Encoding': 'gzip, compress, deflate, br'
+2026-01-22 10:34:30.68
+094b8306
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2026-01-22 10:34:30.68
+094b8306
+User
+at settle (/home/runner/workspace/node_modules/axios/dist/node/axios.cjs:2097:12)
+2026-01-22 10:34:30.68
+094b8306
+User
+xsrfHeaderName: 'X-XSRF-TOKEN',
+2026-01-22 10:34:30.68
+094b8306
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+2026-01-22 10:34:30.68
+094b8306
+User
+timeout: 0,
+2026-01-22 10:34:30.68
+094b8306
+User
+transformResponse: [ [Function: transformResponse] ],
+2026-01-22 10:34:30.68
+094b8306
+User
+silentJSONParsing: true,
+2026-01-22 10:34:30.68
+094b8306
+User
+adapter: [ 'xhr', 'http', 'fetch' ],
+2026-01-22 10:34:30.68
+094b8306
+User
+forcedJSONParsing: true,
+2026-01-22 10:34:30.68
+094b8306
+User
+transformRequest: [ [Function: transformRequest] ],
+2026-01-22 10:34:30.68
+094b8306
+User
+Create invoice error: AxiosError: Request failed with status code 400
+2026-01-22 10:34:30.68
+094b8306
+User
+code: 'ERR_BAD_REQUEST',
+2026-01-22 10:34:30.68
+094b8306
+User
+Accept: 'application/json',
+2026-01-22 10:34:30.68
+094b8306
+User
+at async /home/runner/workspace/src/routes/index.js:3197:28 {
+2026-01-22 10:34:30.68
+094b8306
+User
+writable: true,
+2026-01-22 10:34:30.68
+094b8306
+User
+},
+2026-01-22 10:34:30.68
+094b8306
+User
+maxBodyLength: -1,
+2026-01-22 10:34:30.68
+094b8306
+User
+data: '{"CustomerRef":{"value":"2109"},"Line":[{"DetailType":"SalesItemLineDetail","Amount":1,"Description":"Collectible Trading Cards","SalesItemLineDetail":{"Qty":1,"UnitPrice":1,"ItemRef":{"value":"1010000052"}}}],"DueDate":"2026-02-21","PrivateNote":"TEST - DO NOT SHIP","CustomerMemo":{"value":"Payment Terms: Net 30"},"ShipAddr":{"Line1":"408 North Eagle Road","City":"Eagle","CountrySubDivisionCode":"ID","PostalCode":"83616","Country":"United States"},"BillEmail":{"Address":"contact@dialzara.com"}}',
