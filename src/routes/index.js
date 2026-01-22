@@ -10,7 +10,9 @@ const {
   deleteDealMapping,
   addPendingInvoice,
   setInvoiceMapping,
-  getInvoiceMapping
+  getInvoiceMapping,
+  acquireTokenRefreshLock,
+  releaseTokenRefreshLock
 } = require("../../config/postgres");
 const { getAuthUrl, getToken } = require("../auth/pipedrive");
 const qbAuth = require("../auth/quickbooks");
@@ -19,39 +21,33 @@ const OAuthClient = require("intuit-oauth");
 const axios = require("axios");
 const { encrypt, decrypt } = require("../utils/encryption");
 
-// Token refresh lock to prevent concurrent refresh attempts
+// Token refresh lock using PostgreSQL advisory locks for distributed locking
+// This works across multiple server instances (autoscale deployment)
 // QuickBooks refresh tokens are single-use, so concurrent refreshes cause "invalid token" errors
-const tokenRefreshLocks = new Map(); // userId -> Promise
 
 async function withTokenRefreshLock(userId, refreshFn) {
-  // If there's already a refresh in progress for this user, wait for it
-  if (tokenRefreshLocks.has(userId)) {
-    console.log(`[TokenLock] Waiting for existing refresh for user ${userId}`);
-    try {
-      const result = await tokenRefreshLocks.get(userId);
-      console.log(`[TokenLock] Using result from concurrent refresh for user ${userId}`);
-      return result;
-    } catch (error) {
-      console.log(`[TokenLock] Concurrent refresh failed for user ${userId}, will not retry`);
-      throw error;
+  console.log(`[TokenLock] Attempting to acquire database lock for user ${userId}`);
+  const lockInfo = await acquireTokenRefreshLock(userId, 10000); // 10 second timeout
+  
+  if (!lockInfo.acquired) {
+    console.log(`[TokenLock] Failed to acquire lock for user ${userId}, another refresh may be in progress`);
+    // If we couldn't get the lock, fetch fresh user data (another request may have refreshed)
+    const freshData = await getUser(userId);
+    if (freshData && freshData.qb_access_token) {
+      console.log(`[TokenLock] Using fresh token data after lock timeout for user ${userId}`);
+      return freshData;
     }
+    throw new Error('Could not acquire token refresh lock and no fresh token available');
   }
   
-  // Create a new refresh promise and store it
-  const refreshPromise = (async () => {
-    try {
-      console.log(`[TokenLock] Acquiring lock for user ${userId}`);
-      const result = await refreshFn();
-      return result;
-    } finally {
-      // Always release the lock when done
-      tokenRefreshLocks.delete(userId);
-      console.log(`[TokenLock] Released lock for user ${userId}`);
-    }
-  })();
-  
-  tokenRefreshLocks.set(userId, refreshPromise);
-  return refreshPromise;
+  try {
+    // Re-fetch user data in case another request already refreshed the token while we waited
+    const freshUserData = await getUser(userId);
+    const result = await refreshFn(freshUserData);
+    return result;
+  } finally {
+    await releaseTokenRefreshLock(lockInfo);
+  }
 }
 
 // Helper function to get the correct QuickBooks API base URL based on environment
@@ -172,7 +168,8 @@ function tokenNeedsRefresh(userData) {
 
 // Helper function to refresh QuickBooks token and save to database
 // Returns updated userData on success, or null if refresh should be skipped/failed softly
-// Uses locking to prevent concurrent refresh attempts (QB refresh tokens are single-use)
+// Uses PostgreSQL advisory locks to prevent concurrent refresh attempts across all server instances
+// (QB refresh tokens are single-use)
 async function refreshAndSaveToken(userId, userData, throwOnError = false) {
   // Soft guard against missing refresh token - skip refresh, don't break existing flow
   if (!userData.qb_refresh_token) {
@@ -180,30 +177,35 @@ async function refreshAndSaveToken(userId, userData, throwOnError = false) {
     return null; // Return null to indicate refresh was skipped
   }
   
-  // Use locking to prevent concurrent refresh attempts
-  return withTokenRefreshLock(userId, async () => {
+  // Use database locking to prevent concurrent refresh attempts across all server instances
+  return withTokenRefreshLock(userId, async (freshUserData) => {
     console.log(`[TokenRefresh] Starting token refresh for user ${userId}`);
-    console.log(`[TokenRefresh] Current refresh token exists: ${!!userData.qb_refresh_token}`);
-    console.log(`[TokenRefresh] Current refresh token (first 10 chars): ${userData.qb_refresh_token.substring(0, 10)}...`);
     
-    // Re-fetch user data in case another request already refreshed the token
-    const freshUserData = await getUser(userId);
+    // Use fresh data from the lock (re-fetched after acquiring lock)
+    const dataToUse = freshUserData || userData;
+    
+    // Check if another request already refreshed the token while we waited for the lock
     if (freshUserData && freshUserData.qb_refresh_token !== userData.qb_refresh_token) {
       console.log(`[TokenRefresh] Token was already refreshed by another request, using fresh data`);
+      console.log(`[TokenRefresh] Original token (first 10): ${userData.qb_refresh_token.substring(0, 10)}...`);
+      console.log(`[TokenRefresh] Fresh token (first 10): ${freshUserData.qb_refresh_token.substring(0, 10)}...`);
       return freshUserData;
     }
     
+    console.log(`[TokenRefresh] Current refresh token exists: ${!!dataToUse.qb_refresh_token}`);
+    console.log(`[TokenRefresh] Current refresh token (first 10 chars): ${dataToUse.qb_refresh_token.substring(0, 10)}...`);
+    
     try {
-      const newTokens = await qbAuth.refreshToken(userData.qb_refresh_token);
+      const newTokens = await qbAuth.refreshToken(dataToUse.qb_refresh_token);
       
       console.log(`[TokenRefresh] Refresh successful!`);
       console.log(`[TokenRefresh] New access token received: ${!!newTokens.access_token}`);
       console.log(`[TokenRefresh] New refresh token received: ${!!newTokens.refresh_token}`);
       console.log(`[TokenRefresh] New refresh token (first 10 chars): ${newTokens.refresh_token?.substring(0, 10)}...`);
-      console.log(`[TokenRefresh] Tokens changed: ${userData.qb_refresh_token !== newTokens.refresh_token ? 'YES' : 'NO'}`);
+      console.log(`[TokenRefresh] Tokens changed: ${dataToUse.qb_refresh_token !== newTokens.refresh_token ? 'YES' : 'NO'}`);
       
       const updatedUserData = {
-        ...freshUserData || userData,
+        ...dataToUse,
         qb_access_token: newTokens.access_token,
         qb_refresh_token: newTokens.refresh_token,
         qb_expires_in: newTokens.expires_in,
@@ -218,13 +220,13 @@ async function refreshAndSaveToken(userId, userData, throwOnError = false) {
     } catch (error) {
       console.error(`[TokenRefresh] Failed for user ${userId}:`, error.message);
     
-    // Log specific error details for debugging
-    if (error.response) {
-      console.error(`[TokenRefresh] Error response:`, {
-        status: error.response.status || error.response.statusCode,
-        body: error.response.body || error.response.data
-      });
-    }
+      // Log specific error details for debugging
+      if (error.response) {
+        console.error(`[TokenRefresh] Error response:`, {
+          status: error.response.status || error.response.statusCode,
+          body: error.response.body || error.response.data
+        });
+      }
     
       // Check for specific error types
       const errorMessage = error.message?.toLowerCase() || '';

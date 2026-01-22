@@ -466,6 +466,67 @@ async function getShipStationCredentials() {
   return null;
 }
 
+// PostgreSQL advisory lock for token refresh (works across multiple server instances)
+// Uses pg_advisory_lock with a hash of the userId for distributed locking
+
+// Helper to convert userId string to a consistent integer for PostgreSQL advisory locks
+function hashStringToInt(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+}
+
+async function acquireTokenRefreshLock(userId, timeoutMs = 5000) {
+  const lockId = hashStringToInt(userId);
+  const client = await pool.connect();
+  
+  try {
+    // Set statement timeout to prevent infinite waits
+    await client.query(`SET statement_timeout = ${timeoutMs}`);
+    
+    // Try to acquire an advisory lock (session-level, auto-released on disconnect)
+    const result = await client.query('SELECT pg_try_advisory_lock($1) as acquired', [lockId]);
+    
+    if (result.rows[0].acquired) {
+      console.log(`[TokenLock DB] Acquired lock for user ${userId} (lockId: ${lockId})`);
+      return { client, lockId, acquired: true };
+    } else {
+      console.log(`[TokenLock DB] Lock already held for user ${userId}, waiting...`);
+      // Wait for the lock (with timeout)
+      try {
+        await client.query('SELECT pg_advisory_lock($1)', [lockId]);
+        console.log(`[TokenLock DB] Acquired lock after waiting for user ${userId}`);
+        return { client, lockId, acquired: true };
+      } catch (waitError) {
+        console.log(`[TokenLock DB] Timeout waiting for lock for user ${userId}`);
+        client.release();
+        return { client: null, lockId, acquired: false };
+      }
+    }
+  } catch (error) {
+    console.error(`[TokenLock DB] Error acquiring lock for user ${userId}:`, error.message);
+    client.release();
+    return { client: null, lockId, acquired: false };
+  }
+}
+
+async function releaseTokenRefreshLock(lockInfo) {
+  if (!lockInfo || !lockInfo.client) return;
+  
+  try {
+    await lockInfo.client.query('SELECT pg_advisory_unlock($1)', [lockInfo.lockId]);
+    console.log(`[TokenLock DB] Released lock (lockId: ${lockInfo.lockId})`);
+  } catch (error) {
+    console.error(`[TokenLock DB] Error releasing lock:`, error.message);
+  } finally {
+    lockInfo.client.release();
+  }
+}
+
 module.exports = {
   pool,
   initializeDatabase,
@@ -487,5 +548,7 @@ module.exports = {
   getInvoiceMappingByNumber,
   deleteInvoiceMapping,
   cleanupStaleEntries,
-  cleanupMaxRetries
+  cleanupMaxRetries,
+  acquireTokenRefreshLock,
+  releaseTokenRefreshLock
 };
