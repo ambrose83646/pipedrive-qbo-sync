@@ -1,0 +1,140 @@
+2026-01-22 13:26:00.38
+2db67a69
+User
+"amountPaid": 0,
+2026-01-22 13:26:00.38
+2db67a69
+User
+"city": "Eagle",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"state": "ID",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"shipTo": {
+2026-01-22 13:26:00.38
+2db67a69
+User
+"state": "ID",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"name": "Adam Stewart",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"name": "Adam Stewart",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"postalCode": "83616",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"email": "contact@dialzara.com"
+2026-01-22 13:26:00.38
+2db67a69
+User
+},
+2026-01-22 13:26:00.38
+2db67a69
+User
+"city": "Eagle",
+2026-01-22 13:26:00.38
+2db67a69
+User
+}
+2026-01-22 13:26:00.38
+2db67a69
+User
+{
+2026-01-22 13:26:00.38
+2db67a69
+User
+"sku": "496"
+2026-01-22 13:26:00.38
+2db67a69
+User
+"customField1": "QB_Invoice_25002",
+2026-01-22 13:26:00.38
+2db67a69
+User
+[ShipStation API] POST /orders/createorder - Request payload: {
+2026-01-22 13:26:00.38
+2db67a69
+User
+"country": "US",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"orderNumber": "QB-7284-25002",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"customerEmail": "contact@dialzara.com",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"orderStatus": "awaiting_shipment",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"orderDate": "2026-01-22",
+2026-01-22 13:26:00.38
+2db67a69
+User
+}
+2026-01-22 13:26:00.38
+2db67a69
+User
+"phone": "",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"billTo": {
+2026-01-22 13:26:00.38
+2db67a69
+User
+"quantity": 1,
+2026-01-22 13:26:00.38
+2db67a69
+User
+"street1": "408 North Eagle Road",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"street2": "",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"country": "US",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"street1": "408 North Eagle Road",
+2026-01-22 13:26:00.38
+2db67a69
+User
+"email": "contact@dialzara.com"
+2026-01-22 13:26:00.38
+2db67a69
+User
+"postalCode": "83616",
+2026-01-22 13:26:00.38
+2db67a69
+User
+},
+2026-01-22 13:26:00.38
+2db67a69
+User
+"name": "2025 Boise State Football Trading Cards",
+2026-01-22 13:26:00.76
+2db67a69
+User
+[ShipStation] Saved invoice mapping: 25002 -> QB-7284-25002
+2026-01-22 13:27:15.46
+2db67a69
+System
+system: received signal terminated
