@@ -445,6 +445,8 @@ async function cleanupMaxRetries(maxRetries = 10) {
 // Get ShipStation credentials - simply returns the first user with SS credentials
 // ShipStation API key/secret are global for the installation, not per-user
 async function getShipStationCredentials() {
+  console.log('[getShipStationCredentials] Searching for ShipStation credentials...');
+  
   const result = await resilientQuery(`
     SELECT * FROM users 
     WHERE shipstation_api_key IS NOT NULL 
@@ -452,10 +454,15 @@ async function getShipStationCredentials() {
     LIMIT 1
   `);
   
+  console.log(`[getShipStationCredentials] Query returned ${result.rows.length} rows`);
+  
   if (result.rows.length > 0) {
-    return rowToUserData(result.rows[0]);
+    const userData = rowToUserData(result.rows[0]);
+    console.log(`[getShipStationCredentials] Found credentials for user: ${userData.pipedrive_user_id}, has api_key: ${!!userData.shipstation_api_key}, has api_secret: ${!!userData.shipstation_api_secret}`);
+    return userData;
   }
   
+  console.log('[getShipStationCredentials] No ShipStation credentials found in database');
   return null;
 }
 

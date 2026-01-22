@@ -3769,10 +3769,11 @@ router.get("/api/shipstation/shipments", async (req, res) => {
     
     // ShipStation credentials are global - just find any record with credentials
     const { getShipStationCredentials } = require("../../config/postgres");
+    console.log(`[ShipStation] Shipments - Fetching global ShipStation credentials...`);
     const userData = await getShipStationCredentials();
     
     if (!userData) {
-      console.log(`[ShipStation] Shipments - No credentials found`);
+      console.log(`[ShipStation] Shipments - No credentials found, returning not connected`);
       return res.json({
         success: true,
         shipments: [],
@@ -3780,6 +3781,9 @@ router.get("/api/shipstation/shipments", async (req, res) => {
         message: 'ShipStation not connected'
       });
     }
+    
+    console.log(`[ShipStation] Shipments - Found credentials for user: ${userData.pipedrive_user_id}`);
+    console.log(`[ShipStation] Shipments - Has API key: ${!!userData.shipstation_api_key}, Has API secret: ${!!userData.shipstation_api_secret}`);
     
     // Parse invoice DocNumbers from frontend
     const invoiceDocNumbers = orderNumbers ? orderNumbers.split(',').map(n => n.trim()) : [];
