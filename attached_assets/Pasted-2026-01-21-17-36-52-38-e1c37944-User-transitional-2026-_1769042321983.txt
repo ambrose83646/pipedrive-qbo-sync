@@ -1,0 +1,220 @@
+2026-01-21 17:36:52.38
+e1c37944
+User
+transitional: {
+2026-01-21 17:36:52.38
+e1c37944
+User
+xsrfHeaderName: 'X-XSRF-TOKEN',
+2026-01-21 17:36:52.38
+e1c37944
+User
+xsrfHeaderName: 'X-XSRF-TOKEN',
+2026-01-21 17:36:52.38
+e1c37944
+User
+transitional: {
+2026-01-21 17:36:52.38
+e1c37944
+User
+},
+2026-01-21 17:36:52.38
+e1c37944
+User
+maxBodyLength: -1,
+2026-01-21 17:36:52.38
+e1c37944
+User
+maxContentLength: -1,
+2026-01-21 17:36:52.38
+e1c37944
+User
+env: { FormData: [Function [FormData]], Blob: [class Blob] },
+2026-01-21 17:36:52.38
+e1c37944
+User
+request: ClientRequest {
+2026-01-21 17:36:52.38
+e1c37944
+User
+at async getToken (/home/runner/workspace/src/auth/pipedrive.js:36:22)
+2026-01-21 17:36:52.38
+e1c37944
+User
+},
+2026-01-21 17:36:52.38
+e1c37944
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2026-01-21 17:36:52.38
+e1c37944
+User
+at settle (/home/runner/workspace/node_modules/axios/dist/node/axios.cjs:2097:12)
+2026-01-21 17:36:52.38
+e1c37944
+User
+_closeAfterHandlingError: false,
+2026-01-21 17:36:52.38
+e1c37944
+User
+_parent: null,
+2026-01-21 17:36:52.38
+e1c37944
+User
+at IncomingMessage.handleStreamEnd (/home/runner/workspace/node_modules/axios/dist/node/axios.cjs:3305:11)
+2026-01-21 17:36:52.38
+e1c37944
+User
+[Symbol(alpncallback)]: null,
+2026-01-21 17:36:52.38
+e1c37944
+User
+_maxListeners: undefined,
+2026-01-21 17:36:52.38
+e1c37944
+User
+_eventsCount: 9,
+2026-01-21 17:36:52.38
+e1c37944
+User
+method: 'post',
+2026-01-21 17:36:52.38
+e1c37944
+User
+at Axios.request (/home/runner/workspace/node_modules/axios/dist/node/axios.cjs:4483:41)
+2026-01-21 17:36:52.38
+e1c37944
+User
+headers: Object [AxiosHeaders] {
+2026-01-21 17:36:52.38
+e1c37944
+User
+transformResponse: [ [Function: transformResponse] ],
+2026-01-21 17:36:52.38
+e1c37944
+User
+at endReadableNT (node:internal/streams/readable:1698:12)
+2026-01-21 17:36:52.38
+e1c37944
+User
+_writableState: [WritableState],
+2026-01-21 17:36:52.38
+e1c37944
+User
+_readableState: [ReadableState],
+2026-01-21 17:36:52.38
+e1c37944
+User
+clarifyTimeoutError: false
+2026-01-21 17:36:52.38
+e1c37944
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+2026-01-21 17:36:52.38
+e1c37944
+User
+xsrfCookieName: 'XSRF-TOKEN',
+2026-01-21 17:36:52.38
+e1c37944
+User
+silentJSONParsing: true,
+2026-01-21 17:36:52.38
+e1c37944
+User
+config: {
+2026-01-21 17:36:52.38
+e1c37944
+User
+'Content-Length': '167',
+2026-01-21 17:36:52.38
+e1c37944
+User
+connecting: false,
+2026-01-21 17:36:52.38
+e1c37944
+User
+transformRequest: [ [Function: transformRequest] ],
+2026-01-21 17:36:52.38
+e1c37944
+User
+forcedJSONParsing: true,
+2026-01-21 17:36:52.38
+e1c37944
+User
+_pendingData: null,
+2026-01-21 17:36:52.38
+e1c37944
+User
+OAuth callback error: AxiosError: Request failed with status code 400
+2026-01-21 17:36:52.38
+e1c37944
+User
+'Content-Type': 'application/x-www-form-urlencoded',
+2026-01-21 17:36:52.38
+e1c37944
+User
+'Accept-Encoding': 'gzip, compress, deflate, br'
+2026-01-21 17:36:52.38
+e1c37944
+User
+Authorization: 'Basic Mjc5MjYzMWYwNGJlOWVmMTo5ZTViNWRjYzZmMDM0MzA5NzdiZWFhYzE2MDEzYzE1OWU5MjA3YTFl',
+2026-01-21 17:36:52.38
+e1c37944
+User
+_hadError: false,
+2026-01-21 17:36:52.38
+e1c37944
+User
+url: 'https://oauth.pipedrive.com/oauth/token',
+2026-01-21 17:36:52.38
+e1c37944
+User
+timeout: 0,
+2026-01-21 17:36:52.38
+e1c37944
+User
+code: 'ERR_BAD_REQUEST',
+2026-01-21 17:36:52.38
+e1c37944
+User
+validateStatus: [Function: validateStatus],
+2026-01-21 17:36:52.38
+e1c37944
+User
+at IncomingMessage.emit (node:events:531:35)
+2026-01-21 17:36:52.38
+e1c37944
+User
+_events: [Object: null prototype],
+2026-01-21 17:36:52.38
+e1c37944
+User
+'User-Agent': 'axios/1.12.2',
+2026-01-21 17:36:52.38
+e1c37944
+User
+allowAbsoluteUrls: true
+2026-01-21 17:36:52.38
+e1c37944
+User
+adapter: [ 'xhr', 'http', 'fetch' ],
+2026-01-21 17:36:52.38
+e1c37944
+User
+Accept: 'application/json, text/plain, */*',
+2026-01-21 17:36:52.38
+e1c37944
+User
+at async /home/runner/workspace/src/routes/index.js:899:23 {
+2026-01-21 17:37:51.85
+c811608c
+System
+system: received signal terminated
+2026-01-21 17:37:51.85
+c811608c
+System
+command finished with error [node server.js]: signal: terminated
+2026-01-21 17:37:51.86
+c811608c
+System
+main done, exiting
