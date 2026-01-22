@@ -1,0 +1,220 @@
+2026-01-21 17:32:26.50
+c811608c
+User
+connect: [Function (anonymous)],
+2026-01-21 17:32:26.50
+c811608c
+User
+'x-correlation-id': '4935b25f-3d8f-416c-88b3-431ef1c756d0',
+2026-01-21 17:32:26.50
+c811608c
+User
+error: [Function (anonymous)],
+2026-01-21 17:32:26.50
+c811608c
+User
+'Content-Length': '180',
+2026-01-21 17:32:26.50
+c811608c
+User
+at IncomingMessage.handleStreamEnd (/home/runner/workspace/node_modules/axios/dist/node/axios.cjs:3305:11)
+2026-01-21 17:32:26.50
+c811608c
+User
+'x-download-options': 'noopen',
+2026-01-21 17:32:26.50
+c811608c
+User
+headers: Object [AxiosHeaders] {
+2026-01-21 17:32:26.50
+c811608c
+User
+at async getToken (/home/runner/workspace/src/auth/pipedrive.js:36:22)
+2026-01-21 17:32:26.50
+c811608c
+User
+at IncomingMessage.emit (node:events:531:35)
+2026-01-21 17:32:26.50
+c811608c
+User
+xsrfHeaderName: 'X-XSRF-TOKEN',
+2026-01-21 17:32:26.50
+c811608c
+User
+code: 'ERR_BAD_REQUEST',
+2026-01-21 17:32:26.50
+c811608c
+User
+at settle (/home/runner/workspace/node_modules/axios/dist/node/axios.cjs:2097:12)
+2026-01-21 17:32:26.50
+c811608c
+User
+aborted: [Function (anonymous)],
+2026-01-21 17:32:26.50
+c811608c
+User
+'access-control-allow-methods': 'GET, POST, OPTIONS',
+2026-01-21 17:32:26.50
+c811608c
+User
+'x-dns-prefetch-control': 'off',
+2026-01-21 17:32:26.50
+c811608c
+User
+_events: [Object: null prototype] {
+2026-01-21 17:32:26.50
+c811608c
+User
+'content-security-policy': "default-src 'self';base-uri 'self';block-all-mixed-content;font-src 'self' https: data:;frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+2026-01-21 17:32:26.50
+c811608c
+User
+method: 'post',
+2026-01-21 17:32:26.50
+c811608c
+User
+'x-ratelimit-reset': '60',
+2026-01-21 17:32:26.50
+c811608c
+User
+at async /home/runner/workspace/src/routes/index.js:899:23 {
+2026-01-21 17:32:26.50
+c811608c
+User
+OAuth callback error: AxiosError: Request failed with status code 400
+2026-01-21 17:32:26.50
+c811608c
+User
+validateStatus: [Function: validateStatus],
+2026-01-21 17:32:26.50
+c811608c
+User
+'x-permitted-cross-domain-policies': 'none',
+2026-01-21 17:32:26.50
+c811608c
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+2026-01-21 17:32:26.50
+c811608c
+User
+config: {
+2026-01-21 17:32:26.50
+c811608c
+User
+allowAbsoluteUrls: true
+2026-01-21 17:32:26.50
+c811608c
+User
+timeout: 0,
+2026-01-21 17:32:26.50
+c811608c
+User
+badi: 'Routing: was-1=>was-1; Version: 3c3c; Host: 58579b9445-rlhm5;',
+2026-01-21 17:32:26.50
+c811608c
+User
+clarifyTimeoutError: false
+2026-01-21 17:32:26.50
+c811608c
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2026-01-21 17:32:26.50
+c811608c
+User
+transformRequest: [ [Function: transformRequest] ],
+2026-01-21 17:32:26.50
+c811608c
+User
+Accept: 'application/json, text/plain, */*',
+2026-01-21 17:32:26.50
+c811608c
+User
+xsrfCookieName: 'XSRF-TOKEN',
+2026-01-21 17:32:26.50
+c811608c
+User
+maxBodyLength: -1,
+2026-01-21 17:32:26.50
+c811608c
+User
+'expect-ct': 'max-age=0',
+2026-01-21 17:32:26.50
+c811608c
+User
+},
+2026-01-21 17:32:26.50
+c811608c
+User
+transformResponse: [Array],
+2026-01-21 17:32:26.50
+c811608c
+User
+at Axios.request (/home/runner/workspace/node_modules/axios/dist/node/axios.cjs:4483:41)
+2026-01-21 17:32:26.50
+c811608c
+User
+'access-control-expose-headers': 'X-RateLimit-Remaining, X-RateLimit-Limit, X-RateLimit-Reset, X-Daily-RateLimit-Token-Limit, X-Daily-RateLimit-Token-Remaining',
+2026-01-21 17:32:26.50
+c811608c
+User
+Authorization: 'Basic Mjc5MjYzMWYwNGJlOWVmMTo5ZTViNWRjYzZmMDM0MzA5NzdiZWFhYzE2MDEzYzE1OWU5MjA3YTFl',
+2026-01-21 17:32:26.50
+c811608c
+User
+transitional: {
+2026-01-21 17:32:26.50
+c811608c
+User
+adapter: [ 'xhr', 'http', 'fetch' ],
+2026-01-21 17:32:26.50
+c811608c
+User
+env: { FormData: [Function [FormData]], Blob: [class Blob] },
+2026-01-21 17:32:26.50
+c811608c
+User
+'x-frame-options': 'SAMEORIGIN',
+2026-01-21 17:32:26.50
+c811608c
+User
+at endReadableNT (node:internal/streams/readable:1698:12)
+2026-01-21 17:32:26.50
+c811608c
+User
+maxContentLength: -1,
+2026-01-21 17:32:26.50
+c811608c
+User
+transformResponse: [ [Function: transformResponse] ],
+2026-01-21 17:32:26.50
+c811608c
+User
+timeout: [Function (anonymous)],
+2026-01-21 17:32:26.50
+c811608c
+User
+silentJSONParsing: true,
+2026-01-21 17:32:26.50
+c811608c
+User
+forcedJSONParsing: true,
+2026-01-21 17:32:26.50
+c811608c
+User
+'Content-Type': 'application/x-www-form-urlencoded',
+2026-01-21 17:32:26.50
+c811608c
+User
+connect: [Function (anonymous)],
+2026-01-21 17:32:56.22
+2248614f
+System
+system: received signal terminated
+2026-01-21 17:32:56.23
+2248614f
+System
+command finished with error [node server.js]: signal: terminated
+2026-01-21 17:32:56.24
+2248614f
+System
+main done, exiting
