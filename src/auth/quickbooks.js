@@ -7,11 +7,13 @@ const oauthClient = new OAuthClient({
   redirectUri: process.env.APP_URL + '/auth/qb/callback'
 });
 
-function getAuthUrl(userId, isExtension = false) {
-  // Encode both userId and extension flag in state parameter
+function getAuthUrl(userId, isExtension = false, options = {}) {
+  // Encode userId, extension flag, and additional identifiers in state parameter
   const stateData = JSON.stringify({ 
     userId: userId || 'test', 
-    extension: isExtension 
+    extension: isExtension,
+    companyDomain: options.companyDomain || null,
+    numericUserId: options.numericUserId || null
   });
   const state = Buffer.from(stateData).toString('base64');
   
@@ -20,7 +22,7 @@ function getAuthUrl(userId, isExtension = false) {
     state: state
   });
   
-  console.log('Generated QB auth URL');
+  console.log('Generated QB auth URL with companyDomain:', options.companyDomain, 'numericUserId:', options.numericUserId);
   return authUri;
 }
 

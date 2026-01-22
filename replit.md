@@ -110,7 +110,18 @@ A controller-based synchronization logic (`src/controllers/sync.js`) manages dat
 
 ## User Identification Architecture
 
-The app uses Pipedrive company domain (e.g., "onitathlete.pipedrive.com") as the primary user identifier. This is set during OAuth and stored in `pipedrive_user_id`. The `pipedrive_api_domain` field stores the full API domain for reference.
+The app uses a **dual-identifier system** to handle the mismatch between Pipedrive OAuth and the Pipedrive Extension SDK:
+
+1. **Primary ID (`pipedrive_user_id`)**: The company subdomain (e.g., "onitathlere") - set during Pipedrive OAuth and used as the primary key for user records.
+2. **Secondary ID (`pipedrive_numeric_id`)**: The numeric Pipedrive user ID (e.g., "23527284") - received from the Pipedrive Extension SDK and stored for alternative lookup.
+
+This dual-identifier approach ensures the app correctly identifies users regardless of which identifier is provided:
+- When Pipedrive OAuth completes, the company subdomain becomes `pipedrive_user_id`
+- When the settings page loads (via Pipedrive Extension SDK), it may receive a numeric user ID
+- The app searches by both identifiers to find the correct user record
+- QuickBooks OAuth callback stores the numeric ID alongside the company subdomain for future lookups
+
+The `pipedrive_api_domain` field stores the full API domain for reference.
 
 ### ShipStation Credentials
 ShipStation API key and secret are **global** for the installation (not per-user). When querying ShipStation:

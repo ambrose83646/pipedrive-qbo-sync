@@ -1075,9 +1075,13 @@ router.get("/auth/pipedrive/callback", async (req, res) => {
 router.get("/auth/qb", (req, res) => {
   const userId = req.query.user_id;
   const isExtension = req.query.extension === "true";
+  const companyDomain = req.query.company_domain;   // e.g., "onitathlere"
+  const numericUserId = req.query.numeric_user_id;  // e.g., "23527284"
 
-  // Pass both userId and extension flag to getAuthUrl
-  const authUrl = qbAuth.getAuthUrl(userId, isExtension);
+  console.log(`[QB Auth] Starting OAuth with userId: ${userId}, companyDomain: ${companyDomain}, numericUserId: ${numericUserId}`);
+
+  // Pass userId, extension flag, and additional identifiers to getAuthUrl
+  const authUrl = qbAuth.getAuthUrl(userId, isExtension, { companyDomain, numericUserId });
 
   res.redirect(authUrl);
 });
@@ -1086,15 +1090,20 @@ router.get("/auth/qb/callback", async (req, res) => {
   const code = req.query.code;
   const stateParam = req.query.state;
 
-  // Decode state parameter to get userId and extension flag
+  // Decode state parameter to get userId, extension flag, and additional identifiers
   let userId;
   let isExtension = false;
+  let companyDomain = null;
+  let numericUserId = null;
 
   try {
     const decodedState = Buffer.from(stateParam, "base64").toString("utf-8");
     const stateData = JSON.parse(decodedState);
     userId = stateData.userId;
     isExtension = stateData.extension || false;
+    companyDomain = stateData.companyDomain || null;
+    numericUserId = stateData.numericUserId || null;
+    console.log(`[QB Callback] Decoded state - userId: ${userId}, companyDomain: ${companyDomain}, numericUserId: ${numericUserId}`);
   } catch (e) {
     // Fallback for old format (direct userId)
     userId = stateParam;
@@ -1169,6 +1178,12 @@ router.get("/auth/qb/callback", async (req, res) => {
       qb_expires_at: qbTokenData.expires_at,
       qb_updated_at: new Date().toISOString(),
     };
+    
+    // Store the numeric user ID if provided (for alternative lookup)
+    if (numericUserId) {
+      updatedUser.pipedrive_numeric_id = numericUserId;
+      console.log(`[QB OAuth] Storing pipedrive_numeric_id: ${numericUserId}`);
+    }
 
     await setUser(actualUserId, updatedUser);
     console.log(`[QB OAuth] Successfully stored QB tokens for userId: ${actualUserId}`);
@@ -1422,12 +1437,15 @@ router.get("/api/user-status", async (req, res) => {
       return normalized;
     }
     
+    // Accept multiple identifiers from the request
     let pipedriveUserId = req.query.userId;
+    const companyDomain = req.query.companyDomain;  // e.g., "onitathlere"
+    const numericUserId = req.query.numericUserId;  // e.g., "23527284"
     const normalizedInput = normalizeUserId(pipedriveUserId);
     
-    console.log(`[API User Status] Checking status for userId: ${pipedriveUserId} (normalized: ${normalizedInput})`);
+    console.log(`[API User Status] Checking status for userId: ${pipedriveUserId} (normalized: ${normalizedInput}), companyDomain: ${companyDomain}, numericUserId: ${numericUserId}`);
 
-    if (!pipedriveUserId) {
+    if (!pipedriveUserId && !companyDomain && !numericUserId) {
       console.log('[API User Status] No userId provided');
       return res.json({
         connected: false,
@@ -1439,16 +1457,17 @@ router.get("/api/user-status", async (req, res) => {
       });
     }
 
-    // Try multiple userId formats
+    // Try multiple userId formats - prioritize companyDomain if provided
     const possibleUserIds = [
-      pipedriveUserId,                                    // Original input
+      companyDomain,                                       // Company domain (e.g., "onitathlere")
+      pipedriveUserId,                                     // Original input
       normalizedInput,                                     // Normalized (no https, no .pipedrive.com)
       normalizedInput + '.pipedrive.com',                  // Add suffix back
       'https://' + normalizedInput + '.pipedrive.com',     // Full URL
       'https://' + pipedriveUserId                         // With https prefix
     ];
     
-    // Remove duplicates
+    // Remove duplicates and nulls
     const uniqueUserIds = [...new Set(possibleUserIds.filter(id => id))];
     console.log(`[API User Status] Trying userId formats:`, uniqueUserIds);
     
@@ -1484,15 +1503,23 @@ router.get("/api/user-status", async (req, res) => {
           // Normalize both IDs for comparison
           const normalizedKey = normalizeUserId(key);
           
-          // Check various matching conditions
+          // Check various matching conditions - include numericUserId and companyDomain
           const isMatch = 
             normalizedKey === normalizedInput ||
             key === pipedriveUserId ||
             testUserData.api_domain?.includes(normalizedInput) ||
             normalizedInput.includes(normalizedKey) ||
             normalizedKey.includes(normalizedInput) ||
-            // Check if stored numeric user ID matches
-            (testUserData.pipedrive_user_id && testUserData.pipedrive_user_id.toString() === normalizedInput);
+            // Check if stored numeric user ID matches the provided numeric ID
+            (numericUserId && testUserData.pipedrive_numeric_id === numericUserId) ||
+            // Check if the userId itself is numeric and matches stored pipedrive_numeric_id
+            (testUserData.pipedrive_numeric_id && testUserData.pipedrive_numeric_id === pipedriveUserId) ||
+            (testUserData.pipedrive_numeric_id && testUserData.pipedrive_numeric_id === normalizedInput) ||
+            // Check if company domain matches
+            (companyDomain && normalizedKey === companyDomain) ||
+            (companyDomain && key === companyDomain) ||
+            // Check if stored pipedrive_user_id matches company domain
+            (companyDomain && testUserData.pipedrive_user_id === companyDomain);
           
           if (isMatch) {
             console.log(`[API User Status] Found QB tokens under alternative ID: ${key} (normalized: ${normalizedKey})`);

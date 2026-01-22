@@ -43,6 +43,17 @@ async function getUser(userId) {
     }
   }
   
+  // Try matching by pipedrive_numeric_id (for when userId is the numeric Pipedrive user ID)
+  for (const tryId of [...new Set(possibleIds.filter(id => id))]) {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE pipedrive_numeric_id = $1',
+      [tryId]
+    );
+    if (result.rows.length > 0) {
+      return rowToUserData(result.rows[0]);
+    }
+  }
+  
   // Fallback: search by pipedrive_api_domain (for cases where userId is domain but stored ID is numeric)
   for (const tryId of [...new Set(possibleIds.filter(id => id))]) {
     const result = await pool.query(
@@ -93,7 +104,8 @@ async function setUser(userId, data) {
         setup_completed_at = $19,
         setup_token = $20,
         setup_token_expires = $21,
-        invoice_preferences = $22
+        invoice_preferences = $22,
+        pipedrive_numeric_id = COALESCE($23, pipedrive_numeric_id)
       WHERE pipedrive_user_id = $1
     `, [
       normalized,
@@ -117,7 +129,8 @@ async function setUser(userId, data) {
       data.setup_completed_at ? new Date(data.setup_completed_at) : null,
       data.setup_token || null,
       data.setup_token_expires ? new Date(data.setup_token_expires) : null,
-      data.invoice_preferences ? JSON.stringify(data.invoice_preferences) : null
+      data.invoice_preferences ? JSON.stringify(data.invoice_preferences) : null,
+      data.pipedrive_numeric_id || null
     ]);
   } else {
     await pool.query(`
@@ -143,8 +156,9 @@ async function setUser(userId, data) {
         setup_completed_at,
         setup_token,
         setup_token_expires,
-        invoice_preferences
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+        invoice_preferences,
+        pipedrive_numeric_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
     `, [
       normalized,
       pipedriveAccessToken,
@@ -167,7 +181,8 @@ async function setUser(userId, data) {
       data.setup_completed_at ? new Date(data.setup_completed_at) : null,
       data.setup_token || null,
       data.setup_token_expires ? new Date(data.setup_token_expires) : null,
-      data.invoice_preferences ? JSON.stringify(data.invoice_preferences) : null
+      data.invoice_preferences ? JSON.stringify(data.invoice_preferences) : null,
+      data.pipedrive_numeric_id || null
     ]);
   }
   return true;
@@ -198,6 +213,8 @@ function rowToUserData(row) {
   const qbRefreshToken = decrypt(row.qb_refresh_token);
   
   return {
+    pipedrive_user_id: row.pipedrive_user_id,
+    pipedrive_numeric_id: row.pipedrive_numeric_id,
     pipedrive_access_token: pipedriveAccessToken,
     access_token: pipedriveAccessToken,
     pipedrive_refresh_token: pipedriveRefreshToken,

@@ -300,8 +300,10 @@
         const sdk = await new AppExtensionsSDK().initialize();
 
         // Get signed token and user info from Pipedrive SDK
-        let userId = "test";
-        let apiDomain = "";
+        // Track both identifiers: companyDomain (subdomain) and numericUserId
+        let companyDomain = "";  // e.g., "onitathlere" (the company subdomain)
+        let numericUserId = "";   // e.g., "23527284" (the numeric Pipedrive user ID)
+        let userId = "test";      // Primary identifier for API calls
 
         try {
           // Try to get the signed token
@@ -312,13 +314,13 @@
           if (token) {
             // Check for api_domain in various places
             if (token.api_domain) {
-              apiDomain = token.api_domain;
-              userId = apiDomain;
-              console.log("Found api_domain in token:", userId);
+              const domain = token.api_domain.replace(/\.pipedrive\.com$/, '').replace(/^https?:\/\//, '');
+              companyDomain = domain;
+              console.log("Found company domain from api_domain:", companyDomain);
             } else if (token.data && token.data.api_domain) {
-              apiDomain = token.data.api_domain;
-              userId = apiDomain;
-              console.log("Found api_domain in token.data:", userId);
+              const domain = token.data.api_domain.replace(/\.pipedrive\.com$/, '').replace(/^https?:\/\//, '');
+              companyDomain = domain;
+              console.log("Found company domain from token.data.api_domain:", companyDomain);
             }
           }
 
@@ -329,24 +331,21 @@
 
             // Check if context has user info
             if (context) {
-              if (context.company_domain) {
-                // Use company domain as a fallback
-                const companyUserId = context.company_domain + ".pipedrive.com";
-                if (userId === "test") {
-                  userId = companyUserId;
-                  console.log("Using company_domain from context:", userId);
-                }
+              // Get company_domain (the subdomain like "onitathlere")
+              if (context.company_domain && !companyDomain) {
+                companyDomain = context.company_domain;
+                console.log("Using company_domain from context:", companyDomain);
               }
 
-              if (context.user && context.user.company_domain) {
-                const userCompanyId =
-                  context.user.company_domain + ".pipedrive.com";
-                if (userId === "test") {
-                  userId = userCompanyId;
-                  console.log(
-                    "Using user.company_domain from context:",
-                    userId,
-                  );
+              if (context.user) {
+                // Get numeric user ID if available
+                if (context.user.id) {
+                  numericUserId = String(context.user.id);
+                  console.log("Found numeric user ID from context.user.id:", numericUserId);
+                }
+                if (context.user.company_domain && !companyDomain) {
+                  companyDomain = context.user.company_domain;
+                  console.log("Using user.company_domain from context:", companyDomain);
                 }
               }
             }
@@ -357,16 +356,19 @@
           console.error("Error getting SDK data:", error);
         }
 
-        // Fallback to URL params if needed
+        // Check URL params for numeric userId (this is what Pipedrive passes)
         const urlParams = new URLSearchParams(window.location.search);
         const urlUserId = urlParams.get("userId");
         if (urlUserId && urlUserId !== "test") {
-          userId = urlUserId;
-          console.log("Using URL param userId:", userId);
+          // If it looks like a numeric ID (no dots), save as numericUserId
+          if (!urlUserId.includes('.') && !numericUserId) {
+            numericUserId = urlUserId;
+            console.log("Found numeric userId from URL params:", numericUserId);
+          }
         }
 
-        // Extract company domain from the parent URL if we still don't have a good userId
-        if (userId === "test") {
+        // Extract company domain from the parent URL if we still don't have it
+        if (!companyDomain) {
           try {
             // Check if we're in an iframe and can access parent URL
             if (window.parent !== window) {
@@ -376,8 +378,8 @@
                 /https:\/\/([^\.]+)\.pipedrive\.com/,
               );
               if (match) {
-                userId = match[0].replace("https://", "");
-                console.log("Extracted userId from parent URL:", userId);
+                companyDomain = match[1]; // Just the subdomain part
+                console.log("Extracted companyDomain from parent URL:", companyDomain);
               }
             }
           } catch (e) {
@@ -385,13 +387,14 @@
           }
         }
 
-        // Normalize userId - remove https:// prefix for consistency
-        if (userId && userId.startsWith("https://")) {
-          userId = userId.replace("https://", "");
-          console.log("Normalized userId (removed https://):", userId);
+        // Set primary userId - prefer companyDomain, fall back to numericUserId
+        if (companyDomain) {
+          userId = companyDomain;
+        } else if (numericUserId) {
+          userId = numericUserId;
         }
 
-        console.log("Final userId for API call:", userId);
+        console.log("Final identifiers - userId:", userId, ", companyDomain:", companyDomain, ", numericUserId:", numericUserId);
 
         const statusText = document.getElementById("statusText");
         const companyNameDiv = document.getElementById("companyName");
@@ -485,7 +488,9 @@
 
         // Handle connect button
         function handleConnect() {
-          const authUrl = "/auth/qb?user_id=" + userId + "&extension=true";
+          let authUrl = "/auth/qb?user_id=" + userId + "&extension=true";
+          if (companyDomain) authUrl += "&company_domain=" + companyDomain;
+          if (numericUserId) authUrl += "&numeric_user_id=" + numericUserId;
           var popup = window.open(authUrl, "_blank", "width=600,height=700");
 
           // Simple approach: watch for popup to close, then reload the page
@@ -677,8 +682,11 @@
 
         // Check connection status
         function checkStatus() {
-          console.log("Checking status for userId:", userId);
-          fetch("/api/user-status?userId=" + userId)
+          console.log("Checking status for userId:", userId, "companyDomain:", companyDomain, "numericUserId:", numericUserId);
+          const statusParams = new URLSearchParams({ userId: userId });
+          if (companyDomain) statusParams.append('companyDomain', companyDomain);
+          if (numericUserId) statusParams.append('numericUserId', numericUserId);
+          fetch("/api/user-status?" + statusParams.toString())
             .then(function (response) {
               return response.json();
             })
@@ -799,7 +807,10 @@
         // Check ShipStation status
         async function checkShipStationStatus() {
           try {
-            const response = await fetch('/api/shipstation/status?userId=' + userId);
+            const ssParams = new URLSearchParams({ userId: userId });
+            if (companyDomain) ssParams.append('companyDomain', companyDomain);
+            if (numericUserId) ssParams.append('numericUserId', numericUserId);
+            const response = await fetch('/api/shipstation/status?' + ssParams.toString());
             const data = await response.json();
 
             if (data.connected) {

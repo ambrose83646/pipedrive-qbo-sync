@@ -5,6 +5,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     pipedrive_user_id VARCHAR(255) UNIQUE NOT NULL,
+    pipedrive_numeric_id VARCHAR(100),
     
     -- Pipedrive OAuth
     pipedrive_access_token TEXT,
@@ -80,6 +81,7 @@ CREATE TABLE IF NOT EXISTS invoice_mappings (
 
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_users_pipedrive_id ON users(pipedrive_user_id);
+CREATE INDEX IF NOT EXISTS idx_users_pipedrive_numeric_id ON users(pipedrive_numeric_id);
 CREATE INDEX IF NOT EXISTS idx_deal_mappings_deal_id ON deal_mappings(deal_id);
 CREATE INDEX IF NOT EXISTS idx_pending_invoices_user_id ON pending_invoices(user_id);
 CREATE INDEX IF NOT EXISTS idx_pending_invoices_retry_count ON pending_invoices(retry_count);
