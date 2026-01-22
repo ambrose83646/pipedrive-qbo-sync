@@ -1,0 +1,140 @@
+2026-01-22 14:55:46.28
+58eec67d
+User
+[makeQBApiCall] Response has body: false, has json: true
+2026-01-22 14:55:46.41
+58eec67d
+User
+[TokenCheck] Minutes until expiry: 12, needs refresh: false
+2026-01-22 14:55:46.41
+58eec67d
+User
+[TokenCheck] Token expires at: 2026-01-22T22:08:15.756Z, now: 2026-01-22T21:55:46.414Z
+2026-01-22 14:55:46.41
+58eec67d
+User
+[makeQBApiCall] Has access token: true, Has realm: true
+2026-01-22 14:55:46.41
+58eec67d
+User
+[makeQBApiCall] Starting API call for user 23527284
+2026-01-22 14:55:46.95
+58eec67d
+User
+[makeQBApiCall] Response has body: false, has json: true
+2026-01-22 14:55:46.95
+58eec67d
+User
+[makeQBApiCall] API call successful, response type: object
+2026-01-22 14:55:47.07
+58eec67d
+User
+[ShipStation] Shipments - Fetching global ShipStation credentials...
+2026-01-22 14:55:47.07
+58eec67d
+User
+[ShipStation] === SHIPMENTS ENDPOINT HIT === URL: /api/shipstation/shipments?userId=23527284&orderNumbers=25003%2C25002%2C25001%2C24999%2C25000%2C24998%2C24997%2C24993
+2026-01-22 14:55:47.07
+58eec67d
+User
+[ShipStation] Fetching shipments for user: 23527284, invoices: 25003,25002,25001,24999,25000,24998,24997,24993
+2026-01-22 14:55:47.07
+58eec67d
+User
+[getShipStationCredentials] Searching for ShipStation credentials...
+2026-01-22 14:55:47.10
+58eec67d
+User
+[ShipStation] Shipments - Has API key: true, Has API secret: true
+2026-01-22 14:55:47.10
+58eec67d
+User
+[ShipStation] Using tenant suffix: 7284 (from source: 23527284)
+2026-01-22 14:55:47.10
+58eec67d
+User
+[ShipStation] Shipments - Found credentials for user: onitathlere
+2026-01-22 14:55:47.10
+58eec67d
+User
+[getShipStationCredentials] Found credentials for user: onitathlere, has api_key: true, has api_secret: true
+2026-01-22 14:55:47.10
+58eec67d
+User
+[getShipStationCredentials] Query returned 1 rows
+2026-01-22 14:55:47.10
+58eec67d
+User
+[ShipStation] Looking up order: QB-7284-25003 for invoice 25003
+2026-01-22 14:55:47.36
+58eec67d
+User
+[ShipStation] Looking up order: QB-7284-25002 for invoice 25002
+2026-01-22 14:55:47.57
+58eec67d
+User
+[ShipStation] Looking up order: QB-7284-25001 for invoice 25001
+2026-01-22 14:55:47.69
+58eec67d
+User
+[ShipStation] Looking up order: QB-7284-24999 for invoice 24999
+2026-01-22 14:55:47.80
+58eec67d
+User
+[ShipStation] Looking up order: QB-7284-25000 for invoice 25000
+2026-01-22 14:55:47.92
+58eec67d
+User
+[ShipStation] Looking up order: QB-7284-24998 for invoice 24998
+2026-01-22 14:55:48.03
+58eec67d
+User
+[ShipStation] Looking up order: QB-7284-24997 for invoice 24997
+2026-01-22 14:55:48.14
+58eec67d
+User
+[ShipStation] Looking up order: QB-7284-24993 for invoice 24993
+2026-01-22 14:55:48.25
+58eec67d
+User
+[ShipStation] Found 1 order(s)/shipment(s) for 1 invoice(s)
+2026-01-22 14:55:50.38
+58eec67d
+User
+[ShipStation] === SHIPMENTS ENDPOINT HIT === URL: /api/shipstation/shipments?userId=23527284&orderNumbers=25003
+2026-01-22 14:55:50.38
+58eec67d
+User
+[getShipStationCredentials] Searching for ShipStation credentials...
+2026-01-22 14:55:50.38
+58eec67d
+User
+[ShipStation] Fetching shipments for user: 23527284, invoices: 25003
+2026-01-22 14:55:50.38
+58eec67d
+User
+[ShipStation] Shipments - Fetching global ShipStation credentials...
+2026-01-22 14:55:50.41
+58eec67d
+User
+[getShipStationCredentials] Query returned 1 rows
+2026-01-22 14:55:50.41
+58eec67d
+User
+[ShipStation] Shipments - Found credentials for user: onitathlere
+2026-01-22 14:55:50.41
+58eec67d
+User
+[ShipStation] Using tenant suffix: 7284 (from source: 23527284)
+2026-01-22 14:55:50.41
+58eec67d
+User
+[getShipStationCredentials] Found credentials for user: onitathlere, has api_key: true, has api_secret: true
+2026-01-22 14:55:50.41
+58eec67d
+User
+[ShipStation] Shipments - Has API key: true, Has API secret: true
+2026-01-22 14:55:50.41
+58eec67d
+User
+[ShipStation] Looking up order: QB-7284-25003 for invoice 25003
