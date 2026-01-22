@@ -80,8 +80,21 @@ async function makeShipStationApiCall(userData, method, endpoint, data = null) {
     config.data = data;
   }
   
-  const response = await axios(config);
-  return response.data;
+  try {
+    const response = await axios(config);
+    return response.data;
+  } catch (error) {
+    // Capture and log detailed error response from ShipStation
+    if (error.response) {
+      console.error(`[PaymentPoller] ShipStation API error:`, {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        endpoint: endpoint
+      });
+    }
+    throw error;
+  }
 }
 
 // Build unique ShipStation order number with tenant prefix
@@ -101,6 +114,15 @@ function buildShipStationOrderNumber(userId, invoiceNumber) {
 async function createShipStationOrder(userData, invoice, userId) {
   const invoiceId = invoice.Id;
   const invoiceNumber = invoice.DocNumber || invoice.Id;
+  
+  // Validation: Ensure we have a valid invoice identifier
+  if (!invoiceId && !invoiceNumber) {
+    const error = new Error('Invoice missing both Id and DocNumber - cannot create ShipStation order');
+    error.validationError = true;
+    throw error;
+  }
+  
+  console.log(`[PaymentPoller] createShipStationOrder called - invoiceId: ${invoiceId}, invoiceNumber: ${invoiceNumber}`);
   
   // Step 1: Check if we already have a mapping for this invoice
   try {
@@ -232,9 +254,12 @@ async function checkPendingInvoices() {
     
     for (const pending of pendingInvoices) {
       try {
-        const { invoiceId, invoiceNumber, userId, invoiceData, retryCount = 0, lastError } = pending;
+        const { invoiceId, invoiceNumber: storedInvoiceNumber, userId, invoiceData, retryCount = 0, lastError } = pending;
         
-        console.log(`[PaymentPoller] Checking invoice ${invoiceNumber} (${invoiceId}), attempt ${retryCount + 1}/${MAX_RETRIES}`);
+        // Use stored invoice number, or fall back to invoiceId if null
+        const invoiceNumber = storedInvoiceNumber || invoiceId;
+        
+        console.log(`[PaymentPoller] Checking invoice ${invoiceNumber} (ID: ${invoiceId}), attempt ${retryCount + 1}/${MAX_RETRIES}`);
         
         let userData = await getUser(userId);
         
@@ -306,7 +331,13 @@ async function checkPendingInvoices() {
             }
             
             try {
-              const mergedInvoice = { ...invoiceData, ...currentInvoice };
+              // Ensure invoiceData is parsed if it's a string (safety check)
+              const parsedInvoiceData = typeof invoiceData === 'string' ? JSON.parse(invoiceData) : invoiceData;
+              const mergedInvoice = { ...parsedInvoiceData, ...currentInvoice };
+              
+              // Debug logging for order number construction
+              console.log(`[PaymentPoller] Creating order - Invoice Id: ${mergedInvoice.Id}, DocNumber: ${mergedInvoice.DocNumber}, using: ${mergedInvoice.DocNumber || mergedInvoice.Id}`);
+              
               const ssOrder = await createShipStationOrder(userData, mergedInvoice, userId);
               
               if (ssOrder && ssOrder.orderId) {

@@ -3552,18 +3552,20 @@ router.post("/api/invoices", express.json(), async (req, res) => {
           
           if (isDueOnReceipt && invoiceBalance > 0) {
             // Due on Receipt with unpaid balance - add to pending_invoices table for payment poller
-            console.log(`[ShipStation] Invoice ${result.Invoice.DocNumber} - Due on Receipt, pending payment. Adding to pending invoices.`);
+            // Use DocNumber if available, otherwise fall back to Id
+            const invoiceNumberForPending = result.Invoice.DocNumber || result.Invoice.Id;
+            console.log(`[ShipStation] Invoice ${invoiceNumberForPending} - Due on Receipt, pending payment. Adding to pending invoices.`);
             
             // addPendingInvoice(invoiceId, invoiceNumber, userId, invoiceData)
             await addPendingInvoice(
               result.Invoice.Id,
-              result.Invoice.DocNumber,
+              invoiceNumberForPending,
               actualUserId,
               result.Invoice  // Store full invoice data for ShipStation order creation
             );
             
             shipstationOrderPending = true;
-            console.log(`[ShipStation] Added invoice ${result.Invoice.DocNumber} to pending invoices for payment polling`);
+            console.log(`[ShipStation] Added invoice ${invoiceNumberForPending} to pending invoices for payment polling`);
           } else {
             // Net 30/60 or paid invoice - create ShipStation order immediately
             console.log(`[ShipStation] Creating order for invoice ${result.Invoice.DocNumber}`);
