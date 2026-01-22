@@ -764,7 +764,8 @@
     }
     
     function getShipmentStatus(invoice) {
-      const docNumber = invoice.DocNumber;
+      // Use fallback chain to find invoice number - QuickBooks may return it in different fields
+      const docNumber = invoice.DocNumber || invoice.docNumber || invoice.Id || invoice.id;
       const shipments = shipmentData[docNumber];
       
       if (!shipstationConnected) {
