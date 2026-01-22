@@ -22,6 +22,79 @@ function getQBBaseUrl() {
     : 'https://sandbox-quickbooks.api.intuit.com';
 }
 
+// Convert country names to 2-letter ISO codes for ShipStation
+function convertToCountryCode(country) {
+  if (!country) return 'US';
+  
+  const countryMap = {
+    'united states': 'US',
+    'united states of america': 'US',
+    'usa': 'US',
+    'u.s.a.': 'US',
+    'u.s.': 'US',
+    'us': 'US',
+    'canada': 'CA',
+    'mexico': 'MX',
+    'united kingdom': 'GB',
+    'uk': 'GB',
+    'great britain': 'GB',
+    'australia': 'AU',
+    'germany': 'DE',
+    'france': 'FR',
+    'italy': 'IT',
+    'spain': 'ES',
+    'netherlands': 'NL',
+    'belgium': 'BE',
+    'switzerland': 'CH',
+    'austria': 'AT',
+    'sweden': 'SE',
+    'norway': 'NO',
+    'denmark': 'DK',
+    'finland': 'FI',
+    'ireland': 'IE',
+    'new zealand': 'NZ',
+    'japan': 'JP',
+    'china': 'CN',
+    'india': 'IN',
+    'brazil': 'BR',
+    'argentina': 'AR',
+    'chile': 'CL',
+    'colombia': 'CO',
+    'peru': 'PE',
+    'south africa': 'ZA',
+    'singapore': 'SG',
+    'hong kong': 'HK',
+    'taiwan': 'TW',
+    'south korea': 'KR',
+    'korea': 'KR',
+    'philippines': 'PH',
+    'thailand': 'TH',
+    'vietnam': 'VN',
+    'malaysia': 'MY',
+    'indonesia': 'ID',
+    'poland': 'PL',
+    'czech republic': 'CZ',
+    'portugal': 'PT',
+    'greece': 'GR',
+    'israel': 'IL',
+    'uae': 'AE',
+    'united arab emirates': 'AE',
+    'saudi arabia': 'SA',
+    'russia': 'RU',
+    'ukraine': 'UA',
+    'turkey': 'TR'
+  };
+  
+  const normalized = country.toLowerCase().trim();
+  
+  // If already a 2-letter code, return uppercase
+  if (normalized.length === 2) {
+    return normalized.toUpperCase();
+  }
+  
+  return countryMap[normalized] || 'US';
+}
+
 let pollingInterval = null;
 
 async function refreshQBToken(userId, userData) {
@@ -172,7 +245,7 @@ async function createShipStationOrder(userData, invoice, userId) {
     city: invoice.ShipAddr?.City || invoice.BillAddr?.City || '',
     state: invoice.ShipAddr?.CountrySubDivisionCode || invoice.BillAddr?.CountrySubDivisionCode || '',
     postalCode: invoice.ShipAddr?.PostalCode || invoice.BillAddr?.PostalCode || '',
-    country: invoice.ShipAddr?.Country || invoice.BillAddr?.Country || 'US',
+    country: convertToCountryCode(invoice.ShipAddr?.Country || invoice.BillAddr?.Country),
     phone: invoice.ShipAddr?.Phone || '',
     email: invoice.BillEmail?.Address || ''
   };
