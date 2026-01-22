@@ -2619,7 +2619,7 @@ router.delete("/api/deal-contact", async (req, res) => {
 // Deauthorization endpoint - called by Pipedrive when app is uninstalled
 router.post("/deauth", express.json(), async (req, res) => {
   try {
-    console.log("Deauthorization request received");
+    console.log("Deauthorization request received:", JSON.stringify(req.body));
     
     // Verify Pipedrive signature
     // The signature is HMAC-SHA256 of the request body with the client secret
@@ -2638,18 +2638,73 @@ router.post("/deauth", express.json(), async (req, res) => {
       }
     }
     
-    // Get userId from payload
-    const userId = req.body.user_id || req.body.api_domain;
+    // Get userId from payload - Pipedrive may send company_domain or user_id
+    const providedUserId = req.body.user_id || req.body.api_domain || req.body.company_domain;
     
-    if (!userId) {
+    if (!providedUserId) {
       console.error('No user ID in deauth request');
       return res.status(400).send('User ID not found');
     }
     
-    console.log('Processing deauthorization for user:', userId);
+    console.log('Processing deauthorization for user:', providedUserId);
     
-    // Get user data to retrieve field ID
-    const userData = await getUser(userId);
+    // Normalize userId - strip https://, http://, and .pipedrive.com suffix
+    function normalizeUserId(id) {
+      if (!id) return id;
+      let normalized = id.toString();
+      normalized = normalized.replace(/^https?:\/\//, '');
+      normalized = normalized.replace(/\.pipedrive\.com$/, '');
+      return normalized;
+    }
+    
+    const normalizedInput = normalizeUserId(providedUserId);
+    
+    // Try multiple userId formats to find the user
+    const possibleUserIds = [
+      providedUserId,
+      normalizedInput,
+      normalizedInput + '.pipedrive.com'
+    ];
+    
+    let userData = null;
+    let foundUserId = null;
+    
+    for (const tryUserId of [...new Set(possibleUserIds.filter(id => id))]) {
+      const tryUserData = await getUser(tryUserId);
+      if (tryUserData) {
+        userData = tryUserData;
+        foundUserId = tryUserId;
+        console.log(`[Deauth] Found user by direct lookup: ${tryUserId}`);
+        break;
+      }
+    }
+    
+    // Fallback: scan all users for matching pipedrive_numeric_id
+    if (!userData) {
+      console.log(`[Deauth] Direct lookup failed, scanning all users for: ${providedUserId}`);
+      const allKeys = await listUsers();
+      
+      for (const key of allKeys) {
+        const testUserData = await getUser(key);
+        if (testUserData) {
+          const normalizedKey = normalizeUserId(key);
+          
+          const isMatch = 
+            normalizedKey === normalizedInput ||
+            (testUserData.pipedrive_numeric_id && testUserData.pipedrive_numeric_id === providedUserId) ||
+            (testUserData.pipedrive_numeric_id && testUserData.pipedrive_numeric_id === normalizedInput) ||
+            (testUserData.pipedrive_user_id === providedUserId) ||
+            (testUserData.pipedrive_user_id === normalizedInput);
+          
+          if (isMatch) {
+            console.log(`[Deauth] Found user via scan: ${key}`);
+            userData = testUserData;
+            foundUserId = key;
+            break;
+          }
+        }
+      }
+    }
     
     if (userData) {
       // Delete custom field if it exists
@@ -2679,9 +2734,11 @@ router.post("/deauth", express.json(), async (req, res) => {
         }
       }
       
-      // Clear user from database
-      await setUser(userId, null);
-      console.log('Cleared user from database:', userId);
+      // Delete user from database using deleteUser
+      await deleteUser(foundUserId);
+      console.log('[Deauth] Deleted user from database:', foundUserId);
+    } else {
+      console.log('[Deauth] No user found to delete for:', providedUserId);
     }
     
     // Return 200 OK to acknowledge the deauthorization
