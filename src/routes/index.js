@@ -1124,7 +1124,40 @@ router.get("/auth/qb/callback", async (req, res) => {
     
     console.log(`[QB OAuth] Storing QB data for userId: ${userId}, realmId: ${qbTokenData.realm_id}`);
 
-    const existingUser = (await getUser(userId)) || {};
+    // Try to find existing user - first by provided userId, then look for any user with Pipedrive tokens
+    let existingUser = await getUser(userId);
+    let actualUserId = userId;
+    
+    // If no user found with this userId, or user has no Pipedrive tokens, try to find the canonical user
+    // This handles the case where QB OAuth is initiated with a different userId format than Pipedrive OAuth
+    if (!existingUser || !existingUser.pipedrive_access_token) {
+      console.log(`[QB OAuth] No user with Pipedrive tokens found for userId: ${userId}, searching for existing installation...`);
+      const { listUsers } = require("../../config/postgres");
+      const allUserIds = await listUsers();
+      
+      for (const candidateId of allUserIds) {
+        const candidateUser = await getUser(candidateId);
+        if (candidateUser && candidateUser.pipedrive_access_token && !candidateUser.qb_access_token) {
+          // Found a user with Pipedrive tokens but no QB tokens - this is our target
+          console.log(`[QB OAuth] Found existing Pipedrive installation under userId: ${candidateId}, merging QB tokens`);
+          existingUser = candidateUser;
+          actualUserId = candidateId;
+          break;
+        } else if (candidateUser && candidateUser.pipedrive_access_token) {
+          // Found a user with Pipedrive tokens (may already have QB tokens - update anyway)
+          console.log(`[QB OAuth] Found existing Pipedrive installation under userId: ${candidateId}`);
+          existingUser = candidateUser;
+          actualUserId = candidateId;
+          break;
+        }
+      }
+    }
+    
+    if (!existingUser) {
+      existingUser = {};
+    }
+    
+    console.log(`[QB OAuth] Using actualUserId: ${actualUserId} for storing QB tokens`);
 
     const updatedUser = {
       ...existingUser,
@@ -1137,8 +1170,8 @@ router.get("/auth/qb/callback", async (req, res) => {
       qb_updated_at: new Date().toISOString(),
     };
 
-    await setUser(userId, updatedUser);
-    console.log(`[QB OAuth] Successfully stored QB tokens for userId: ${userId}`);
+    await setUser(actualUserId, updatedUser);
+    console.log(`[QB OAuth] Successfully stored QB tokens for userId: ${actualUserId}`);
 
     // Check if this user has already completed setup
     const hasCompleteSetup = !!(updatedUser.invoice_preferences?.setup_completed_at);
@@ -1148,7 +1181,7 @@ router.get("/auth/qb/callback", async (req, res) => {
     const setupToken = crypto.randomBytes(32).toString('hex');
     
     // Store the setup token temporarily with the user data
-    await setUser(userId, {
+    await setUser(actualUserId, {
       ...updatedUser,
       setup_token: setupToken,
       setup_token_expires: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutes
@@ -1157,7 +1190,7 @@ router.get("/auth/qb/callback", async (req, res) => {
     // If in extension/iframe AND setup not complete, redirect to setup flow with secure token
     if (isExtension && !hasCompleteSetup) {
       // Redirect to the setup page with secure token instead of userId
-      return res.redirect(`/setup.html?token=${encodeURIComponent(setupToken)}&userId=${encodeURIComponent(userId)}`);
+      return res.redirect(`/setup.html?token=${encodeURIComponent(setupToken)}&userId=${encodeURIComponent(actualUserId)}`);
     }
     
     // If in extension/iframe and setup is complete, send message to parent
