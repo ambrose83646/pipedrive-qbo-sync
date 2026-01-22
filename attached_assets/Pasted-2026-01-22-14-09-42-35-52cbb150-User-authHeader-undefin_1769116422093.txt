@@ -1,0 +1,148 @@
+2026-01-22 14:09:42.35
+52cbb150
+User
+authHeader: undefined,
+2026-01-22 14:09:42.35
+52cbb150
+User
+statusCode: 401,
+2026-01-22 14:09:42.35
+52cbb150
+User
+}
+2026-01-22 14:09:42.35
+52cbb150
+User
+"report": null,
+2026-01-22 14:09:42.35
+52cbb150
+User
+"type": "AUTHENTICATION"
+2026-01-22 14:09:42.35
+52cbb150
+User
+},
+2026-01-22 14:09:42.35
+52cbb150
+User
+{
+2026-01-22 14:09:42.35
+52cbb150
+User
+"detail": null,
+2026-01-22 14:09:42.35
+52cbb150
+User
+"attachableResponse": [],
+2026-01-22 14:09:42.35
+52cbb150
+User
+"batchItemResponse": [],
+2026-01-22 14:09:42.35
+52cbb150
+User
+"time": 1769116182327,
+2026-01-22 14:09:42.35
+52cbb150
+User
+"code": "3200",
+2026-01-22 14:09:42.35
+52cbb150
+User
+"cdcresponse": []
+2026-01-22 14:09:42.35
+52cbb150
+User
+],
+2026-01-22 14:09:42.35
+52cbb150
+User
+"error": [
+2026-01-22 14:09:42.35
+52cbb150
+User
+"message": "message=AuthenticationFailed; errorCode=003200; statusCode=401",
+2026-01-22 14:09:42.35
+52cbb150
+User
+[TokenLock] Attempting to acquire database lock for user 23527284
+2026-01-22 14:09:42.35
+52cbb150
+User
+}
+2026-01-22 14:09:42.35
+52cbb150
+User
+"requestId": null,
+2026-01-22 14:09:42.35
+52cbb150
+User
+[makeQBApiCall] QB token expired (401) for user 23527284, attempting reactive refresh...
+2026-01-22 14:09:42.35
+52cbb150
+User
+"intuitObject": null,
+2026-01-22 14:09:42.35
+52cbb150
+User
+"warnings": null,
+2026-01-22 14:09:42.35
+52cbb150
+User
+"queryResponse": null,
+2026-01-22 14:09:42.35
+52cbb150
+User
+"syncErrorResponse": null,
+2026-01-22 14:09:42.35
+52cbb150
+User
+[makeQBApiCall] Full error body: {
+2026-01-22 14:09:42.35
+52cbb150
+User
+"element": null
+2026-01-22 14:09:42.35
+52cbb150
+User
+"status": null,
+2026-01-22 14:09:42.35
+52cbb150
+User
+"fault": {
+2026-01-22 14:09:42.41
+52cbb150
+User
+[TokenLock DB] Acquired lock for user 23527284 (lockId: 824427701)
+2026-01-22 14:09:42.44
+52cbb150
+User
+[TokenRefresh] Current refresh token (first 10 chars): RT1-218-H0...
+2026-01-22 14:09:42.44
+52cbb150
+User
+[QB Auth] Refresh token prefix: RT1-218-H0-1777...
+2026-01-22 14:09:42.44
+52cbb150
+User
+[TokenRefresh] Current refresh token exists: true
+2026-01-22 14:09:42.44
+52cbb150
+User
+[TokenRefresh] Failed for user 23527284: The Refresh token is invalid, please Authorize again.
+2026-01-22 14:09:42.47
+52cbb150
+User
+[makeQBApiCall] Reactive refresh failed for user 23527284: QuickBooks refresh token is invalid or expired. Please reconnect to QuickBooks.
+2026-01-22 14:09:42.47
+52cbb150
+User
+[TokenLock DB] Released lock (lockId: 824427701)
+2026-01-22 14:10:00.62
+52cbb150
+User
+[PaymentPoller] Starting payment check cycle...
+2026-01-22 14:10:01.32
+52cbb150
+User
+[PaymentPoller] No pending invoices to check
