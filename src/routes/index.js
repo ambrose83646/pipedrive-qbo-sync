@@ -3759,6 +3759,7 @@ async function makeShipStationApiCall(userData, method, endpoint, data = null) {
 // Get shipments for invoices (by order number = invoice DocNumber)
 // Orders are stored in ShipStation with format QB-{tenant}-{invoiceNumber}
 router.get("/api/shipstation/shipments", async (req, res) => {
+  console.log(`[ShipStation] === SHIPMENTS ENDPOINT HIT === URL: ${req.originalUrl}`);
   try {
     const { userId, orderNumbers } = req.query;
     console.log(`[ShipStation] Fetching shipments for user: ${userId}, invoices: ${orderNumbers || 'none'}`);

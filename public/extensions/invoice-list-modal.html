@@ -711,7 +711,11 @@
     }
     
     async function loadShipmentData() {
-      if (invoices.length === 0) return;
+      console.log('[ShipStation Modal] loadShipmentData called, invoices count:', invoices.length);
+      if (invoices.length === 0) {
+        console.log('[ShipStation Modal] No invoices, skipping shipment data load');
+        return;
+      }
       
       try {
         // Get all invoice DocNumbers to query ShipStation
@@ -720,20 +724,34 @@
           .filter(Boolean)
           .join(',');
         
-        if (!orderNumbers) return;
+        console.log('[ShipStation Modal] Order numbers to query:', orderNumbers);
         
-        const response = await fetch(`/api/shipstation/shipments?userId=${encodeURIComponent(userId)}&orderNumbers=${encodeURIComponent(orderNumbers)}`);
+        if (!orderNumbers) {
+          console.log('[ShipStation Modal] No order numbers, skipping');
+          return;
+        }
+        
+        const fetchUrl = `/api/shipstation/shipments?userId=${encodeURIComponent(userId)}&orderNumbers=${encodeURIComponent(orderNumbers)}`;
+        console.log('[ShipStation Modal] Fetching:', fetchUrl);
+        
+        const response = await fetch(fetchUrl);
+        console.log('[ShipStation Modal] Response status:', response.status);
+        
         const data = await response.json();
+        console.log('[ShipStation Modal] Response data:', data);
         
         if (data.success) {
           shipmentData = data.shipments || {};
           shipstationConnected = data.connected;
+          console.log('[ShipStation Modal] ShipStation connected:', shipstationConnected, 'Shipments:', Object.keys(shipmentData).length);
           
           // Re-render table with shipment data
           renderInvoiceTable();
+        } else {
+          console.log('[ShipStation Modal] Response not successful:', data.error);
         }
       } catch (error) {
-        console.error('Error loading shipment data:', error);
+        console.error('[ShipStation Modal] Error loading shipment data:', error);
         // Continue without shipment data
       }
     }
