@@ -1189,9 +1189,82 @@ router.get("/auth/qb/callback", async (req, res) => {
 });
 
 router.get("/success", (req, res) => {
-  res.send(
-    "<h1>Authentication Successful!</h1><p>Your Pipedrive and QuickBooks accounts have been connected.</p>",
-  );
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Connected - Onit Invoice Builder</title>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          background: #f5f5f5;
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .container {
+          max-width: 400px;
+          margin: 0 auto;
+          padding: 40px 20px;
+        }
+        .card {
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          padding: 50px 40px;
+          text-align: center;
+        }
+        .icon {
+          width: 72px;
+          height: 72px;
+          margin: 0 auto 24px;
+          background: #e8f5e9;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .icon svg {
+          width: 36px;
+          height: 36px;
+          color: #4caf50;
+        }
+        h1 {
+          font-size: 24px;
+          color: #1a1a2e;
+          margin-bottom: 12px;
+        }
+        p {
+          color: #666;
+          font-size: 15px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="card">
+          <div class="icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1>Successfully Connected</h1>
+          <p>Your Pipedrive and QuickBooks accounts have been connected.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
 });
 
 // Disconnect landing page - Required by QuickBooks for production app approval
