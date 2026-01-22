@@ -80,6 +80,37 @@ function getQBResponseData(response) {
   throw new Error('No valid response data found');
 }
 
+// Country name to 2-letter ISO code mapping (for ShipStation)
+const COUNTRY_CODES = {
+  'united states': 'US', 'united states of america': 'US', 'usa': 'US', 'u.s.a.': 'US', 'u.s.': 'US', 'america': 'US',
+  'canada': 'CA', 'mexico': 'MX', 'united kingdom': 'GB', 'great britain': 'GB', 'england': 'GB', 'uk': 'GB',
+  'australia': 'AU', 'new zealand': 'NZ', 'germany': 'DE', 'france': 'FR', 'spain': 'ES', 'italy': 'IT',
+  'japan': 'JP', 'china': 'CN', 'india': 'IN', 'brazil': 'BR', 'argentina': 'AR', 'chile': 'CL',
+  'netherlands': 'NL', 'belgium': 'BE', 'switzerland': 'CH', 'austria': 'AT', 'sweden': 'SE', 'norway': 'NO',
+  'denmark': 'DK', 'finland': 'FI', 'ireland': 'IE', 'portugal': 'PT', 'poland': 'PL', 'czech republic': 'CZ',
+  'south korea': 'KR', 'korea': 'KR', 'singapore': 'SG', 'hong kong': 'HK', 'taiwan': 'TW', 'philippines': 'PH',
+  'israel': 'IL', 'south africa': 'ZA', 'russia': 'RU', 'ukraine': 'UA', 'turkey': 'TR', 'greece': 'GR'
+};
+
+// Helper to convert country name to 2-letter ISO code (ShipStation requires ISO codes)
+function normalizeCountryCode(countryInput) {
+  if (!countryInput) return 'US'; // Default to US
+  const trimmed = countryInput.trim();
+  // If already a 2-letter code, return as uppercase
+  if (trimmed.length === 2) {
+    return trimmed.toUpperCase();
+  }
+  // Look up full country name
+  const code = COUNTRY_CODES[trimmed.toLowerCase()];
+  if (code) {
+    console.log(`[Country Normalize] Converted "${countryInput}" to "${code}"`);
+    return code;
+  }
+  // Return US as fallback if not found
+  console.log(`[Country Normalize] Unknown country "${countryInput}", defaulting to US`);
+  return 'US';
+}
+
 // US State name to abbreviation mapping
 const STATE_ABBREVIATIONS = {
   'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA',
@@ -4035,6 +4066,10 @@ async function createShipStationOrderFromInvoice(userData, invoice, userId) {
   }
   
   // Step 4: Build ship-to address from invoice
+  // Note: ShipStation requires 2-letter ISO country codes, so we normalize the country
+  const rawCountry = invoice.ShipAddr?.Country || invoice.BillAddr?.Country || 'US';
+  const normalizedCountry = normalizeCountryCode(rawCountry);
+  
   const shipTo = {
     name: invoice.CustomerRef?.name || invoice.ShipAddr?.Line1 || 'Customer',
     street1: invoice.ShipAddr?.Line1 || invoice.BillAddr?.Line1 || '',
@@ -4042,7 +4077,7 @@ async function createShipStationOrderFromInvoice(userData, invoice, userId) {
     city: invoice.ShipAddr?.City || invoice.BillAddr?.City || '',
     state: invoice.ShipAddr?.CountrySubDivisionCode || invoice.BillAddr?.CountrySubDivisionCode || '',
     postalCode: invoice.ShipAddr?.PostalCode || invoice.BillAddr?.PostalCode || '',
-    country: invoice.ShipAddr?.Country || invoice.BillAddr?.Country || 'US',
+    country: normalizedCountry,
     phone: invoice.ShipAddr?.Phone || '',
     email: invoice.BillEmail?.Address || ''
   };
