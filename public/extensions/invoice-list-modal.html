@@ -717,10 +717,17 @@
         return;
       }
       
+      // Debug: log first invoice structure to find correct property name
+      if (invoices.length > 0) {
+        console.log('[ShipStation Modal] First invoice keys:', Object.keys(invoices[0]));
+        console.log('[ShipStation Modal] First invoice sample:', JSON.stringify(invoices[0]).substring(0, 500));
+      }
+      
       try {
         // Get all invoice DocNumbers to query ShipStation
+        // Try multiple possible property names for invoice number
         const orderNumbers = invoices
-          .map(inv => inv.DocNumber)
+          .map(inv => inv.DocNumber || inv.docNumber || inv.InvoiceNumber || inv.invoiceNumber || inv.Id || inv.id)
           .filter(Boolean)
           .join(',');
         
