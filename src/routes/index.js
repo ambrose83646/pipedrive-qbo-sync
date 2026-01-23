@@ -3284,22 +3284,48 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
         console.log(`[Deal Address] Enriching address via Nominatim: "${searchQuery}"`);
         
         const appUrl = process.env.APP_URL || 'https://pipedrive-qbo-sync.replit.app';
-        const nominatimResponse = await axios.get('https://nominatim.openstreetmap.org/search', {
-          params: {
-            q: searchQuery,
-            format: 'json',
-            addressdetails: 1,
-            limit: 1
-          },
-          headers: {
-            'User-Agent': `PipedriveQuickBooksIntegration/1.0 (${appUrl})`,
-            'Accept': 'application/json',
-            'Referer': appUrl
-          },
-          timeout: 10000
-        });
         
-        if (nominatimResponse.data && nominatimResponse.data.length > 0) {
+        // Retry logic for Nominatim requests (3 attempts with 1-second delay)
+        let nominatimResponse = null;
+        const maxRetries = 3;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            nominatimResponse = await axios.get('https://nominatim.openstreetmap.org/search', {
+              params: {
+                q: searchQuery,
+                format: 'json',
+                addressdetails: 1,
+                limit: 1
+              },
+              headers: {
+                'User-Agent': `PipedriveQuickBooksIntegration/1.0 (${appUrl})`,
+                'Accept': 'application/json',
+                'Referer': appUrl
+              },
+              timeout: 10000
+            });
+            break; // Success, exit retry loop
+          } catch (retryError) {
+            const isRetryable = retryError.code === 'ECONNABORTED' || 
+                                retryError.code === 'ETIMEDOUT' || 
+                                retryError.code === 'ECONNRESET' ||
+                                !retryError.response || 
+                                (retryError.response && retryError.response.status >= 500);
+            
+            console.log(`[Deal Address] Nominatim attempt ${attempt}/${maxRetries} failed: ${retryError.message}`);
+            
+            if (isRetryable && attempt < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+            } else {
+              if (attempt === maxRetries) {
+                console.log(`[Deal Address] Nominatim geocoding failed after ${maxRetries} attempts`);
+              }
+              throw retryError; // Re-throw on final attempt or non-retryable error
+            }
+          }
+        }
+        
+        if (nominatimResponse && nominatimResponse.data && nominatimResponse.data.length > 0) {
           const result = nominatimResponse.data[0];
           const addressDetails = result.address || {};
           
