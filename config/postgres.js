@@ -110,10 +110,42 @@ async function getUser(userId) {
 async function setUser(userId, data) {
   const normalized = normalizeUserId(userId);
   
-  const existing = await resilientQuery(
-    'SELECT id FROM users WHERE pipedrive_user_id = $1',
+  // Check for existing user by pipedrive_user_id OR pipedrive_numeric_id OR pipedrive_api_domain
+  // This prevents duplicate rows when reconnecting via Pipedrive Extension SDK
+  // which provides a numeric user ID instead of the company subdomain
+  let existing = await resilientQuery(
+    'SELECT id, pipedrive_user_id FROM users WHERE pipedrive_user_id = $1',
     [normalized]
   );
+  let foundVia = 'pipedrive_user_id';
+  
+  // If not found by pipedrive_user_id, try pipedrive_numeric_id
+  if (existing.rows.length === 0) {
+    existing = await resilientQuery(
+      'SELECT id, pipedrive_user_id FROM users WHERE pipedrive_numeric_id = $1',
+      [normalized]
+    );
+    if (existing.rows.length > 0) {
+      foundVia = 'pipedrive_numeric_id';
+      console.log(`[setUser] Found existing user by pipedrive_numeric_id: ${normalized} -> pipedrive_user_id: ${existing.rows[0].pipedrive_user_id}`);
+    }
+  }
+  
+  // If still not found and we have api_domain data, try finding by domain
+  // This helps when numeric_id isn't set yet on the canonical row
+  if (existing.rows.length === 0 && data.pipedrive_api_domain) {
+    existing = await resilientQuery(
+      'SELECT id, pipedrive_user_id FROM users WHERE pipedrive_api_domain = $1 AND pipedrive_access_token IS NOT NULL',
+      [data.pipedrive_api_domain]
+    );
+    if (existing.rows.length > 0) {
+      foundVia = 'pipedrive_api_domain';
+      console.log(`[setUser] Found existing user by pipedrive_api_domain: ${data.pipedrive_api_domain} -> pipedrive_user_id: ${existing.rows[0].pipedrive_user_id}`);
+    }
+  }
+  
+  // Use the original pipedrive_user_id for the WHERE clause if found by any method
+  const existingPipedriveUserId = existing.rows.length > 0 ? existing.rows[0].pipedrive_user_id : null;
   
   const pipedriveAccessToken = encrypt(data.pipedrive_access_token || data.access_token);
   const pipedriveRefreshToken = encrypt(data.pipedrive_refresh_token || data.refresh_token);
@@ -121,6 +153,14 @@ async function setUser(userId, data) {
   const qbRefreshToken = encrypt(data.qb_refresh_token);
   
   if (existing.rows.length > 0) {
+    // Use the existing pipedrive_user_id for the WHERE clause (handles numeric ID lookups)
+    const whereUserId = existingPipedriveUserId || normalized;
+    
+    // If we found by numeric_id, also store the numeric_id for future lookups
+    // Only set numericIdToStore if the normalized ID is actually numeric (not a subdomain)
+    const isNumericId = /^\d+$/.test(normalized);
+    const numericIdToStore = data.pipedrive_numeric_id || (isNumericId && existingPipedriveUserId !== normalized ? normalized : null);
+    
     await resilientQuery(`
       UPDATE users SET
         pipedrive_access_token = $2,
@@ -147,7 +187,7 @@ async function setUser(userId, data) {
         pipedrive_numeric_id = COALESCE($23, pipedrive_numeric_id)
       WHERE pipedrive_user_id = $1
     `, [
-      normalized,
+      whereUserId,
       pipedriveAccessToken,
       pipedriveRefreshToken,
       data.pipedrive_expires_at || data.expires_at ? new Date(data.pipedrive_expires_at || data.expires_at) : null,
@@ -169,8 +209,9 @@ async function setUser(userId, data) {
       data.setup_token || null,
       data.setup_token_expires ? new Date(data.setup_token_expires) : null,
       data.invoice_preferences ? JSON.stringify(data.invoice_preferences) : null,
-      data.pipedrive_numeric_id || null
+      numericIdToStore || data.pipedrive_numeric_id || null
     ]);
+    console.log(`[setUser] Updated existing user: ${whereUserId} (found via: ${foundVia})`);
   } else {
     await resilientQuery(`
       INSERT INTO users (
