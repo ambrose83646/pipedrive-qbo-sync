@@ -1,0 +1,621 @@
+
+
+
+pipedrive-qbo-sync
+Files
+Commands
+Packager files
+Config files
+PORT=5000 node server.js
+1m
+ • 
+2 minutes ago
+/
+
+Remote Updates
+origin/main•upstream
+last fetched 1 day ago
+Commit
+There are no changes to commit.
+Overview
+This Node.js application integrates Pipedrive CRM with QuickBooks Online (QBO) to synchronize contact data. It enables users to manage CRM contacts and accounting customers from a unified interface, utilizing OAuth 2.0 for secure authentication with both services. The application stores user credentials in PostgreSQL and provides Pipedrive browser extensions for direct QuickBooks connection and contact synchronization. It adheres to QuickBooks compliance by requiring explicit user action to connect.
+
+Key functionalities include:
+
+Post-Installation Setup: A two-step process for administrators to authorize users and configure invoice preferences (field mappings).
+ShipStation Integration: Configured separately in the Settings page. Automates order fulfillment based on invoice payment terms, with encrypted credentials and background polling for payment status.
+User Preferences
+Preferred communication style: Simple, everyday language.
+
+System Architecture
+Application Structure
+The application uses Express.js with a modular structure for handling OAuth flows, webhooks, and API requests. This design ensures maintainability and scalability for integrating external services.
+
+Authentication Architecture
+Secure OAuth 2.0 is implemented for both Pipedrive and QuickBooks. It leverages intuit-oauth for QuickBooks and a custom Axios-based solution for Pipedrive, ensuring secure token management and refresh.
+
+Data Storage
+PostgreSQL is used for persistent storage with proper relational tables:
+
+users: OAuth tokens (encrypted with AES-256-GCM), realm IDs, ShipStation credentials (encrypted), and configuration data
+deal_mappings: Links between Pipedrive deals and QuickBooks customers
+pending_invoices: Invoices awaiting payment for ShipStation automation
+invoice_mappings: Links between QuickBooks invoices and ShipStation orders
+The database schema is defined in config/schema.sql and the data access layer in config/postgres.js.
+
+Security
+All OAuth tokens (Pipedrive and QuickBooks) are encrypted at rest using AES-256-GCM
+ShipStation API credentials are also encrypted
+Encryption uses the SESSION_SECRET environment variable as the key source
+Frontend Architecture
+Browser-based Pipedrive App Extensions, built with @pipedrive/app-extensions-sdk, provide UI components integrated directly into the Pipedrive interface. These extensions facilitate connection management and deal-contact operations.
+
+Synchronization Logic
+A controller-based synchronization logic (src/controllers/sync.js) manages data mapping and transfer between Pipedrive and QuickBooks. It fetches person data from Pipedrive, maps it to QuickBooks customer fields, and utilizes official API clients for both services.
+
+UI/UX Decisions
+Professional two-column layout for invoicing panel, matching QuickBooks design standards.
+Visual feedback for linked/unlinked states.
+Real-time invoice data fetching and overview calculations.
+Automatic email option when creating invoices.
+Discount field with percentage or fixed amount options and live calculation updates.
+Date range selector for invoice filtering.
+Feature Specifications
+Invoice Creation: Functionality to create invoices in QuickBooks with product search, dynamic line item management, and real-time total calculation.
+ShipStation Integration: Automated order creation based on invoice payment status, with shipment tracking and status display.
+Invoice List Modal: View all invoices within Pipedrive, with PDF download, payment link copying, and detailed line item display.
+Contact Linking: Secure, tenant-isolated linking of Pipedrive deals to QuickBooks customers, with an unlink feature.
+Token Refresh: Automatic token refresh for both Pipedrive and QuickBooks to handle expired tokens. Uses PostgreSQL advisory locks to prevent concurrent refresh attempts across multiple server instances (QuickBooks refresh tokens are single-use).
+External Dependencies
+Third-Party Services
+Pipedrive CRM
+Purpose: Source of contact/person data.
+Authentication: OAuth 2.0 (custom implementation).
+API Access: RESTful API via pipedrive npm package.
+Required Scopes: persons:full, organizations:full, deals:full.
+QuickBooks Online
+Purpose: Destination for customer data synchronization.
+Authentication: OAuth 2.0 via intuit-oauth library.
+API Access: Accounting API.
+Environment: Sandbox (for development/testing).
+Required Scopes: com.intuit.quickbooks.accounting.
+ShipStation
+Purpose: Automated order fulfillment and shipment tracking
+Authentication: HTTP Basic Auth (API Key + Secret, stored encrypted)
+API Access: REST API (https://ssapi.shipstation.com)
+Key Features Used: Orders, Shipments, Stores
+Configuration: Per-user API credentials entered in Settings page
+Automation: Background polling service checks for paid invoices every 5 minutes
+Database
+PostgreSQL (Replit-hosted)
+Type: Relational database via pg package
+Infrastructure: Replit's native database (separate dev/prod environments)
+Tables:
+users: OAuth tokens (Pipedrive & QuickBooks), ShipStation credentials (encrypted), setup preferences
+deal_mappings: Pipedrive deal ID to QuickBooks customer ID associations
+pending_invoices: Due on Receipt invoices waiting for payment polling
+invoice_mappings: QuickBooks invoice to ShipStation order associations
+Features: Automatic timestamps, triggers for updated_at, indexes for efficient queries
+Key NPM Packages
+express: Web server framework.
+axios: HTTP client for Pipedrive OAuth flow.
+dotenv: Environment variable management.
+intuit-oauth: QuickBooks OAuth client.
+pipedrive: Official Pipedrive API client.
+pg: PostgreSQL client for database operations.
+node-cron: Scheduled job runner for payment polling.
+Environment Variables Required
+PORT
+APP_URL
+PIPEDRIVE_CLIENT_ID
+PIPEDRIVE_CLIENT_SECRET
+QB_CLIENT_ID
+QB_CLIENT_SECRET
+QB_ENVIRONMENT - QuickBooks environment: sandbox (default) or production
+User Identification Architecture
+The app uses a dual-identifier system to handle the mismatch between Pipedrive OAuth and the Pipedrive Extension SDK:
+
+Primary ID (pipedrive_user_id): The company subdomain (e.g., "onitathlere") - set during Pipedrive OAuth and used as the primary key for user records.
+Secondary ID (pipedrive_numeric_id): The numeric Pipedrive user ID (e.g., "23527284") - received from the Pipedrive Extension SDK and stored for alternative lookup.
+This dual-identifier approach ensures the app correctly identifies users regardless of which identifier is provided:
+
+When Pipedrive OAuth completes, the company subdomain becomes pipedrive_user_id
+When the settings page loads (via Pipedrive Extension SDK), it may receive a numeric user ID
+The app searches by both identifiers to find the correct user record
+QuickBooks OAuth callback stores the numeric ID alongside the company subdomain for future lookups
+The pipedrive_api_domain field stores the full API domain for reference.
+
+ShipStation Credentials
+ShipStation API key and secret are global for the installation (not per-user). When querying ShipStation:
+
+The app finds any record with ShipStation credentials stored
+Uses those credentials to query ShipStation by order number (format: QB-{tenant}-{invoiceNumber})
+This simplifies lookups since we just need credentials to authenticate, then match invoices to orders by number.
+
+Important: Single-Tenant Design
+This app is designed for single-tenant deployment (one Pipedrive company per installation).
+
+Preview
+Secrets
+SESSION_SECRET
+••••••••
+PIPEDRIVE_CLIENT_ID
+••••••••
+PIPEDRIVE_CLIENT_SECRET
+••••••••
+QB_CLIENT_ID
+••••••••
+QB_CLIENT_SECRET
+••••••••
+APP_URL
+••••••••
+Configurations
+Configurations are similar to secrets, but should only be used for non-sensitive information. They're useful for having a variable that's different between your published app and when testing on Replit.
+QB_ENVIRONMENT
+production
+Databases
+Development Database
+29.57MB / 10GB
+Production Database
+29.58MB / 100GB
+Billing Period
+Renews monthly, Jan 28
+Hours of Compute Used
+360.24 hours
+QuickBooks Integration for Pipedrive
+User Training Manual
+Welcome to the QuickBooks Integration for Pipedrive! This guide will walk you through all the features of this app and how to use them effectively.
+
+Table of Contents
+Getting Started
+Connecting to QuickBooks
+Linking Deals to QuickBooks Customers
+Creating Invoices
+Viewing Invoice History
+ShipStation Integration
+Settings and Configuration
+Troubleshooting
+Getting Started
+After your administrator installs the app, you'll see new panels and options appear within your Pipedrive account. The integration adds the following features:
+
+QuickBooks Connection Panel - Connect your QuickBooks account
+Contact Linking Panel - Link Pipedrive deals to QuickBooks customers
+Invoicing Panel - Create and manage invoices directly from deals
+Settings Page - Configure ShipStation and other preferences
+Connecting to QuickBooks
+Before you can create invoices or link customers, you need to connect your QuickBooks account.
+
+Step 1: Open the Settings Page
+In Pipedrive, navigate to Apps & Integrations
+Find the QuickBooks Integration app
+Click on Settings
+Step 2: Connect Your QuickBooks Account
+Click the Connect QuickBooks button
+A new window will open asking you to sign in to your QuickBooks account
+Select the QuickBooks company you want to connect
+Click Authorize to grant the app permission to access your QuickBooks data
+Step 3: Verify Connection
+Once connected, you'll see:
+
+A green "Connected" status
+Your QuickBooks company name displayed
+Options to disconnect or reconnect if needed
+Note: The connection will automatically refresh in the background, so you shouldn't need to reconnect unless you manually disconnect.
+
+Linking Deals to QuickBooks Customers
+Before creating invoices for a deal, you need to link the Pipedrive deal to a QuickBooks customer.
+
+Opening the Contact Panel
+Open any deal in Pipedrive
+Look for the QuickBooks panel on the right side of the deal view
+The panel shows the current link status
+Linking a Deal to a Customer
+If the customer already exists in QuickBooks:
+
+Click the Link to Customer button
+Search for the customer by name
+Select the matching customer from the list
+Click Confirm to create the link
+If the customer doesn't exist in QuickBooks:
+
+Click Create New Customer
+The customer's information from Pipedrive will be used to create a new QuickBooks customer
+Review the information and click Create
+The deal will automatically be linked to the new customer
+Viewing Linked Status
+When a deal is linked:
+
+You'll see the QuickBooks customer name displayed
+The customer's billing address and email will be shown
+An Unlink button will appear if you need to change the connection
+Unlinking a Deal
+Click the Unlink button
+Confirm that you want to remove the connection
+The deal will no longer be associated with that QuickBooks customer
+Note: Unlinking a deal does not delete any invoices already created for that customer.
+
+Creating Invoices
+Once a deal is linked to a QuickBooks customer, you can create invoices directly from Pipedrive.
+
+Opening the Invoice Panel
+Open the linked deal in Pipedrive
+Look for the Invoicing panel
+Click Create Invoice to open the invoice form
+Invoice Form Fields
+Customer Information (Auto-filled)
+
+Customer name from QuickBooks
+Billing address
+Email address (for sending invoice)
+Invoice Details
+
+Invoice Date: When the invoice is issued (defaults to today)
+Due Date: When payment is expected
+Terms: Payment terms (Net 30, Due on Receipt, etc.)
+Line Items Each line item includes:
+
+Product/Service: Search and select from your QuickBooks products
+Description: Auto-filled from product, but can be edited
+Quantity: Number of items
+Rate: Price per item
+Amount: Automatically calculated (Quantity x Rate)
+Adding Line Items
+Click Add Line Item
+Start typing in the Product/Service field to search
+Select the product from the dropdown
+Adjust quantity and rate as needed
+The amount will calculate automatically
+Applying Discounts
+Scroll to the Discount section
+Choose discount type:
+Percentage (e.g., 10%)
+Fixed Amount (e.g., $50)
+Enter the discount value
+The total will update in real-time
+Invoice Summary
+At the bottom of the form, you'll see:
+
+Subtotal: Sum of all line items
+Discount: Any discount applied
+Total: Final amount due
+Creating the Invoice
+Review all information
+Check the Send email to customer box if you want QuickBooks to email the invoice
+Click Create Invoice
+The invoice will be created in QuickBooks and linked to the deal
+Viewing Invoice History
+You can view all invoices for a linked customer directly from Pipedrive.
+
+Opening the Invoice List
+Open the linked deal
+In the Invoicing panel, click View All Invoices
+A modal will open showing all invoices for that customer
+Invoice List Features
+Overview Summary At the top, you'll see:
+
+Total number of invoices
+Total amount invoiced
+Outstanding balance
+Paid amount
+Date Range Filter
+
+Use the date selector to filter invoices by date range
+Click Apply to update the list
+Invoice Table Each invoice shows:
+
+Invoice number
+Date created
+Due date
+Total amount
+Balance due
+Status (Paid, Open, Overdue)
+Shipping status (if ShipStation is connected)
+Invoice Actions
+View Details
+
+Click on any invoice to expand and see line items
+Shows product name, quantity, rate, and amount for each item
+Download PDF
+
+Click the PDF button to download the invoice as a PDF
+The file will download to your computer
+Copy Payment Link
+
+Click the Payment Link button
+A shareable link is copied to your clipboard
+Send this link to customers for online payment
+ShipStation Integration
+If your organization uses ShipStation for shipping, the app can automatically create orders when invoices are paid.
+
+How It Works
+When you create an invoice with "Due on Receipt" terms, the app monitors it for payment
+Once the invoice is marked as paid in QuickBooks, a ShipStation order is automatically created
+The order includes all the invoice details needed for fulfillment
+Viewing Shipping Status
+In the Invoice List, each invoice shows its shipping status:
+
+Status	Meaning
+No Order	No ShipStation order exists yet
+Awaiting Shipment	Order created, waiting to be shipped
+X/Y Shipped	Partial shipment (e.g., "3/5 Shipped" means 3 of 5 items shipped)
+Shipped	All items have been shipped
+Delivered	All packages delivered to customer
+Split Shipment Support
+The app fully supports orders that are split into multiple shipments:
+
+In the Invoice List:
+
+Partial shipments show as "3/5 Shipped" (3 of 5 items shipped)
+Fully shipped orders show as "Shipped"
+In Invoice Details (click to expand):
+
+Fulfillment Summary - Shows overall status and item counts
+"Fully Shipped" / "Partially Shipped" / "Awaiting Shipment"
+Total items shipped vs total items ordered
+Number of shipments created
+Individual Shipments - Each shipment displays separately with:
+Shipment number (Shipment 1, Shipment 2, etc.)
+Status (In Transit, Delivered, etc.)
+Tracking number with clickable link
+Carrier and service type
+Ship date and delivery date
+Items included in that specific shipment
+Shipment Tracking
+Each shipment has its own tracking number
+Click any tracking number to view carrier tracking information
+Supported carriers: UPS, FedEx, USPS, DHL, and others
+Settings and Configuration
+Accessing Settings
+Go to Apps & Integrations in Pipedrive
+Find the QuickBooks Integration
+Click Settings
+QuickBooks Connection
+View your current connection status
+Disconnect and reconnect if needed
+See which QuickBooks company is connected
+ShipStation Configuration
+If your admin has enabled ShipStation:
+
+Enter your ShipStation API Key
+Enter your ShipStation API Secret
+Click Save
+Note: ShipStation credentials are shared across your organization. Only one person needs to set this up.
+
+Testing the Connection
+After entering ShipStation credentials:
+
+Click Test Connection
+If successful, you'll see a green confirmation
+If there's an error, verify your API credentials are correct
+Troubleshooting
+Common Issues and Solutions
+"QuickBooks Not Connected" Message
+
+Go to Settings and click Connect QuickBooks
+Complete the authorization process
+Return to the deal and refresh the page
+Can't Find Customer When Linking
+
+Make sure the customer exists in QuickBooks
+Try searching with different name variations
+If the customer is new, use Create New Customer
+Invoice Not Appearing in QuickBooks
+
+Wait a few seconds and refresh
+Check your QuickBooks account directly
+Verify your connection is still active
+ShipStation Order Not Created
+
+Verify ShipStation credentials are entered in Settings
+Order creation happens automatically for Net 30 and Net 60 invoices
+Orders are created automatically when Due on Receipt invoices are marked as paid
+Wait up to 5 minutes for the system to detect payment
+Payment Link Not Working
+
+Ensure the invoice exists in QuickBooks
+Check that online payments are enabled in your QuickBooks settings
+The customer may need to be set up for online invoicing
+Getting Help
+If you continue to experience issues:
+
+Take note of any error messages displayed
+Check which screen/panel you were using
+Contact your Pipedrive administrator
+Your admin can check the app logs for detailed error information
+Quick Reference
+Keyboard Shortcuts
+Tab: Move between form fields
+Enter: Submit forms / Confirm actions
+Esc: Close modals
+Status Icons
+Icon/Color	Meaning
+Green	Connected / Paid / Success
+Orange	Pending / Outstanding
+Red	Error / Overdue
+Gray	Not connected / No data
+Invoice Payment Terms
+Term	Description
+Due on Receipt	Payment expected immediately upon receipt
+Net 30	Payment due within 30 days
+Net 60	Payment due within 60 days
+Best Practices
+Always link deals first before creating invoices
+Verify customer information is correct before invoicing
+Use product search to maintain consistent pricing
+Enable email sending for faster payment collection
+Check invoice status regularly to follow up on overdue payments
+Keep ShipStation credentials secure - only administrators should configure this
+Last updated: January 2026
+
+Time
+Deployment
+Source
+Log
+2026-01-23 15:15:12.39
+189566bc
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-01-23 16:11:18.07
+f81d12b2
+User
+name: 'AxiosError',
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"message": "message=AuthenticationFailed; errorCode=003200; statusCode=401",
+2026-01-23 16:11:18.07
+f81d12b2
+User
+}
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"intuitObject": null,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+}
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"error": [
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"queryResponse": null,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+authHeader: undefined,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+}
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"warnings": null,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+intuit_tid: ''
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"cdcresponse": []
+2026-01-23 16:11:18.07
+f81d12b2
+User
+{
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"attachableResponse": [],
+2026-01-23 16:11:18.07
+f81d12b2
+User
+[makeQBApiCall] Full error body: {
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"status": null,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"detail": null,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+statusCode: 401,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"batchItemResponse": [],
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"requestId": null,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"element": null
+2026-01-23 16:11:18.07
+f81d12b2
+User
+[makeQBApiCall] QB token expired (401) for user 23527284, attempting reactive refresh...
+2026-01-23 16:11:18.07
+f81d12b2
+User
+[makeQBApiCall] Error details: {
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"type": "AUTHENTICATION"
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"time": 1769209878041,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+],
+2026-01-23 16:11:18.07
+f81d12b2
+User
+},
+2026-01-23 16:11:18.07
+f81d12b2
+User
+[TokenLock] Attempting to acquire database lock for user 23527284
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"report": null,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"syncErrorResponse": null,
+2026-01-23 16:11:18.15
+f81d12b2
+User
+[QB Auth] Refresh token prefix: RT1-138-H0-1777...
+2026-01-23 16:11:18.15
+f81d12b2
+User
+[TokenRefresh] Starting token refresh for user 23527284
+2026-01-23 16:11:18.15
+f81d12b2
+User
+[TokenRefresh] Current refresh token (first 10 chars): RT1-138-H0...
+2026-01-23 16:11:18.15
+f81d12b2
+User
+[QB Auth] Error refreshing token: The Refresh token is invalid, please Authorize again.
+2026-01-23 16:11:18.15
+f81d12b2
+User
+[TokenRefresh] Failed for user 23527284: The Refresh token is invalid, please Authorize again.
+2026-01-23 16:11:18.18
+f81d12b2
+User
+[TokenLock DB] Released lock (lockId: 824427701)
+2026-01-23 16:11:18.18
+f81d12b2
+User
+Error stack: Error: QuickBooks refresh token is invalid or expired. Please reconnect to QuickBooks.
+2026-01-23 16:11:19.11
+f81d12b2
+User
+[makeQBApiCall] Starting API call for user 23527284
+2026-01-23 16:11:19.11
+f81d12b2
+User
+[TokenCheck] Token expires at: 2026-01-22T23:05:06.554Z, now: 2026-01-23T23:11:19.116Z
+2026-01-23 16:11:19.20
+f81d12b2
+User
+[TokenRefresh] Current refresh token (first 10 chars): RT1-138-H0...
+2026-01-23 16:11:19.20
+f81d12b2
+User
+[QB Auth] Error refreshing token: The Refresh token is invalid, please Authorize again.

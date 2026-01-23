@@ -1,0 +1,124 @@
+2026-01-23 16:11:18.07
+f81d12b2
+User
+intuit_tid: ''
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"cdcresponse": []
+2026-01-23 16:11:18.07
+f81d12b2
+User
+{
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"attachableResponse": [],
+2026-01-23 16:11:18.07
+f81d12b2
+User
+[makeQBApiCall] Full error body: {
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"status": null,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"detail": null,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+statusCode: 401,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"batchItemResponse": [],
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"requestId": null,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"element": null
+2026-01-23 16:11:18.07
+f81d12b2
+User
+[makeQBApiCall] QB token expired (401) for user 23527284, attempting reactive refresh...
+2026-01-23 16:11:18.07
+f81d12b2
+User
+[makeQBApiCall] Error details: {
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"type": "AUTHENTICATION"
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"time": 1769209878041,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+],
+2026-01-23 16:11:18.07
+f81d12b2
+User
+},
+2026-01-23 16:11:18.07
+f81d12b2
+User
+[TokenLock] Attempting to acquire database lock for user 23527284
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"report": null,
+2026-01-23 16:11:18.07
+f81d12b2
+User
+"syncErrorResponse": null,
+2026-01-23 16:11:18.15
+f81d12b2
+User
+[QB Auth] Refresh token prefix: RT1-138-H0-1777...
+2026-01-23 16:11:18.15
+f81d12b2
+User
+[TokenRefresh] Starting token refresh for user 23527284
+2026-01-23 16:11:18.15
+f81d12b2
+User
+[TokenRefresh] Current refresh token (first 10 chars): RT1-138-H0...
+2026-01-23 16:11:18.15
+f81d12b2
+User
+[QB Auth] Error refreshing token: The Refresh token is invalid, please Authorize again.
+2026-01-23 16:11:18.15
+f81d12b2
+User
+[TokenRefresh] Failed for user 23527284: The Refresh token is invalid, please Authorize again.
+2026-01-23 16:11:18.18
+f81d12b2
+User
+[TokenLock DB] Released lock (lockId: 824427701)
+2026-01-23 16:11:18.18
+f81d12b2
+User
+Error stack: Error: QuickBooks refresh token is invalid or expired. Please reconnect to QuickBooks.
+2026-01-23 16:11:19.11
+f81d12b2
+User
+[makeQBApiCall] Starting API call for user 23527284
+2026-01-23 16:11:19.11
+f81d12b2
+User
+[TokenCheck] Token expires at: 2026-01-22T23:05:06.554Z, now: 2026-01-23T23:11:19.116Z
+2026-01-23 16:11:19.20
+f81d12b2
+User
+[TokenRefresh] Current refresh token (first 10 chars): RT1-138-H0...
+2026-01-23 16:11:19.20
+f81d12b2
+User
+[QB Auth] Error refreshing token: The Refresh token is invalid, please Authorize again.
