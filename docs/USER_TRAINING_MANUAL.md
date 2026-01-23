@@ -275,8 +275,8 @@ After entering ShipStation credentials:
 
 **ShipStation Order Not Created**
 - Verify ShipStation credentials are entered in Settings
-- Order creation only happens for "Due on Receipt" invoices
-- Orders are created automatically when the invoice is marked as paid
+- Order creation happens automatically for Net 30 and Net 60 invoices
+- Orders are created automatically when Due on Receipt invoices are marked as paid
 - Wait up to 5 minutes for the system to detect payment
 
 **Payment Link Not Working**
@@ -315,9 +315,7 @@ If you continue to experience issues:
 | Term | Description |
 |------|-------------|
 | Due on Receipt | Payment expected immediately upon receipt |
-| Net 15 | Payment due within 15 days |
 | Net 30 | Payment due within 30 days |
-| Net 45 | Payment due within 45 days |
 | Net 60 | Payment due within 60 days |
 
 ---
