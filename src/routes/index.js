@@ -140,8 +140,35 @@ function normalizeStateCode(stateInput) {
   return trimmed;
 }
 
+// Cooldown period to prevent concurrent refresh attempts (in milliseconds)
+const REFRESH_COOLDOWN_MS = 60 * 1000; // 60 seconds
+
+// Helper function to check if a recent refresh happened (within cooldown period)
+function wasRecentlyRefreshed(userData) {
+  if (!userData.qb_last_refresh) {
+    return false;
+  }
+  
+  const lastRefresh = new Date(userData.qb_last_refresh);
+  const now = new Date();
+  const msSinceRefresh = now - lastRefresh;
+  
+  if (msSinceRefresh < REFRESH_COOLDOWN_MS) {
+    console.log(`[TokenCheck] Token was refreshed ${Math.round(msSinceRefresh / 1000)}s ago, within ${REFRESH_COOLDOWN_MS / 1000}s cooldown - skipping refresh`);
+    return true;
+  }
+  
+  return false;
+}
+
 // Helper function to check if token needs refresh (expires within 10 minutes)
 function tokenNeedsRefresh(userData) {
+  // COOLDOWN CHECK: Skip refresh if token was refreshed very recently
+  // This prevents race conditions where multiple requests try to refresh the same token
+  if (wasRecentlyRefreshed(userData)) {
+    return false;
+  }
+  
   if (!userData.qb_expires_at) {
     // If no expiration timestamp and we have a refresh token, proactively refresh
     // This handles cases where tokens were stored without expiration tracking
@@ -184,11 +211,19 @@ async function refreshAndSaveToken(userId, userData, throwOnError = false) {
     // Use fresh data from the lock (re-fetched after acquiring lock)
     const dataToUse = freshUserData || userData;
     
-    // Check if another request already refreshed the token while we waited for the lock
+    // CRITICAL: Check if token was recently refreshed by another request while we waited for lock
+    // This is the primary race condition prevention - check the timestamp
+    if (freshUserData && wasRecentlyRefreshed(freshUserData)) {
+      console.log(`[TokenRefresh] Token was refreshed by another request within cooldown period, using fresh data`);
+      console.log(`[TokenRefresh] Last refresh: ${freshUserData.qb_last_refresh}`);
+      return freshUserData;
+    }
+    
+    // Secondary check: Compare token values (may differ due to encryption, but worth checking)
     if (freshUserData && freshUserData.qb_refresh_token !== userData.qb_refresh_token) {
       console.log(`[TokenRefresh] Token was already refreshed by another request, using fresh data`);
-      console.log(`[TokenRefresh] Original token (first 10): ${userData.qb_refresh_token.substring(0, 10)}...`);
-      console.log(`[TokenRefresh] Fresh token (first 10): ${freshUserData.qb_refresh_token.substring(0, 10)}...`);
+      console.log(`[TokenRefresh] Original token (first 10): ${userData.qb_refresh_token?.substring(0, 10)}...`);
+      console.log(`[TokenRefresh] Fresh token (first 10): ${freshUserData.qb_refresh_token?.substring(0, 10)}...`);
       return freshUserData;
     }
     
