@@ -1,0 +1,109 @@
+
+2026-01-23 16:36:45.00
+28a50198
+User
+[makeQBApiCall] Response has body: false, has json: true
+2026-01-23 16:38:15.98
+28a50198
+User
+[makeQBApiCall] API call successful, response type: object
+2026-01-23 16:38:15.98
+28a50198
+User
+[makeQBApiCall] Response has body: false, has json: true
+2026-01-23 16:38:16.16
+28a50198
+User
+[TokenCheck] Token expires at: 2026-01-23T22:38:04.247Z, now: 2026-01-23T23:38:16.169Z
+2026-01-23 16:38:16.16
+28a50198
+User
+[makeQBApiCall] Has access token: true, Has realm: true
+2026-01-23 16:38:16.16
+28a50198
+User
+[TokenCheck] Minutes until expiry: -60, needs refresh: true
+2026-01-23 16:38:16.16
+28a50198
+User
+[makeQBApiCall] Token expiring soon, attempting proactive refresh...
+2026-01-23 16:38:16.16
+28a50198
+User
+[TokenLock] Attempting to acquire database lock for user 23527284
+2026-01-23 16:38:16.16
+28a50198
+User
+[makeQBApiCall] Starting API call for user 23527284
+2026-01-23 16:38:16.22
+28a50198
+User
+[TokenLock DB] Acquired lock for user 23527284 (lockId: 824427701)
+2026-01-23 16:38:16.31
+28a50198
+User
+[TokenRefresh] Starting token refresh for user 23527284
+2026-01-23 16:38:16.31
+28a50198
+User
+[TokenRefresh] Failed for user 23527284: The Refresh token is invalid, please Authorize again.
+2026-01-23 16:38:16.31
+28a50198
+User
+[TokenRefresh] Current refresh token exists: true
+2026-01-23 16:38:16.31
+28a50198
+User
+[QB Auth] Refresh token prefix: RT1-226-H0-1777...
+2026-01-23 16:38:16.31
+28a50198
+User
+[QB Auth] Error refreshing token: The Refresh token is invalid, please Authorize again.
+2026-01-23 16:38:16.31
+28a50198
+User
+[QB Auth] Starting token refresh...
+2026-01-23 16:38:16.31
+28a50198
+User
+[TokenRefresh] Current refresh token (first 10 chars): RT1-226-H0...
+2026-01-23 16:38:16.34
+28a50198
+User
+[makeQBApiCall] Proactive refresh failed: QuickBooks refresh token is invalid or expired. Please reconnect to QuickBooks.
+2026-01-23 16:38:16.34
+28a50198
+User
+[TokenLock DB] Released lock (lockId: 824427701)
+2026-01-23 16:38:16.60
+28a50198
+User
+[makeQBApiCall] API call successful, response type: object
+2026-01-23 16:38:16.60
+28a50198
+User
+[makeQBApiCall] Response has body: false, has json: true
+2026-01-23 16:38:16.70
+28a50198
+User
+[ShipStation] === SHIPMENTS ENDPOINT HIT === URL: /api/shipstation/shipments?userId=23527284&orderNumbers=25003%2C25002%2C25001%2C24999%2C25000%2C24998%2C24997%2C24993
+2026-01-23 16:38:16.70
+28a50198
+User
+[ShipStation] Shipments - Fetching global ShipStation credentials...
+2026-01-23 16:38:16.70
+28a50198
+User
+[ShipStation] Fetching shipments for user: 23527284, invoices: 25003,25002,25001,24999,25000,24998,24997,24993
+2026-01-23 16:38:16.70
+28a50198
+User
+[getShipStationCredentials] Searching for ShipStation credentials...
+2026-01-23 16:38:16.73
+28a50198
+User
+[getShipStationCredentials] Query returned 1 rows
+2026-01-23 16:38:16.73
+28a50198
+User
+[getShipStationCredentials] Found credentials for user: onitathlere, has api_key: true, has api_secret: true
