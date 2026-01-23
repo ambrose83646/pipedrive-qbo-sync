@@ -1390,7 +1390,7 @@ router.get("/auth/qb/callback", async (req, res) => {
     const shouldSearchForCanonical = !existingUser || !existingUser.pipedrive_access_token || isNumericUserId;
     
     if (shouldSearchForCanonical) {
-      console.log(`[QB OAuth] Searching for canonical user (numeric userId: ${isNumericUserId}, has existing: ${!!existingUser}, has PD tokens: ${!!existingUser?.pipedrive_access_token})`);
+      console.log(`[QB OAuth] Searching for canonical user (numeric userId: ${isNumericUserId}, has existing: ${!!existingUser}, has PD tokens: ${!!existingUser?.pipedrive_access_token}, companyDomain: ${companyDomain})`);
       const { listUsers } = require("../../config/postgres");
       const allUserIds = await listUsers();
       
@@ -1398,17 +1398,30 @@ router.get("/auth/qb/callback", async (req, res) => {
       let bestCandidate = null;
       let bestCandidateId = null;
       
-      for (const candidateId of allUserIds) {
-        // Skip the numeric userId we already checked
-        if (candidateId === userId) continue;
-        
-        const candidateUser = await getUser(candidateId);
-        if (candidateUser && candidateUser.pipedrive_access_token) {
-          // Found a user with Pipedrive tokens - this is likely the canonical user
-          console.log(`[QB OAuth] Found canonical Pipedrive installation under userId: ${candidateId} (has QB tokens: ${!!candidateUser.qb_access_token})`);
-          bestCandidate = candidateUser;
-          bestCandidateId = candidateId;
-          break; // First user with Pipedrive tokens wins
+      // First, try to find by companyDomain if available (most reliable match)
+      if (companyDomain && !bestCandidate) {
+        const domainUser = await getUser(companyDomain);
+        if (domainUser && domainUser.pipedrive_access_token) {
+          console.log(`[QB OAuth] Found canonical user by companyDomain: ${companyDomain}`);
+          bestCandidate = domainUser;
+          bestCandidateId = companyDomain;
+        }
+      }
+      
+      // If not found by domain, scan all users for one with Pipedrive tokens
+      if (!bestCandidate) {
+        for (const candidateId of allUserIds) {
+          // Skip the numeric userId we already checked
+          if (candidateId === userId) continue;
+          
+          const candidateUser = await getUser(candidateId);
+          if (candidateUser && candidateUser.pipedrive_access_token) {
+            // Found a user with Pipedrive tokens - this is likely the canonical user
+            console.log(`[QB OAuth] Found canonical Pipedrive installation under userId: ${candidateId} (has QB tokens: ${!!candidateUser.qb_access_token})`);
+            bestCandidate = candidateUser;
+            bestCandidateId = candidateId;
+            break; // First user with Pipedrive tokens wins
+          }
         }
       }
       
@@ -1418,8 +1431,15 @@ router.get("/auth/qb/callback", async (req, res) => {
         actualUserId = bestCandidateId;
         console.log(`[QB OAuth] Using canonical user: ${actualUserId} instead of provided: ${userId}`);
       } else if (!existingUser) {
+        // No canonical user found - create new record but include companyDomain for future lookups
         existingUser = {};
-        console.log(`[QB OAuth] No existing user found, creating new record for: ${userId}`);
+        // If we have companyDomain from state, include it so setUser can use it for future lookups
+        if (companyDomain) {
+          existingUser.pipedrive_api_domain = `https://${companyDomain}.pipedrive.com`;
+          console.log(`[QB OAuth] No existing user found, will create with api_domain: ${existingUser.pipedrive_api_domain}`);
+        } else {
+          console.log(`[QB OAuth] No existing user found, creating new record for: ${userId} (no companyDomain available)`);
+        }
       }
     }
     
