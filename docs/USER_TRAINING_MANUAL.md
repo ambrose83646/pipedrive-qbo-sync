@@ -217,12 +217,35 @@ In the Invoice List, each invoice shows its shipping status:
 |--------|---------|
 | **No Order** | No ShipStation order exists yet |
 | **Awaiting Shipment** | Order created, waiting to be shipped |
-| **Shipped** | Order has been shipped |
-| **Delivered** | Package delivered to customer |
+| **X/Y Shipped** | Partial shipment (e.g., "3/5 Shipped" means 3 of 5 items shipped) |
+| **Shipped** | All items have been shipped |
+| **Delivered** | All packages delivered to customer |
+
+### Split Shipment Support
+
+The app fully supports orders that are split into multiple shipments:
+
+**In the Invoice List:**
+- Partial shipments show as "3/5 Shipped" (3 of 5 items shipped)
+- Fully shipped orders show as "Shipped"
+
+**In Invoice Details (click to expand):**
+- **Fulfillment Summary** - Shows overall status and item counts
+  - "Fully Shipped" / "Partially Shipped" / "Awaiting Shipment"
+  - Total items shipped vs total items ordered
+  - Number of shipments created
+- **Individual Shipments** - Each shipment displays separately with:
+  - Shipment number (Shipment 1, Shipment 2, etc.)
+  - Status (In Transit, Delivered, etc.)
+  - Tracking number with clickable link
+  - Carrier and service type
+  - Ship date and delivery date
+  - Items included in that specific shipment
 
 ### Shipment Tracking
-- When an order is shipped, a tracking number appears
-- Click the tracking number to view carrier tracking information
+- Each shipment has its own tracking number
+- Click any tracking number to view carrier tracking information
+- Supported carriers: UPS, FedEx, USPS, DHL, and others
 
 ---
 
