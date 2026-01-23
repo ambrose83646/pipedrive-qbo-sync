@@ -3951,38 +3951,76 @@ router.get("/api/shipstation/shipments", async (req, res) => {
         
         if (ordersData && ordersData.orders && ordersData.orders.length > 0) {
           for (const order of ordersData.orders) {
+            // Calculate total order items for partial fulfillment tracking
+            const orderItems = order.items || [];
+            const totalOrderQty = orderItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+            
             // Get shipments for this order
             const shipmentsData = await makeShipStationApiCall(userData, 'GET', `/shipments?orderId=${order.orderId}`);
             
             if (shipmentsData.shipments && shipmentsData.shipments.length > 0) {
+              // Calculate total shipped quantity across all shipments
+              let totalShippedQty = 0;
+              
               // Map shipments to our format - use docNumber as key for frontend
-              const formattedShipments = shipmentsData.shipments.map(ship => ({
-                shipmentId: ship.shipmentId,
-                orderNumber: ssOrderNumber,
-                orderId: order.orderId,
-                trackingNumber: ship.trackingNumber,
-                carrierCode: ship.carrierCode,
-                serviceCode: ship.serviceCode,
-                shipDate: ship.shipDate,
-                deliveryDate: ship.deliveryDate,
-                shipmentStatus: getShipmentStatusLabel(ship),
-                voided: ship.voided,
-                shipTo: ship.shipTo,
-                items: order.items || []
-              }));
+              const formattedShipments = shipmentsData.shipments.map(ship => {
+                // Use shipment-specific items if available, otherwise fall back to order items
+                const shipmentItems = ship.shipmentItems || [];
+                const shipmentQty = shipmentItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+                totalShippedQty += shipmentQty;
+                
+                return {
+                  shipmentId: ship.shipmentId,
+                  orderNumber: ssOrderNumber,
+                  orderId: order.orderId,
+                  trackingNumber: ship.trackingNumber,
+                  carrierCode: ship.carrierCode,
+                  serviceCode: ship.serviceCode,
+                  shipDate: ship.shipDate,
+                  deliveryDate: ship.deliveryDate,
+                  shipmentStatus: getShipmentStatusLabel(ship),
+                  voided: ship.voided,
+                  shipTo: ship.shipTo,
+                  items: shipmentItems.length > 0 ? shipmentItems : orderItems,
+                  shipmentItemCount: shipmentQty || shipmentItems.length
+                };
+              });
+              
+              // Add fulfillment summary to the response
+              const fulfillmentSummary = {
+                totalOrderItems: totalOrderQty,
+                totalShippedItems: totalShippedQty,
+                shipmentCount: formattedShipments.length,
+                isPartiallyShipped: totalShippedQty > 0 && totalShippedQty < totalOrderQty,
+                isFullyShipped: totalShippedQty >= totalOrderQty
+              };
               
               // Key by DocNumber for frontend compatibility
-              shipmentMap[docNumber] = formattedShipments;
+              shipmentMap[docNumber] = {
+                shipments: formattedShipments,
+                summary: fulfillmentSummary,
+                orderItems: orderItems
+              };
             } else {
               // No shipments yet, but order exists
-              shipmentMap[docNumber] = [{
-                orderId: order.orderId,
-                orderNumber: ssOrderNumber,
-                orderStatus: order.orderStatus,
-                shipmentStatus: order.orderStatus === 'shipped' ? 'Shipped' : 'Awaiting Shipment',
-                items: order.items || [],
-                createDate: order.createDate
-              }];
+              shipmentMap[docNumber] = {
+                shipments: [{
+                  orderId: order.orderId,
+                  orderNumber: ssOrderNumber,
+                  orderStatus: order.orderStatus,
+                  shipmentStatus: order.orderStatus === 'shipped' ? 'Shipped' : 'Awaiting Shipment',
+                  items: orderItems,
+                  createDate: order.createDate
+                }],
+                summary: {
+                  totalOrderItems: totalOrderQty,
+                  totalShippedItems: 0,
+                  shipmentCount: 0,
+                  isPartiallyShipped: false,
+                  isFullyShipped: false
+                },
+                orderItems: orderItems
+              };
             }
           }
         }
@@ -3992,8 +4030,12 @@ router.get("/api/shipstation/shipments", async (req, res) => {
       }
     }
     
-    const shipmentCount = Object.values(shipmentMap).reduce((sum, arr) => sum + arr.length, 0);
-    console.log(`[ShipStation] Found ${shipmentCount} order(s)/shipment(s) for ${Object.keys(shipmentMap).length} invoice(s)`);
+    const shipmentCount = Object.values(shipmentMap).reduce((sum, entry) => {
+      // Handle new object format { shipments: [...] } or old array format
+      const shipments = Array.isArray(entry) ? entry : (entry?.shipments || []);
+      return sum + shipments.length;
+    }, 0);
+    console.log(`[ShipStation] Found ${shipmentCount} shipment(s) for ${Object.keys(shipmentMap).length} invoice(s)`);
     
     res.json({
       success: true,

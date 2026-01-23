@@ -766,11 +766,15 @@
     function getShipmentStatus(invoice) {
       // Use fallback chain to find invoice number - QuickBooks may return it in different fields
       const docNumber = invoice.DocNumber || invoice.docNumber || invoice.Id || invoice.id;
-      const shipments = shipmentData[docNumber];
+      const shipmentInfo = shipmentData[docNumber];
       
       if (!shipstationConnected) {
         return { label: '-', class: 'shipment-none', icon: '' };
       }
+      
+      // Handle both old array format and new object format
+      const shipments = Array.isArray(shipmentInfo) ? shipmentInfo : (shipmentInfo?.shipments || []);
+      const summary = shipmentInfo?.summary;
       
       if (!shipments || shipments.length === 0) {
         // Check payment terms - if "Due on Receipt" and not paid, show pending payment
@@ -781,6 +785,24 @@
           return { label: 'Pending Payment', class: 'shipment-pending-payment', icon: '⏳' };
         }
         return { label: 'No Order', class: 'shipment-none', icon: '' };
+      }
+      
+      // Check for partial shipment using summary
+      if (summary && summary.isPartiallyShipped) {
+        return { 
+          label: `${summary.totalShippedItems}/${summary.totalOrderItems} Shipped`, 
+          class: 'shipment-transit', 
+          icon: '📦' 
+        };
+      }
+      
+      if (summary && summary.isFullyShipped) {
+        // Check if any shipment is delivered
+        const allDelivered = shipments.every(s => s.shipmentStatus === 'Delivered');
+        if (allDelivered) {
+          return { label: 'Delivered', class: 'shipment-delivered', icon: '✓' };
+        }
+        return { label: 'Shipped', class: 'shipment-transit', icon: '🚚' };
       }
       
       const shipment = shipments[0];
@@ -1152,12 +1174,17 @@
     function renderShipmentSection(invoice) {
       // Use fallback chain to find invoice number - QuickBooks may return it in different fields
       const docNumber = invoice.DocNumber || invoice.docNumber || invoice.Id || invoice.id;
-      const shipments = shipmentData[docNumber];
+      const shipmentInfo = shipmentData[docNumber];
+      
+      // Handle both old array format and new object format
+      const shipments = Array.isArray(shipmentInfo) ? shipmentInfo : (shipmentInfo?.shipments || []);
+      const summary = shipmentInfo?.summary;
       
       // Debug logging
       console.log('[ShipStation Modal] renderShipmentSection - docNumber:', docNumber, '(from DocNumber:', invoice.DocNumber, ', Id:', invoice.Id, ')');
       console.log('[ShipStation Modal] renderShipmentSection - shipmentData keys:', Object.keys(shipmentData));
       console.log('[ShipStation Modal] renderShipmentSection - shipments for this invoice:', shipments);
+      console.log('[ShipStation Modal] renderShipmentSection - summary:', summary);
       console.log('[ShipStation Modal] renderShipmentSection - shipstationConnected:', shipstationConnected);
       
       let html = '<div class="shipment-section">';
@@ -1204,18 +1231,50 @@
         return html;
       }
       
+      // Show fulfillment summary if available
+      if (summary && summary.totalOrderItems > 0) {
+        const statusClass = summary.isFullyShipped ? 'shipment-delivered' : 
+                           summary.isPartiallyShipped ? 'shipment-transit' : 'shipment-awaiting';
+        const statusText = summary.isFullyShipped ? 'Fully Shipped' :
+                          summary.isPartiallyShipped ? 'Partially Shipped' : 'Awaiting Shipment';
+        
+        html += `
+          <div class="fulfillment-summary" style="background: #f0f5ff; border-radius: 6px; padding: 12px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span style="font-weight: 600; color: #1a1a1a;">Fulfillment Status</span>
+                <span class="shipment-badge ${statusClass}" style="margin-left: 8px;">${statusText}</span>
+              </div>
+              <div style="text-align: right;">
+                <span style="font-size: 18px; font-weight: 600; color: #1890ff;">${summary.totalShippedItems}</span>
+                <span style="color: #8c8c8c;"> / ${summary.totalOrderItems} items shipped</span>
+              </div>
+            </div>
+            ${summary.shipmentCount > 1 ? `<div style="font-size: 12px; color: #595959; margin-top: 4px;">${summary.shipmentCount} shipments for this order</div>` : ''}
+          </div>
+        `;
+      }
+      
       // Render each shipment
-      shipments.forEach(shipment => {
+      shipments.forEach((shipment, index) => {
+        const shipmentLabel = shipments.length > 1 ? ` - Shipment ${index + 1}` : '';
         const statusClass = getShipmentBadgeClass(shipment.shipmentStatus);
         
         html += '<div class="shipment-card">';
         
-        // Order number at the top
-        if (shipment.orderNumber || shipment.orderId) {
+        // Order number at the top (with shipment number for multiple shipments)
+        if (shipment.orderNumber || shipment.orderId || shipmentLabel) {
           html += '<div class="shipment-order-number">';
-          html += `<strong>Order:</strong> ${shipment.orderNumber || ''}`;
-          if (shipment.orderId) {
-            html += ` <span style="color: #8c8c8c;">(ID: ${shipment.orderId})</span>`;
+          if (shipmentLabel) {
+            html += `<strong style="color: #1890ff;">Shipment ${index + 1}</strong>`;
+            if (shipment.orderNumber) {
+              html += ` <span style="color: #8c8c8c;">• Order: ${shipment.orderNumber}</span>`;
+            }
+          } else {
+            html += `<strong>Order:</strong> ${shipment.orderNumber || ''}`;
+            if (shipment.orderId) {
+              html += ` <span style="color: #8c8c8c;">(ID: ${shipment.orderId})</span>`;
+            }
           }
           html += '</div>';
         }
