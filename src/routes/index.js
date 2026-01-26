@@ -231,7 +231,14 @@ async function refreshAndSaveToken(userId, userData, throwOnError = false) {
     console.log(`[TokenRefresh] Current refresh token (first 10 chars): ${dataToUse.qb_refresh_token.substring(0, 10)}...`);
     
     try {
-      const newTokens = await qbAuth.refreshToken(dataToUse.qb_refresh_token);
+      // Pass full token object to refreshToken (required by intuit-oauth library)
+      const tokenObject = {
+        access_token: dataToUse.qb_access_token,
+        refresh_token: dataToUse.qb_refresh_token,
+        token_type: dataToUse.qb_token_type || 'bearer',
+        expires_in: dataToUse.qb_expires_in || 3600
+      };
+      const newTokens = await qbAuth.refreshToken(tokenObject);
       
       console.log(`[TokenRefresh] Refresh successful!`);
       console.log(`[TokenRefresh] New access token received: ${!!newTokens.access_token}`);

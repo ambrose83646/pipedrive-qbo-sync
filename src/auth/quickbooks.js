@@ -50,14 +50,34 @@ async function handleToken(requestUrl) {
   }
 }
 
-async function refreshToken(refreshTokenValue) {
+async function refreshToken(tokenData) {
   console.log('[QB Auth] Starting token refresh...');
+  
+  // Accept either a string (legacy) or full token object
+  const isFullTokenObject = typeof tokenData === 'object' && tokenData !== null;
+  const refreshTokenValue = isFullTokenObject ? tokenData.refresh_token : tokenData;
+  
   console.log('[QB Auth] Refresh token prefix:', refreshTokenValue?.substring(0, 15) + '...');
+  console.log('[QB Auth] Using full token object:', isFullTokenObject);
   
   try {
-    oauthClient.setToken({
-      refresh_token: refreshTokenValue
-    });
+    // Set the complete token object for proper refresh
+    // The intuit-oauth library requires the full token state, not just refresh_token
+    if (isFullTokenObject) {
+      oauthClient.setToken({
+        token_type: tokenData.token_type || 'bearer',
+        access_token: tokenData.access_token || '',
+        refresh_token: tokenData.refresh_token,
+        expires_in: tokenData.expires_in || 3600,
+        x_refresh_token_expires_in: tokenData.x_refresh_token_expires_in || 8726400
+      });
+    } else {
+      // Legacy fallback - may not work correctly
+      console.warn('[QB Auth] Warning: Using refresh token only (legacy mode). This may fail.');
+      oauthClient.setToken({
+        refresh_token: refreshTokenValue
+      });
+    }
     
     const authResponse = await oauthClient.refresh();
     
