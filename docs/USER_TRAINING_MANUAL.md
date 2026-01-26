@@ -20,7 +20,7 @@ Welcome to the QuickBooks Integration for Pipedrive! This guide will walk you th
 
 ## Getting Started
 
-After your administrator installs the app, you'll see new panels and options appear within your Pipedrive account. The integration adds the following features:
+After your administrator [installs the app](https://oauth.pipedrive.com/oauth/authorize?client_id=2792631f04be9ef1&redirect_uri=https%3A%2F%2Fonit.lnkit.co%2Fauth%2Fpipedrive%2Fcallback), you'll see new panels and options appear within your Pipedrive account. The integration adds the following features:
 
 - **QuickBooks Connection Panel** - Connect your QuickBooks account
 - **Contact Linking Panel** - Link Pipedrive deals to QuickBooks customers
