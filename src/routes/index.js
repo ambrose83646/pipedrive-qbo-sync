@@ -380,6 +380,195 @@ async function makeQBApiCall(userId, userData, apiCallFunction) {
   }
 }
 
+// ============================================
+// Pipedrive Product Sync Helper Functions
+// ============================================
+
+// Helper function to make Pipedrive API calls with token refresh
+async function makePipedriveApiCall(userData, method, endpoint, data = null) {
+  const apiDomain = userData.api_domain || userData.pipedrive_api_domain;
+  const accessToken = userData.access_token || userData.pipedrive_access_token;
+  
+  if (!apiDomain || !accessToken) {
+    throw new Error('Pipedrive not connected - missing API domain or access token');
+  }
+  
+  const url = `https://${apiDomain}${endpoint}`;
+  const headers = {
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  };
+  
+  console.log(`[Pipedrive API] ${method} ${endpoint}`);
+  
+  try {
+    let response;
+    if (method === 'GET') {
+      response = await axios.get(url, { headers });
+    } else if (method === 'POST') {
+      response = await axios.post(url, data, { headers });
+    } else if (method === 'PUT') {
+      response = await axios.put(url, data, { headers });
+    }
+    return response.data;
+  } catch (error) {
+    console.error(`[Pipedrive API] Error: ${error.response?.status} - ${error.response?.data?.error || error.message}`);
+    throw error;
+  }
+}
+
+// Search Pipedrive products by SKU (code field)
+async function findPipedriveProductBySku(userData, sku) {
+  if (!sku) return null;
+  
+  try {
+    // Use Pipedrive's /products/search endpoint with exact match on code field
+    const result = await makePipedriveApiCall(userData, 'GET', `/api/v1/products/search?term=${encodeURIComponent(sku)}&fields=code&exact_match=true`);
+    
+    // The /products/search endpoint returns data.items[].item structure
+    if (result.success && result.data && result.data.items && result.data.items.length > 0) {
+      // Find exact match on code (SKU) - items contain { item: {...product...} }
+      for (const wrapper of result.data.items) {
+        const product = wrapper.item;
+        if (product && product.code === sku) {
+          console.log(`[Pipedrive Products] Found product by SKU "${sku}": ID ${product.id}`);
+          return product;
+        }
+      }
+    }
+    
+    console.log(`[Pipedrive Products] No product found with SKU "${sku}"`);
+    return null;
+  } catch (error) {
+    console.error(`[Pipedrive Products] Error searching for SKU "${sku}":`, error.message);
+    return null;
+  }
+}
+
+// Create a new Pipedrive product with name and SKU
+async function createPipedriveProduct(userData, name, sku) {
+  try {
+    const productData = {
+      name: name,
+      code: sku  // SKU is stored in the 'code' field
+    };
+    
+    const result = await makePipedriveApiCall(userData, 'POST', '/api/v1/products', productData);
+    
+    if (result.success && result.data) {
+      console.log(`[Pipedrive Products] Created product "${name}" (SKU: ${sku}) with ID ${result.data.id}`);
+      return result.data;
+    }
+    
+    console.error(`[Pipedrive Products] Failed to create product:`, result);
+    return null;
+  } catch (error) {
+    console.error(`[Pipedrive Products] Error creating product "${name}":`, error.message);
+    return null;
+  }
+}
+
+// Find or create a Pipedrive product by SKU
+async function findOrCreatePipedriveProduct(userData, name, sku) {
+  if (!sku) {
+    console.log(`[Pipedrive Products] Skipping product "${name}" - no SKU provided`);
+    return null;
+  }
+  
+  // First try to find existing product by SKU
+  let product = await findPipedriveProductBySku(userData, sku);
+  
+  // If not found, create new product
+  if (!product) {
+    product = await createPipedriveProduct(userData, name, sku);
+  }
+  
+  return product;
+}
+
+// Attach a product to a Pipedrive deal
+async function attachProductToDeal(userData, dealId, productId, quantity, itemPrice) {
+  try {
+    const attachData = {
+      product_id: productId,
+      item_price: itemPrice,
+      quantity: quantity
+    };
+    
+    const result = await makePipedriveApiCall(userData, 'POST', `/api/v1/deals/${dealId}/products`, attachData);
+    
+    if (result.success && result.data) {
+      console.log(`[Pipedrive Products] Attached product ${productId} to deal ${dealId} (qty: ${quantity}, price: ${itemPrice})`);
+      return result.data;
+    }
+    
+    console.error(`[Pipedrive Products] Failed to attach product to deal:`, result);
+    return null;
+  } catch (error) {
+    console.error(`[Pipedrive Products] Error attaching product ${productId} to deal ${dealId}:`, error.message);
+    return null;
+  }
+}
+
+// Sync invoice line items to Pipedrive deal as products
+async function syncInvoiceProductsToDeal(userData, dealId, lineItems) {
+  if (!dealId) {
+    console.log('[Pipedrive Products] No deal ID provided, skipping product sync');
+    return { synced: 0, skipped: 0, errors: 0 };
+  }
+  
+  if (!lineItems || lineItems.length === 0) {
+    console.log('[Pipedrive Products] No line items to sync');
+    return { synced: 0, skipped: 0, errors: 0 };
+  }
+  
+  console.log(`[Pipedrive Products] Syncing ${lineItems.length} line items to deal ${dealId}`);
+  
+  let synced = 0;
+  let skipped = 0;
+  let errors = 0;
+  
+  for (const item of lineItems) {
+    const sku = item.sku;
+    const name = item.name || item.description || 'Unnamed Product';
+    const quantity = item.quantity || 1;
+    const unitPrice = item.unitPrice || 0;
+    
+    if (!sku) {
+      console.log(`[Pipedrive Products] Skipping item "${name}" - no SKU`);
+      skipped++;
+      continue;
+    }
+    
+    try {
+      // Find or create the product in Pipedrive
+      const product = await findOrCreatePipedriveProduct(userData, name, sku);
+      
+      if (product) {
+        // Attach to the deal
+        const attached = await attachProductToDeal(userData, dealId, product.id, quantity, unitPrice);
+        if (attached) {
+          synced++;
+        } else {
+          errors++;
+        }
+      } else {
+        errors++;
+      }
+    } catch (error) {
+      console.error(`[Pipedrive Products] Error syncing item "${name}":`, error.message);
+      errors++;
+    }
+  }
+  
+  console.log(`[Pipedrive Products] Sync complete: ${synced} synced, ${skipped} skipped (no SKU), ${errors} errors`);
+  return { synced, skipped, errors };
+}
+
+// ============================================
+// End Pipedrive Product Sync Helper Functions
+// ============================================
+
 router.get("/", (req, res) => {
   res.send("Hello!");
 });
@@ -3485,10 +3674,11 @@ router.get("/api/pipedrive/deal-address", async (req, res) => {
 // Create QuickBooks invoice
 router.post("/api/invoices", express.json(), async (req, res) => {
   try {
-    const { customerId, customerEmail, lineItems, dueDate, memo, paymentTerms, shippingAddress, discount, sendEmail } = req.body;
+    const { customerId, customerEmail, lineItems, dueDate, memo, paymentTerms, shippingAddress, discount, sendEmail, dealId } = req.body;
     const providedUserId = req.query.userId || req.body.userId || 'test';
     
     console.log('Creating invoice for customer:', customerId, 'Email:', customerEmail, 'User ID:', providedUserId);
+    console.log('Deal ID for product sync:', dealId || 'not provided');
     console.log('Discount:', discount ? `${discount.type} - ${discount.value}` : 'none');
     console.log('Send email after creation:', sendEmail ? 'yes' : 'no');
 
@@ -3756,11 +3946,32 @@ router.post("/api/invoices", express.json(), async (req, res) => {
         }
       }
       
+      // Pipedrive Products Integration - sync invoice line items to deal as products
+      let pipedriveProductsSync = { synced: 0, skipped: 0, errors: 0 };
+      
+      // Check for either access_token or pipedrive_access_token (both can hold the Pipedrive token)
+      const hasPipedriveToken = !!(userData.access_token || userData.pipedrive_access_token);
+      
+      if (dealId && hasPipedriveToken) {
+        try {
+          console.log(`[Pipedrive Products] Starting product sync for deal ${dealId}`);
+          pipedriveProductsSync = await syncInvoiceProductsToDeal(userData, dealId, lineItems);
+        } catch (pdError) {
+          console.error('[Pipedrive Products] Error syncing products:', pdError.message);
+          // Don't fail the invoice creation just because Pipedrive sync failed
+        }
+      } else if (!dealId) {
+        console.log('[Pipedrive Products] Skipping product sync - no deal ID provided');
+      } else if (!hasPipedriveToken) {
+        console.log('[Pipedrive Products] Skipping product sync - no Pipedrive access token');
+      }
+      
       res.json({
         success: true,
         emailSent: emailSent,
         shipstationOrderCreated: shipstationOrderCreated,
         shipstationOrderPending: shipstationOrderPending,
+        pipedriveProductsSync: pipedriveProductsSync,
         invoice: {
           id: result.Invoice.Id,
           docNumber: result.Invoice.DocNumber,
