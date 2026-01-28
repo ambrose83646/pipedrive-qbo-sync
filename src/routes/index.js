@@ -386,12 +386,15 @@ async function makeQBApiCall(userId, userData, apiCallFunction) {
 
 // Helper function to make Pipedrive API calls with token refresh
 async function makePipedriveApiCall(userData, method, endpoint, data = null) {
-  const apiDomain = userData.api_domain || userData.pipedrive_api_domain;
+  let apiDomain = userData.api_domain || userData.pipedrive_api_domain;
   const accessToken = userData.access_token || userData.pipedrive_access_token;
   
   if (!apiDomain || !accessToken) {
     throw new Error('Pipedrive not connected - missing API domain or access token');
   }
+  
+  // Strip https:// prefix if present to avoid double-prefixing
+  apiDomain = apiDomain.replace(/^https?:\/\//, '');
   
   const url = `https://${apiDomain}${endpoint}`;
   const headers = {
