@@ -1848,10 +1848,11 @@
           let html = '';
           products.forEach(product => {
             const price = product.unitPrice || 0;
+            const sku = (product.sku || '').replace(/'/g, "\\'");
             html += `
-              <div class="product-item" onclick="selectProduct(${itemId}, '${product.id}', '${(product.name || '').replace(/'/g, "\\'")}', '${(product.description || '').replace(/'/g, "\\'")}', ${price})">
+              <div class="product-item" onclick="selectProduct(${itemId}, '${product.id}', '${(product.name || '').replace(/'/g, "\\'")}', '${(product.description || '').replace(/'/g, "\\'")}', ${price}, '${sku}')">
                 <div class="product-name">${product.name}</div>
-                <div class="product-price">$${price.toFixed(2)} ${product.type ? `- ${product.type}` : ''}</div>
+                <div class="product-price">$${price.toFixed(2)} ${product.type ? `- ${product.type}` : ''} ${sku ? `(${sku})` : ''}</div>
               </div>
             `;
           });
@@ -1872,13 +1873,14 @@
       }
     }
     
-    function selectProduct(itemId, productId, name, description, unitPrice) {
+    function selectProduct(itemId, productId, name, description, unitPrice, sku) {
       const item = lineItems.find(i => i.id === itemId);
       if (item) {
         item.itemId = productId;
         item.name = name;
         item.description = description;
         item.unitPrice = unitPrice;
+        item.sku = sku || '';
       }
       
       // Close dropdown
@@ -1924,12 +1926,14 @@
           },
           body: JSON.stringify({
             customerId: linkedContact.Id,
+            dealId: dealId,
             lineItems: lineItems.map(item => ({
               itemId: item.itemId,
               name: item.name,
               description: item.description,
               quantity: item.quantity,
-              unitPrice: item.unitPrice
+              unitPrice: item.unitPrice,
+              sku: item.sku || ''
             })),
             dueDate: dueDate || undefined,
             memo: memo || undefined

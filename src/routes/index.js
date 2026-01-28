@@ -3677,8 +3677,10 @@ router.post("/api/invoices", express.json(), async (req, res) => {
     const { customerId, customerEmail, lineItems, dueDate, memo, paymentTerms, shippingAddress, discount, sendEmail, dealId } = req.body;
     const providedUserId = req.query.userId || req.body.userId || 'test';
     
+    console.log('=== INVOICE CREATION REQUEST ===');
     console.log('Creating invoice for customer:', customerId, 'Email:', customerEmail, 'User ID:', providedUserId);
-    console.log('Deal ID for product sync:', dealId || 'not provided');
+    console.log('Deal ID for product sync:', dealId, '(type:', typeof dealId, ')');
+    console.log('Line items count:', lineItems?.length || 0);
     console.log('Discount:', discount ? `${discount.type} - ${discount.value}` : 'none');
     console.log('Send email after creation:', sendEmail ? 'yes' : 'no');
 
@@ -3951,6 +3953,12 @@ router.post("/api/invoices", express.json(), async (req, res) => {
       
       // Check for either access_token or pipedrive_access_token (both can hold the Pipedrive token)
       const hasPipedriveToken = !!(userData.access_token || userData.pipedrive_access_token);
+      
+      console.log('[Pipedrive Products] === SYNC CHECK ===');
+      console.log('[Pipedrive Products] dealId:', dealId, 'type:', typeof dealId);
+      console.log('[Pipedrive Products] hasPipedriveToken:', hasPipedriveToken);
+      console.log('[Pipedrive Products] access_token exists:', !!userData.access_token);
+      console.log('[Pipedrive Products] pipedrive_access_token exists:', !!userData.pipedrive_access_token);
       
       if (dealId && hasPipedriveToken) {
         try {
