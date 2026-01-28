@@ -1,0 +1,140 @@
+26-01-27 20:51:55.89
+574c5fcb
+User
+[Invoices] Raw item response: [{"Name":"2025 Boise State Football Trading Cards","sparse":true,"Id":"496"},{"Name":"ONIT Hat","sparse":true,"Id":"492"},{"Name":"Arizona State University Football 2025 ONIT Gravity Blaster Box","sparse":true,"Id":"592"}]
+2026-01-27 20:51:55.89
+574c5fcb
+User
+[Invoices] Fetched SKUs for 5 items, SKU map: { '492': '', '496': '', '592': '', '601': '', '640': '' }
+2026-01-27 20:51:55.89
+574c5fcb
+User
+[Invoices] Total items enriched with SKU: 0
+2026-01-27 20:51:55.89
+574c5fcb
+User
+[makeQBApiCall] Response has body: false, has json: true
+2026-01-27 20:51:55.89
+574c5fcb
+User
+[makeQBApiCall] API call successful, response type: object
+2026-01-27 20:51:56.44
+574c5fcb
+User
+[TokenCheck] Minutes until expiry: 27, needs refresh: false
+2026-01-27 20:51:56.44
+574c5fcb
+User
+[TokenCheck] Token expires at: 2026-01-28T04:18:58.521Z, now: 2026-01-28T03:51:56.443Z
+2026-01-27 20:51:56.44
+574c5fcb
+User
+[makeQBApiCall] Starting API call for user 23527284
+2026-01-27 20:51:56.44
+574c5fcb
+User
+[makeQBApiCall] Has access token: true, Has realm: true
+2026-01-27 20:51:56.48
+574c5fcb
+User
+[ShipStation] Looking up order: QB-7284-24998 for invoice 24998
+2026-01-27 20:51:57.20
+574c5fcb
+User
+[makeQBApiCall] Starting API call for user 23527284
+2026-01-27 20:51:57.20
+574c5fcb
+User
+[Invoices] SKU query: SELECT Id, Name, Sku FROM Item WHERE Id IN ('601','592','640','492','496')
+2026-01-27 20:51:57.20
+574c5fcb
+User
+[TokenCheck] Token expires at: 2026-01-28T04:18:58.521Z, now: 2026-01-28T03:51:57.200Z
+2026-01-27 20:51:57.20
+574c5fcb
+User
+[makeQBApiCall] API call successful, response type: object
+2026-01-27 20:51:57.20
+574c5fcb
+User
+[makeQBApiCall] Response has body: false, has json: true
+2026-01-27 20:51:57.20
+574c5fcb
+User
+[makeQBApiCall] Has access token: true, Has realm: true
+2026-01-27 20:51:57.20
+574c5fcb
+User
+[Invoices] Collected 5 unique item IDs for SKU lookup: [ '601', '592', '640', '492', '496' ]
+2026-01-27 20:51:57.20
+574c5fcb
+User
+[TokenCheck] Minutes until expiry: 27, needs refresh: false
+2026-01-27 20:51:57.37
+574c5fcb
+User
+[Invoices] Fetched SKUs for 5 items, SKU map: { '492': '', '496': '', '592': '', '601': '', '640': '' }
+2026-01-27 20:51:57.37
+574c5fcb
+User
+[Invoices] Raw item response: [{"Name":"2025 Boise State Football Trading Cards","sparse":true,"Id":"496"},{"Name":"ONIT Hat","sparse":true,"Id":"492"},{"Name":"Arizona State University Football 2025 ONIT Gravity Blaster Box","sparse":true,"Id":"592"}]
+2026-01-27 20:51:57.37
+574c5fcb
+User
+[makeQBApiCall] API call successful, response type: object
+2026-01-27 20:51:57.37
+574c5fcb
+User
+[makeQBApiCall] Response has body: false, has json: true
+2026-01-27 20:51:57.37
+574c5fcb
+User
+[Invoices] Total items enriched with SKU: 0
+2026-01-27 20:51:58.03
+574c5fcb
+User
+[TokenCheck] Token expires at: 2026-01-28T04:18:58.521Z, now: 2026-01-28T03:51:58.035Z
+2026-01-27 20:51:58.03
+574c5fcb
+User
+[makeQBApiCall] Starting API call for user 23527284
+2026-01-27 20:51:58.03
+574c5fcb
+User
+[makeQBApiCall] Has access token: true, Has realm: true
+2026-01-27 20:51:58.03
+574c5fcb
+User
+[TokenCheck] Minutes until expiry: 27, needs refresh: false
+2026-01-27 20:51:58.34
+574c5fcb
+User
+[makeQBApiCall] Starting API call for user 23527284
+2026-01-27 20:51:58.34
+574c5fcb
+User
+[TokenCheck] Minutes until expiry: 27, needs refresh: false
+2026-01-27 20:51:58.34
+574c5fcb
+User
+[makeQBApiCall] API call successful, response type: object
+2026-01-27 20:51:58.34
+574c5fcb
+User
+[TokenCheck] Token expires at: 2026-01-28T04:18:58.521Z, now: 2026-01-28T03:51:58.349Z
+2026-01-27 20:51:58.34
+574c5fcb
+User
+[makeQBApiCall] Has access token: true, Has realm: true
+2026-01-27 20:51:58.34
+574c5fcb
+User
+[makeQBApiCall] Response has body: false, has json: true
+2026-01-27 20:51:58.34
+574c5fcb
+User
+[Invoices] SKU query: SELECT Id, Name, Sku FROM Item WHERE Id IN ('601','592','640','492','496')
+2026-01-27 20:51:58.34
+574c5fcb
+User
+[Invoices] Collected 5 unique item IDs for SKU lookup: [ '601', '592', '640', '492', '496' ]
