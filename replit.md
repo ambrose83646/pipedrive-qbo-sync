@@ -48,6 +48,7 @@ A controller-based synchronization logic (`src/controllers/sync.js`) manages dat
 
 ## Feature Specifications
 - **Invoice Creation**: Functionality to create invoices in QuickBooks with product search, dynamic line item management, and real-time total calculation.
+- **Pipedrive Product Sync**: After invoice creation, invoice line items are automatically synced to the Pipedrive deal as Products. Products are matched by SKU (stored in Pipedrive's `code` field). If no match is found, a new product is created with the name and SKU from QuickBooks, then attached to the deal with quantity and price.
 - **ShipStation Integration**: Automated order creation based on invoice payment status, with shipment tracking and status display.
 - **Invoice List Modal**: View all invoices within Pipedrive, with PDF download, payment link copying, and detailed line item display.
 - **Contact Linking**: Secure, tenant-isolated linking of Pipedrive deals to QuickBooks customers, with an unlink feature.
