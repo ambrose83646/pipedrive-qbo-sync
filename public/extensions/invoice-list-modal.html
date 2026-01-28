@@ -1061,6 +1061,10 @@
           switch(line.DetailType) {
             case 'SalesItemLineDetail':
               itemName = line.SalesItemLineDetail?.ItemRef?.name || line.Description || 'Item';
+              const sku = line.SalesItemLineDetail?.Sku || '';
+              if (sku) {
+                itemName += ` <span style="color: #8c8c8c; font-size: 12px;">(SKU: ${sku})</span>`;
+              }
               const qty = line.SalesItemLineDetail?.Qty || 1;
               const unitPrice = line.SalesItemLineDetail?.UnitPrice || line.Amount;
               itemDetail = `${qty} x ${formatCurrency(unitPrice)}`;
@@ -1109,7 +1113,11 @@
               // Render child entries
               if (line.GroupLineDetail?.Line) {
                 line.GroupLineDetail.Line.forEach(childLine => {
-                  const childName = childLine.SalesItemLineDetail?.ItemRef?.name || childLine.Description || 'Item';
+                  let childName = childLine.SalesItemLineDetail?.ItemRef?.name || childLine.Description || 'Item';
+                  const childSku = childLine.SalesItemLineDetail?.Sku || '';
+                  if (childSku) {
+                    childName += ` <span style="color: #8c8c8c; font-size: 12px;">(SKU: ${childSku})</span>`;
+                  }
                   const childQty = childLine.SalesItemLineDetail?.Qty || 1;
                   const childPrice = childLine.SalesItemLineDetail?.UnitPrice || childLine.Amount || 0;
                   const childAmount = childLine.Amount || 0;

@@ -2213,6 +2213,58 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
     const responseData = getQBResponseData(invoiceResponse);
     const invoices = responseData.QueryResponse?.Invoice || [];
     
+    // Collect all unique item IDs from invoice line items to fetch SKUs
+    const itemIds = new Set();
+    invoices.forEach(invoice => {
+      if (invoice.Line) {
+        invoice.Line.forEach(line => {
+          if (line.DetailType === 'SalesItemLineDetail' && line.SalesItemLineDetail?.ItemRef?.value) {
+            itemIds.add(line.SalesItemLineDetail.ItemRef.value);
+          }
+        });
+      }
+    });
+    
+    // Fetch item details to get SKUs (if there are any items)
+    let itemSkuMap = {};
+    if (itemIds.size > 0) {
+      try {
+        const itemIdList = Array.from(itemIds).join("','");
+        const itemQuery = `SELECT Id, Name, Sku FROM Item WHERE Id IN ('${itemIdList}')`;
+        
+        const itemResponse = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
+          return await qbClient.makeApiCall({
+            url: `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(itemQuery)}&minorversion=65`,
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+        });
+        
+        const itemData = getQBResponseData(itemResponse);
+        const items = itemData.QueryResponse?.Item || [];
+        items.forEach(item => {
+          itemSkuMap[item.Id] = item.Sku || '';
+        });
+        console.log(`[Invoices] Fetched SKUs for ${items.length} items`);
+      } catch (itemError) {
+        console.warn('[Invoices] Could not fetch item SKUs:', itemError.message);
+      }
+    }
+    
+    // Enrich invoice line items with SKU data
+    invoices.forEach(invoice => {
+      if (invoice.Line) {
+        invoice.Line.forEach(line => {
+          if (line.DetailType === 'SalesItemLineDetail' && line.SalesItemLineDetail?.ItemRef?.value) {
+            const itemId = line.SalesItemLineDetail.ItemRef.value;
+            line.SalesItemLineDetail.Sku = itemSkuMap[itemId] || '';
+          }
+        });
+      }
+    });
+    
     // Calculate overview totals
     const overview = {
       outstanding: 0,
@@ -3016,6 +3068,7 @@ router.get("/api/items/search", async (req, res) => {
     const simplifiedItems = items.map(item => ({
       id: item.Id,
       name: item.Name,
+      sku: item.Sku || '',
       description: item.Description || '',
       unitPrice: item.UnitPrice || 0,
       type: item.Type, // 'Inventory', 'Service', 'NonInventory'
@@ -4245,7 +4298,7 @@ async function createShipStationOrderFromInvoice(userData, invoice, userId) {
           name: line.SalesItemLineDetail.ItemRef?.name || line.Description || 'Item',
           quantity: line.SalesItemLineDetail.Qty || 1,
           unitPrice: line.SalesItemLineDetail.UnitPrice || line.Amount || 0,
-          sku: line.SalesItemLineDetail.ItemRef?.value || ''
+          sku: line.SalesItemLineDetail.Sku || ''
         });
       }
     });

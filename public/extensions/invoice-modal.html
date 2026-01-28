@@ -890,7 +890,8 @@
         name: '',
         description: '',
         quantity: 1,
-        unitPrice: 0
+        unitPrice: 0,
+        sku: ''
       };
       lineItems.push(newItem);
       renderLineItems();
@@ -929,6 +930,7 @@
                        autocomplete="off">
                 <div class="product-dropdown" id="productDropdown_${item.id}"></div>
               </div>
+              ${item.sku ? `<div style="color: #8c8c8c; font-size: 12px; margin-top: 4px;">SKU: ${item.sku}</div>` : ''}
             </div>
             <div class="line-item-row">
               <input type="text" class="form-input" style="flex: 1;" 
@@ -1097,11 +1099,13 @@
           let html = '';
           products.forEach(product => {
             const price = product.unitPrice || 0;
+            const sku = product.sku || '';
             const escapedName = (product.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
             const escapedDesc = (product.description || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const escapedSku = (sku || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
             html += `
-              <div class="product-item" onclick="selectProduct(${itemId}, '${product.id}', '${escapedName}', '${escapedDesc}', ${price})">
-                <div class="product-name">${product.name}</div>
+              <div class="product-item" onclick="selectProduct(${itemId}, '${product.id}', '${escapedName}', '${escapedDesc}', ${price}, '${escapedSku}')">
+                <div class="product-name">${product.name}${sku ? ` <span style="color: #8c8c8c; font-size: 11px;">(SKU: ${sku})</span>` : ''}</div>
                 <div class="product-price">$${price.toFixed(2)} ${product.type ? `- ${product.type}` : ''}</div>
               </div>
             `;
@@ -1123,13 +1127,14 @@
       }
     }
     
-    function selectProduct(itemId, productId, name, description, unitPrice) {
+    function selectProduct(itemId, productId, name, description, unitPrice, sku = '') {
       const item = lineItems.find(i => i.id === itemId);
       if (item) {
         item.itemId = productId;
         item.name = name;
         item.description = description;
         item.unitPrice = unitPrice;
+        item.sku = sku;
       }
       
       document.getElementById(`productDropdown_${itemId}`).classList.remove('active');
@@ -1274,7 +1279,8 @@
               name: item.name,
               description: item.description,
               quantity: item.quantity,
-              unitPrice: item.unitPrice
+              unitPrice: item.unitPrice,
+              sku: item.sku || ''
             })),
             dueDate: dueDate || undefined,
             memo: memo || undefined,
