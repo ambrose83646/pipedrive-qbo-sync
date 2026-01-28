@@ -2235,10 +2235,12 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
     
     // Fetch item details to get SKUs (if there are any items)
     let itemSkuMap = {};
+    console.log(`[Invoices] Collected ${itemIds.size} unique item IDs for SKU lookup:`, Array.from(itemIds));
     if (itemIds.size > 0) {
       try {
         const itemIdList = Array.from(itemIds).join("','");
         const itemQuery = `SELECT Id, Name, Sku FROM Item WHERE Id IN ('${itemIdList}')`;
+        console.log(`[Invoices] SKU query:`, itemQuery);
         
         const itemResponse = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
           return await qbClient.makeApiCall({
@@ -2252,35 +2254,48 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
         
         const itemData = getQBResponseData(itemResponse);
         const items = itemData.QueryResponse?.Item || [];
+        console.log(`[Invoices] Raw item response:`, JSON.stringify(items.slice(0, 3)));
         items.forEach(item => {
           itemSkuMap[item.Id] = item.Sku || '';
         });
-        console.log(`[Invoices] Fetched SKUs for ${items.length} items`);
+        console.log(`[Invoices] Fetched SKUs for ${items.length} items, SKU map:`, itemSkuMap);
       } catch (itemError) {
         console.warn('[Invoices] Could not fetch item SKUs:', itemError.message);
       }
     }
     
     // Enrich invoice line items with SKU data
+    let enrichedCount = 0;
     invoices.forEach(invoice => {
       if (invoice.Line) {
         invoice.Line.forEach(line => {
           if (line.DetailType === 'SalesItemLineDetail' && line.SalesItemLineDetail?.ItemRef?.value) {
             const itemId = line.SalesItemLineDetail.ItemRef.value;
-            line.SalesItemLineDetail.Sku = itemSkuMap[itemId] || '';
+            const sku = itemSkuMap[itemId] || '';
+            line.SalesItemLineDetail.Sku = sku;
+            if (sku) {
+              enrichedCount++;
+              console.log(`[Invoices] Enriched item ${itemId} with SKU: ${sku}`);
+            }
           }
           // Also enrich GroupLineDetail children with SKU data
           if (line.DetailType === 'GroupLineDetail' && line.GroupLineDetail?.Line) {
             line.GroupLineDetail.Line.forEach(childLine => {
               if (childLine.SalesItemLineDetail?.ItemRef?.value) {
                 const itemId = childLine.SalesItemLineDetail.ItemRef.value;
-                childLine.SalesItemLineDetail.Sku = itemSkuMap[itemId] || '';
+                const sku = itemSkuMap[itemId] || '';
+                childLine.SalesItemLineDetail.Sku = sku;
+                if (sku) {
+                  enrichedCount++;
+                  console.log(`[Invoices] Enriched group child item ${itemId} with SKU: ${sku}`);
+                }
               }
             });
           }
         });
       }
     });
+    console.log(`[Invoices] Total items enriched with SKU: ${enrichedCount}`);
     
     // Calculate overview totals
     const overview = {
