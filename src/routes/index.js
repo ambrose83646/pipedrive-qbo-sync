@@ -385,9 +385,9 @@ async function makeQBApiCall(userId, userData, apiCallFunction) {
 // ============================================
 
 // Helper function to make Pipedrive API calls with token refresh
-async function makePipedriveApiCall(userData, method, endpoint, data = null) {
+async function makePipedriveApiCall(userData, method, endpoint, data = null, userId = null, retryCount = 0) {
   let apiDomain = userData.api_domain || userData.pipedrive_api_domain;
-  const accessToken = userData.access_token || userData.pipedrive_access_token;
+  let accessToken = userData.access_token || userData.pipedrive_access_token;
   
   if (!apiDomain || !accessToken) {
     throw new Error('Pipedrive not connected - missing API domain or access token');
@@ -402,7 +402,7 @@ async function makePipedriveApiCall(userData, method, endpoint, data = null) {
     'Content-Type': 'application/json'
   };
   
-  console.log(`[Pipedrive API] ${method} ${endpoint}`);
+  console.log(`[Pipedrive API] ${method} ${endpoint} (attempt ${retryCount + 1})`);
   
   try {
     let response;
@@ -416,17 +416,54 @@ async function makePipedriveApiCall(userData, method, endpoint, data = null) {
     return response.data;
   } catch (error) {
     console.error(`[Pipedrive API] Error: ${error.response?.status} - ${error.response?.data?.error || error.message}`);
+    
+    // If 401 and we haven't retried yet, try to refresh token
+    const refreshToken = userData.refresh_token || userData.pipedrive_refresh_token;
+    if (error.response?.status === 401 && refreshToken && retryCount === 0) {
+      console.log('[Pipedrive API] Token expired, attempting refresh...');
+      try {
+        const pipedriveAuth = require('../auth/pipedrive');
+        const newTokens = await pipedriveAuth.refreshToken(refreshToken);
+        
+        console.log('[Pipedrive API] Token refresh successful');
+        
+        // Update userData in memory with new tokens
+        userData.access_token = newTokens.access_token;
+        userData.pipedrive_access_token = newTokens.access_token;
+        userData.refresh_token = newTokens.refresh_token;
+        userData.pipedrive_refresh_token = newTokens.refresh_token;
+        
+        // Persist updated tokens to database if userId is provided
+        if (userId) {
+          const { setUser } = require("../../config/postgres");
+          await setUser(userId, {
+            ...userData,
+            access_token: newTokens.access_token,
+            refresh_token: newTokens.refresh_token,
+            pipedrive_updated_at: new Date().toISOString()
+          });
+          console.log('[Pipedrive API] New tokens persisted to database');
+        }
+        
+        // Retry with new token
+        return await makePipedriveApiCall(userData, method, endpoint, data, userId, retryCount + 1);
+      } catch (refreshError) {
+        console.error('[Pipedrive API] Token refresh failed:', refreshError.message);
+        throw new Error('Pipedrive session expired. Please reconnect to Pipedrive.');
+      }
+    }
+    
     throw error;
   }
 }
 
 // Search Pipedrive products by SKU (code field)
-async function findPipedriveProductBySku(userData, sku) {
+async function findPipedriveProductBySku(userData, sku, userId = null) {
   if (!sku) return null;
   
   try {
     // Use Pipedrive's /products/search endpoint with exact match on code field
-    const result = await makePipedriveApiCall(userData, 'GET', `/api/v1/products/search?term=${encodeURIComponent(sku)}&fields=code&exact_match=true`);
+    const result = await makePipedriveApiCall(userData, 'GET', `/api/v1/products/search?term=${encodeURIComponent(sku)}&fields=code&exact_match=true`, null, userId);
     
     // The /products/search endpoint returns data.items[].item structure
     if (result.success && result.data && result.data.items && result.data.items.length > 0) {
@@ -449,14 +486,14 @@ async function findPipedriveProductBySku(userData, sku) {
 }
 
 // Create a new Pipedrive product with name and SKU
-async function createPipedriveProduct(userData, name, sku) {
+async function createPipedriveProduct(userData, name, sku, userId = null) {
   try {
     const productData = {
       name: name,
       code: sku  // SKU is stored in the 'code' field
     };
     
-    const result = await makePipedriveApiCall(userData, 'POST', '/api/v1/products', productData);
+    const result = await makePipedriveApiCall(userData, 'POST', '/api/v1/products', productData, userId);
     
     if (result.success && result.data) {
       console.log(`[Pipedrive Products] Created product "${name}" (SKU: ${sku}) with ID ${result.data.id}`);
@@ -472,25 +509,25 @@ async function createPipedriveProduct(userData, name, sku) {
 }
 
 // Find or create a Pipedrive product by SKU
-async function findOrCreatePipedriveProduct(userData, name, sku) {
+async function findOrCreatePipedriveProduct(userData, name, sku, userId = null) {
   if (!sku) {
     console.log(`[Pipedrive Products] Skipping product "${name}" - no SKU provided`);
     return null;
   }
   
   // First try to find existing product by SKU
-  let product = await findPipedriveProductBySku(userData, sku);
+  let product = await findPipedriveProductBySku(userData, sku, userId);
   
   // If not found, create new product
   if (!product) {
-    product = await createPipedriveProduct(userData, name, sku);
+    product = await createPipedriveProduct(userData, name, sku, userId);
   }
   
   return product;
 }
 
 // Attach a product to a Pipedrive deal
-async function attachProductToDeal(userData, dealId, productId, quantity, itemPrice) {
+async function attachProductToDeal(userData, dealId, productId, quantity, itemPrice, userId = null) {
   try {
     const attachData = {
       product_id: productId,
@@ -498,7 +535,7 @@ async function attachProductToDeal(userData, dealId, productId, quantity, itemPr
       quantity: quantity
     };
     
-    const result = await makePipedriveApiCall(userData, 'POST', `/api/v1/deals/${dealId}/products`, attachData);
+    const result = await makePipedriveApiCall(userData, 'POST', `/api/v1/deals/${dealId}/products`, attachData, userId);
     
     if (result.success && result.data) {
       console.log(`[Pipedrive Products] Attached product ${productId} to deal ${dealId} (qty: ${quantity}, price: ${itemPrice})`);
@@ -514,7 +551,7 @@ async function attachProductToDeal(userData, dealId, productId, quantity, itemPr
 }
 
 // Sync invoice line items to Pipedrive deal as products
-async function syncInvoiceProductsToDeal(userData, dealId, lineItems) {
+async function syncInvoiceProductsToDeal(userData, dealId, lineItems, userId = null) {
   if (!dealId) {
     console.log('[Pipedrive Products] No deal ID provided, skipping product sync');
     return { synced: 0, skipped: 0, errors: 0 };
@@ -545,11 +582,11 @@ async function syncInvoiceProductsToDeal(userData, dealId, lineItems) {
     
     try {
       // Find or create the product in Pipedrive
-      const product = await findOrCreatePipedriveProduct(userData, name, sku);
+      const product = await findOrCreatePipedriveProduct(userData, name, sku, userId);
       
       if (product) {
         // Attach to the deal
-        const attached = await attachProductToDeal(userData, dealId, product.id, quantity, unitPrice);
+        const attached = await attachProductToDeal(userData, dealId, product.id, quantity, unitPrice, userId);
         if (attached) {
           synced++;
         } else {
@@ -3965,8 +4002,8 @@ router.post("/api/invoices", express.json(), async (req, res) => {
       
       if (dealId && hasPipedriveToken) {
         try {
-          console.log(`[Pipedrive Products] Starting product sync for deal ${dealId}`);
-          pipedriveProductsSync = await syncInvoiceProductsToDeal(userData, dealId, lineItems);
+          console.log(`[Pipedrive Products] Starting product sync for deal ${dealId} (userId: ${actualUserId})`);
+          pipedriveProductsSync = await syncInvoiceProductsToDeal(userData, dealId, lineItems, actualUserId);
         } catch (pdError) {
           console.error('[Pipedrive Products] Error syncing products:', pdError.message);
           // Don't fail the invoice creation just because Pipedrive sync failed
