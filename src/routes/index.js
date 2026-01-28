@@ -2221,6 +2221,14 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
           if (line.DetailType === 'SalesItemLineDetail' && line.SalesItemLineDetail?.ItemRef?.value) {
             itemIds.add(line.SalesItemLineDetail.ItemRef.value);
           }
+          // Also collect item IDs from GroupLineDetail children
+          if (line.DetailType === 'GroupLineDetail' && line.GroupLineDetail?.Line) {
+            line.GroupLineDetail.Line.forEach(childLine => {
+              if (childLine.SalesItemLineDetail?.ItemRef?.value) {
+                itemIds.add(childLine.SalesItemLineDetail.ItemRef.value);
+              }
+            });
+          }
         });
       }
     });
@@ -2260,6 +2268,15 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
           if (line.DetailType === 'SalesItemLineDetail' && line.SalesItemLineDetail?.ItemRef?.value) {
             const itemId = line.SalesItemLineDetail.ItemRef.value;
             line.SalesItemLineDetail.Sku = itemSkuMap[itemId] || '';
+          }
+          // Also enrich GroupLineDetail children with SKU data
+          if (line.DetailType === 'GroupLineDetail' && line.GroupLineDetail?.Line) {
+            line.GroupLineDetail.Line.forEach(childLine => {
+              if (childLine.SalesItemLineDetail?.ItemRef?.value) {
+                const itemId = childLine.SalesItemLineDetail.ItemRef.value;
+                childLine.SalesItemLineDetail.Sku = itemSkuMap[itemId] || '';
+              }
+            });
           }
         });
       }
