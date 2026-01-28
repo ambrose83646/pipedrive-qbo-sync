@@ -2239,7 +2239,7 @@ router.get("/api/customer/:customerId/invoices", async (req, res) => {
     if (itemIds.size > 0) {
       try {
         const itemIdList = Array.from(itemIds).join("','");
-        const itemQuery = `SELECT Id, Name, Sku FROM Item WHERE Id IN ('${itemIdList}')`;
+        const itemQuery = `SELECT * FROM Item WHERE Id IN ('${itemIdList}')`;
         console.log(`[Invoices] SKU query:`, itemQuery);
         
         const itemResponse = await makeQBApiCall(actualUserId, userData, async (qbClient, currentUserData) => {
