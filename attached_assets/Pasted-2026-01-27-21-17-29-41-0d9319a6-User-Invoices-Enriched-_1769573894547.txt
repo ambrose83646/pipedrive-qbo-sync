@@ -1,0 +1,148 @@
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 496 with SKU: TC-TEAM-BOISE-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 496 with SKU: TC-TEAM-BOISE-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 592 with SKU: BLST-GRAV-AZST-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+'640': 'BLST-GRAV-TENN-FB-25'
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 496 with SKU: TC-TEAM-BOISE-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 496 with SKU: TC-TEAM-BOISE-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+'496': 'TC-TEAM-BOISE-FB-25',
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 601 with SKU: BLST-GRAV-FLORST-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 496 with SKU: TC-TEAM-BOISE-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Total items enriched with SKU: 13
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 587 with SKU: HOB-GRAV-ALAB-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[makeQBApiCall] API call successful, response type: object
+2026-01-27 21:17:29.41
+0d9319a6
+User
+'592': 'BLST-GRAV-AZST-FB-25',
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 640 with SKU: BLST-GRAV-TENN-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 601 with SKU: BLST-GRAV-FLORST-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 496 with SKU: TC-TEAM-BOISE-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Raw item response: [{"Name":"2025 Boise State Football Trading Cards","Sku":"TC-TEAM-BOISE-FB-25","Description":"810160089131","Active":true,"FullyQualifiedName":"2025 Boise State Football Trading Cards","Taxable":true,"UnitPrice":0,"Type":"Service","IncomeAccountRef":{"value":"31","name":"Sales of Product Income"},"PurchaseCost":0,"ExpenseAccountRef":{"value":"32","name":"Cost of Goods Sold"},"TrackQtyOnHand":false,"TaxClassificationRef":{"value":"EUC-99990202-V1-00020000","name":"Service marked taxable by its seller where seller accepts full responsibility"},"domain":"QBO","sparse":false,"Id":"496","SyncToken":"1","MetaData":{"CreateTime":"2025-08-01T13:54:52-07:00","LastUpdatedTime":"2025-11-24T09:21:06-08:00"}},{"Name":"ONIT Hat","Active":true,"SubItem":true,"ParentRef":{"value":"1010000081","name":"Apparel & Accessories"},"Level":1,"FullyQualifiedName":"Apparel & Accessories:ONIT Hat","Taxable":true,"UnitPrice":14.99,"Type":"NonInventory","IncomeAccountRef":{"value":"31","name":"Sales of Product Income"},"PurchaseDesc":"https://cdn.shopify.com/s/files/1/0719/6980/0492/files/OnitHat5.jpg?v=1747953109","PurchaseCost":7,"ExpenseAccountRef":{"value":"32","name":"Cost of Goods Sold"},"TrackQtyOnHand":false,"domain":"QBO","sparse":false,"Id":"492","SyncToken":"2","MetaData":{"CreateTime":"2025-05-30T13:25:34-07:00","LastUpdatedTime":"2025-11-24T09:22:52-08:00"}},{"Name":"Arizona State University Football 2025 ONIT Gravity Blaster Box","Sku":"BLST-GRAV-AZST-FB-25","Description":"Blaster Box 810199250502","Active":true,"SubItem":true,"ParentRef":{"value":"1010000091","name":"Sports Trading Cards"},"Level":1,"FullyQualifiedName":"Sports Trading Cards:Arizona State University Football 2025 ONIT Gravity Blaster Box","Taxable":true,"UnitPrice":29.99,"Type":"NonInventory","IncomeAccountRef":{"value":"31","name":"Sales of Product Income"},"PurchaseDesc":"Blaster Box","PurchaseCost":0,"ExpenseAccountRef":{"value":"32","name":"Cost of Goods Sold"},"TrackQtyOnHand":false,"TaxClassificationRef":{"value":"EUC-09020802-V1-00120000","name":"General taxable retail products - use this if nothing else fits"},"domain":"QBO","sparse":false,"Id":"592","SyncToken":"3","MetaData":{"CreateTime":"2025-11-17T07:39:21-08:00","LastUpdatedTime":"2025-11-24T09:21:07-08:00"}}]
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Fetched SKUs for 6 items, SKU map: {
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 601 with SKU: BLST-GRAV-FLORST-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[makeQBApiCall] Response has body: false, has json: true
+2026-01-27 21:17:29.41
+0d9319a6
+User
+'601': 'BLST-GRAV-FLORST-FB-25',
+2026-01-27 21:17:29.41
+0d9319a6
+User
+}
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 496 with SKU: TC-TEAM-BOISE-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+'587': 'HOB-GRAV-ALAB-FB-25',
+2026-01-27 21:17:29.41
+0d9319a6
+User
+'492': '',
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 496 with SKU: TC-TEAM-BOISE-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 496 with SKU: TC-TEAM-BOISE-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 592 with SKU: BLST-GRAV-AZST-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+'640': 'BLST-GRAV-TENN-FB-25'
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 496 with SKU: TC-TEAM-BOISE-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 496 with SKU: TC-TEAM-BOISE-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+'496': 'TC-TEAM-BOISE-FB-25',
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 601 with SKU: BLST-GRAV-FLORST-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 496 with SKU: TC-TEAM-BOISE-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Total items enriched with SKU: 13
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[Invoices] Enriched item 587 with SKU: HOB-GRAV-ALAB-FB-25
+2026-01-27 21:17:29.41
+0d9319a6
+User
+[makeQBApiCall] API call successful, response type: object
